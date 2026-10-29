@@ -18,9 +18,7 @@
 namespace ui::menu {
     using namespace style;
 
-    // ============================================
-    // STATE
-    // ============================================
+    /** Menu window state and coordinates */
     static float  ma     = 1.f;
     static int    tab    = 0;
     static bool   drag   = false;
@@ -30,9 +28,7 @@ namespace ui::menu {
     static constexpr float R  = 10.f;
     static constexpr float Rt = 6.f;
 
-    // ============================================
-    // ANIMATION
-    // ============================================
+    /** Animation and interpolation state */
     static std::unordered_map<std::string, float> g_nsAnim;
     static inline float NS_Anim(const std::string& key, float target, float speed = 14.f) {
         float dt = ImGui::GetIO().DeltaTime; if (dt <= 0.f) dt = 1.f/60.f;
@@ -52,9 +48,7 @@ namespace ui::menu {
                         (int)(ab+(bb-ab)*t),(int)(aa+(ba-aa)*t));
     }
 
-    // ============================================
-    // COLOR HELPERS
-    // ============================================
+    /** Theme color resolution helpers */
     static inline ImU32 C_TextMain()    { return col(UITheme::text,       content_alpha); }
     static inline ImU32 C_TextSec()     { return col(UITheme::text_dim,   content_alpha); }
     static inline ImU32 C_TextDim()     { return col(UITheme::text_dim,   content_alpha * 0.7f); }
@@ -69,9 +63,7 @@ namespace ui::menu {
     static inline ImU32 C_Success()     { return IM_COL32(52, 199, 89, (int)(content_alpha * 255)); }
     static inline ImU32 C_Danger()      { return IM_COL32(255, 69, 58, (int)(content_alpha * 255)); }
 
-    // ============================================
-    // CORE COMPONENTS
-    // ============================================
+    /** Custom glassmorphic UI card and layout widgets */
     static void NS_CardBegin(ImDrawList* dl, ImVec2 pos, float w, float h) {
         dl->AddRectFilled(pos, {pos.x+w, pos.y+h}, C_BgCard(), 8.f);
         dl->AddRect(pos, {pos.x+w, pos.y+h}, C_Border(), 8.f, 0, 1.f);
@@ -289,9 +281,7 @@ namespace ui::menu {
         ImGui::PopID();
     }
 
-    // ============================================
-    // TAB 0: DASHBOARD
-    // ============================================
+    /** Tab 0: System dashboard and live FPS/match stats */
     static void tab_dashboard(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
@@ -355,9 +345,7 @@ namespace ui::menu {
         ImGui::Dummy({0, 40});
     }
 
-    // ============================================
-    // TAB 1: ESP
-    // ============================================
+    /** Tab 1: Visual ESP controls and color settings */
     static void tab_esp(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
@@ -374,7 +362,7 @@ namespace ui::menu {
         ImGui::Dummy({0,0});
 
         float colW = (cw - 32 - 24) * 0.5f;
-        float card1H = 240.f;
+        float card1H = 180.f;
         ImVec2 cp = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp, cw, card1H);
         NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("ESP Features"), "Toggles");
@@ -385,21 +373,16 @@ namespace ui::menu {
         ImGui::SetColumnWidth(0, colW + 12);
         ImGui::SetColumnWidth(1, colW + 12);
 
-        NS_Toggle("esp_box",     oxorany("Box"),       &cfg::esp::box);
-        NS_Toggle("esp_name",    oxorany("Name"),      &cfg::esp::name);
-        NS_Toggle("esp_health",  oxorany("Health"),    &cfg::esp::health);
-        NS_Toggle("esp_armor",   oxorany("Armor"),     &cfg::esp::armor);
-        NS_Toggle("esp_dist",    oxorany("Distance"),  &cfg::esp::distance);
-        NS_Toggle("esp_bot",     oxorany("Bot Tag"),   &cfg::esp::bot_tag);
+        NS_Toggle("esp_tracer",  oxorany("ESP Line"),     &cfg::esp::tracer);
+        NS_Toggle("esp_box",     oxorany("ESP Box"),      &cfg::esp::box);
+        NS_Toggle("esp_skel",    oxorany("ESP Skeleton"), &cfg::esp::skeleton);
 
         ImGui::NextColumn();
 
-        NS_Toggle("esp_tracer",  oxorany("Tracer"),    &cfg::esp::tracer);
-        NS_Toggle("esp_skel",    oxorany("Skeleton"),  &cfg::esp::skeleton);
-        NS_Toggle("esp_cross",   oxorany("Crosshair"), &cfg::esp::crosshair);
-        NS_Toggle("esp_weapon",  oxorany("Weapon"),    &cfg::esp::weapon);
-        NS_Toggle("esp_fire",    oxorany("Firing"),    &cfg::esp::firing_ind);
-        NS_Toggle("esp_loot",    oxorany("Loot"),      &cfg::esp::loot);
+        NS_Toggle("esp_health",  oxorany("ESP Health"),   &cfg::esp::health);
+        NS_Toggle("esp_name",    oxorany("ESP Name"),     &cfg::esp::name);
+        NS_Toggle("esp_dist",    oxorany("ESP Distance"), &cfg::esp::distance);
+        NS_Toggle("esp_cross",   oxorany("Crosshair"),    &cfg::esp::crosshair);
 
         ImGui::Columns(1);
         ImGui::PopID();
@@ -431,35 +414,23 @@ namespace ui::menu {
         ImGui::SetCursorScreenPos({cpAim.x, cpAim.y+cardAimH+12});
         ImGui::Dummy({0,0});
 
-        // ── Card 3: Box Settings ──
+        // ── Card 3: Visual Settings ──
         float card2H = 180.f;
         ImVec2 cp2 = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp2, cw, card2H);
-        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Box Settings"));
+        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Visual Settings"));
         ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+44});
 
-        const char* box_types[] = { oxorany("Corner"), oxorany("Full"), oxorany("Glow") };
-        NS_ComboRow("box_type", oxorany("Box Type"), &cfg::esp::box_type, box_types, 3);
-        NS_Slider("box_th", oxorany("Thickness"),  &cfg::esp::box_thickness, 0.5f, 5.0f, "");
-        NS_Slider("box_rd", oxorany("Rounding"),   &cfg::esp::box_rounding,  0.f,  10.f, "");
+        const char* box_types[] = { oxorany("Corner"), oxorany("Full") };
+        NS_ComboRow("box_type", oxorany("Box Style"), &cfg::esp::box_type, box_types, 2);
+        NS_Slider("box_th", oxorany("Thickness"),  &cfg::esp::box_thickness, 0.5f, 3.0f, "");
+        NS_Slider("box_rd", oxorany("Rounding"),   &cfg::esp::box_rounding,  0.f,  8.f, "");
         NS_Slider("box_rg", oxorany("Max Range"),  &cfg::esp::max_range,     50.f, 500.f, "m");
 
         ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+12});
         ImGui::Dummy({0,0});
 
-        // ── Card 4: Loot Settings ──
-        float card3H = 100.f;
-        ImVec2 cp3 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp3, cw, card3H);
-        NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("Loot Settings"));
-        ImGui::SetCursorScreenPos({cp3.x+16, cp3.y+44});
-
-        NS_Slider("loot_rg", oxorany("Loot Range"), &cfg::esp::loot_range, 30.f, 300.f, "m");
-
-        ImGui::SetCursorScreenPos({cp3.x, cp3.y+card3H+12});
-        ImGui::Dummy({0,0});
-
-        // ── Card 5: Colors ──
+        // ── Card 4: Colors ──
         float card4H = 160.f;
         ImVec2 cp4 = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp4, cw, card4H);
@@ -474,9 +445,7 @@ namespace ui::menu {
         ImGui::Dummy({0, 40});
     }
 
-    // ============================================
-    // TAB 2: SETTINGS
-    // ============================================
+    /** Tab 2: Display, orientation flip, and system settings */
     static void tab_settings(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
@@ -533,9 +502,9 @@ namespace ui::menu {
         ImGui::Dummy({0, 40});
     }
 
-    // ============================================
-    // MAIN RENDER
-    // ============================================
+    /**
+     * @brief Master UI rendering routine. Draws ESP visuals, floating pill button, and main dialog.
+     */
     void render() {
         func::esp::draw();
         bar::render();

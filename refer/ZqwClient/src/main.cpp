@@ -23,9 +23,7 @@
 #define LOG_TAG "CLIENT"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 
-// ═══════════════════════════════════════════════════════════
-// ANSI COLOR
-// ═══════════════════════════════════════════════════════════
+/** ANSI terminal color escapes */
 #define RST        "\033[0m"
 #define BOLD       "\033[1m"
 #define FG_BRED    "\033[91m"
@@ -36,25 +34,17 @@
 #define FG_BCYAN   "\033[96m"
 #define FG_BWHITE  "\033[97m"
 
-// ═══════════════════════════════════════════════════════════
-//  FLAG GLOBAL
-// ═══════════════════════════════════════════════════════════
+/** Global overlay lifecycle flags */
 std::atomic<bool> g_menu_started{true};
 extern float global_anim_time;
 
-// ═══════════════════════════════════════════════════════════
-// BYPASS
-// ═══════════════════════════════════════════════════════════
+/** Bypass initialization routine */
 extern "C" void init_bypass();
 
-// ═══════════════════════════════════════════════════════════
-// GLOBAL
-// ═══════════════════════════════════════════════════════════
+/** Recording protection flag */
 bool g_hideRecord = false;
 
-// ═══════════════════════════════════════════════════════════
-// TARGET GAME
-// ═══════════════════════════════════════════════════════════
+/** Supported target game variants */
 enum TargetGame {
     GAME_FF     = 0,
     GAME_FF_MAX = 1
@@ -74,9 +64,10 @@ static const char* GetTargetPackage() {
     return (g_targetGame == GAME_FF) ? kFFPackage : kFFMaxPackage;
 }
 
-// ═══════════════════════════════════════════════════════════
-// LAUNCH TARGET
-// ═══════════════════════════════════════════════════════════
+/**
+ * @brief Silently launches the target activity via Android activity manager.
+ * @return True if process execution was dispatched successfully.
+ */
 static bool launch_target_silent() {
     pid_t pid = fork();
     if (pid < 0) return false;
@@ -91,9 +82,10 @@ static bool launch_target_silent() {
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
-// ═══════════════════════════════════════════════════════════
-// ATTACH / LAUNCH
-// ═══════════════════════════════════════════════════════════
+/**
+ * @brief Resolves target game PID, launching the application if not already running.
+ * @return Positive PID upon success, or -1 on failure.
+ */
 static int attach_or_launch() {
     proc::pid = get_pid();
     if (proc::pid > 0) {
@@ -113,21 +105,20 @@ static int attach_or_launch() {
     return -1;
 }
 
-// ═══════════════════════════════════════════════════════════
-// BANNER
-// ═══════════════════════════════════════════════════════════
+/**
+ * @brief Prints client startup header to standard output.
+ */
 static void print_banner() {
     printf("\n");
-    printf(FG_BCYAN BOLD "  ╔═══════════════════════════════════════════════╗\n" RST);
-    printf(FG_BCYAN "  ║" RST FG_BMAGENTA BOLD "               NINMODS CLIENT                  " RST FG_BCYAN "║\n" RST);
-    printf(FG_BCYAN "  ║" RST FG_BCYAN        "          Purple Glass Edition (v1.0)          " RST FG_BCYAN "║\n" RST);
-    printf(FG_BCYAN "  ╚═══════════════════════════════════════════════╝\n" RST);
+    printf(FG_BCYAN BOLD "  [ NINMODS CLIENT ]\n" RST);
+    printf(FG_BCYAN      "  Purple Glass Edition (v1.0)\n" RST);
     printf("\n");
 }
 
-// ═══════════════════════════════════════════════════════════
-// START OVERLAY
-// ═══════════════════════════════════════════════════════════
+/**
+ * @brief Initializes native surface, touch system, bypass, memory hook, and render loop.
+ * @return 0 on exit, or -1 on initialization failure.
+ */
 static int start_overlay() {
     LOGI("=== Starting Client Overlay ===");
 
@@ -196,9 +187,7 @@ static int start_overlay() {
     printf(FG_BGREEN BOLD "  ⭐ Menu Started Successfully! ⭐\n" RST);
     fflush(stdout);
 
-    // ═══════════════════════════════════════════════════════
-    //  MAIN LOOP
-    // ═══════════════════════════════════════════════════════
+    /** Main rendering loop */
     while (true) {
         global_anim_time += 0.016f;
         drawBegin();
@@ -209,9 +198,12 @@ static int start_overlay() {
     return 0;
 }
 
-// ═══════════════════════════════════════════════════════════
-// MAIN
-// ═══════════════════════════════════════════════════════════
+/**
+ * @brief Application entry point.
+ * @param argc Argument count.
+ * @param argv Argument vectors.
+ * @return Exit status code.
+ */
 int main(int argc, char** argv) {
     print_banner();
 

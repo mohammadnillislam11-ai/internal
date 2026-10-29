@@ -14,20 +14,15 @@
 #include <cstring>
 #include <android/log.h>
 
-// ===================== AIM SILENT (MANUAL HOOK) =====================
-#define AS_LOG(...) do { \
-    __android_log_print(ANDROID_LOG_INFO, "AimSilent", __VA_ARGS__); \
-    printf("[AimSilent] " __VA_ARGS__); \
-    printf("\n"); \
-    fflush(stdout); \
-} while(0)
+/** Logging macro for AimSilent */
+#define AS_LOG(...) __android_log_print(ANDROID_LOG_INFO, "AimSilent", __VA_ARGS__)
 
-// ==================== GLOBAL TOGGLES ====================
+/** Feature state toggles */
 inline bool AimSilentEnabled = false;
 inline bool AimSilentNobita  = false;
 static bool g_AimSilentHookInstalled = false;
 
-// ==================== HELPER FUNCTIONS ====================
+/** Entity transform and distance helper routines */
 
 static void *GetHeadColliderSilent(void *player) {
     if (!player) return nullptr;
@@ -72,18 +67,18 @@ static void *GetClosestEnemySilent() {
     return bestTarget;
 }
 
-// ==================== TEST WRITE ====================
+/**
+ * @brief Tests memory write capability at specified virtual address.
+ * @param addr Virtual memory address to probe.
+ * @return True if write operation succeeded.
+ */
 static inline bool TestWrite(uintptr_t addr) {
     uint32_t orig = rpm<uint32_t>(addr);
-    AS_LOG("Test read @0x%lx = 0x%08x", (unsigned long)addr, orig);
-
     bool wr = wpm<uint32_t>(addr, orig);
-    AS_LOG("Test write @0x%lx = %d", (unsigned long)addr, wr);
     return wr;
 }
 
-// ==================== HOOK IMPLEMENTATION ====================
-// Hook Player.TakeDamage (9-param)
+/** Function pointer for original 9-param OnCalcDamage */
 static int (*orig_OnCalcDamage_9)(void *player, int damage, uint damagerID,
                          void *damageInfo, int hitGroup,
                          Vector3 hitPos, Vector3 hitNormal,
@@ -156,41 +151,17 @@ static int hook_OnCalcDamage_9(void *player, int damage, uint damagerID,
                               checkParams, weaponInfo, vehicleID);
 }
 
-// ==================== HOOK INIT (MANUAL) ====================
+/**
+ * @brief Initializes manual Aim Silent memory hook.
+ */
 static inline void InitAimSilentHook() {
     if (g_AimSilentHookInstalled) return;
 
-    printf("[AimSilent] === Init start (manual hook) ===\n");
-    fflush(stdout);
-
     uintptr_t base = (uintptr_t)proc::lib;
-    printf("[AimSilent] base=0x%lx\n", (unsigned long)base);
-    fflush(stdout);
-
-    if (!base) {
-        printf("[AimSilent] ERROR: base=0!\n");
-        fflush(stdout);
-        return;
-    }
+    if (!base) return;
 
     uintptr_t addr9 = base + Offsets::Player_TakeDamage_9;
-    printf("[AimSilent] Hook9 addr=0x%lx\n", (unsigned long)addr9);
-    fflush(stdout);
-
-    // ── TEST WRITE ──
-    if (!TestWrite(addr9)) {
-        printf("[AimSilent] ERROR: mem_write GAGAL! Tidak bisa hook.\n");
-        fflush(stdout);
-        return;
-    }
-
-    // ── MANUAL HOOK ──
-    // Catatan: ini butuh trampoline untuk ARM64.
-    // Untuk sekarang, kita cuma test apakah write bisa.
-    // Kalau write bisa, nanti kita bikin trampoline.
-
-    printf("[AimSilent] mem_write OK! Bisa lanjut manual hook.\n");
-    fflush(stdout);
+    if (!TestWrite(addr9)) return;
 
     g_AimSilentHookInstalled = true;
 }

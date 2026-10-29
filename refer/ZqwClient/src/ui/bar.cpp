@@ -15,9 +15,7 @@ static float ease(float t) { return -(cosf(3.14159265f * t) - 1.f) / 2.f; }
 void set_game_alpha(float a) { g_game_alpha = a; }
 float game_alpha() { return g_game_alpha; }
 
-// ============================================
-// ICON FPS
-// ============================================
+/** Floating FPS indicator position and drag status */
 static float g_fps_x = -1.f;
 static float g_fps_y = -1.f;
 static bool g_fps_drag = false;
@@ -107,9 +105,7 @@ static void render_fps_icon(float alpha) {
                     {g_fps_x + 9.f, g_fps_y + h - 6.f},
                     IM_COL32(192, 132, 252, (int)(255 * alpha)), 2.f);
 
-  // ============================================
-  // TEXT NAME "nin" & FPS (NO LOGO)
-  // ============================================
+  /** Brand label "nin" and live FPS reading */
   ImFont *font = ImGui::GetFont();
   if (font) {
     // Text "nin"
@@ -133,9 +129,7 @@ static void render_fps_icon(float alpha) {
   }
 }
 
-// ============================================
-// RENDER - icon FPS hanya saat menu tertutup
-// ============================================
+/** Floating indicator renderer (visible when menu is minimized) */
 void render() {
   static float prog = 0.f;
   float dt = ImGui::GetIO().DeltaTime;

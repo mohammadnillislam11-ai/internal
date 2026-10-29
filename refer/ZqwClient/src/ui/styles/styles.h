@@ -9,18 +9,14 @@
 inline float g_sw, g_sh;
 
 namespace UITheme {
-    // ═══════════════════════════════════════════════════════════
-    // GLASS BACKGROUND (PURPLE GLASSMORPHISM - TRANSLUCENT)
-    // ═══════════════════════════════════════════════════════════
+    /** Translucent purple acrylic glass background palettes */
     inline ImVec4 bg           = ImVec4(14/255.f, 10/255.f, 26/255.f, 0.82f);
     inline ImVec4 bg_two       = ImVec4(20/255.f, 14/255.f, 36/255.f, 0.75f);
     inline ImVec4 sidebar      = ImVec4(20/255.f, 14/255.f, 36/255.f, 0.78f);
     inline ImVec4 panel        = ImVec4(30/255.f, 20/255.f, 54/255.f, 0.60f);
     inline ImVec4 widget       = ImVec4(44/255.f, 28/255.f, 76/255.f, 0.65f);
 
-    // ═══════════════════════════════════════════════════════════
-    // ACCENT — VIBRANT NEON PURPLE
-    // ═══════════════════════════════════════════════════════════
+    /** Neon purple accent shades */
     inline ImVec4 accent       = ImVec4(168/255.f, 85/255.f, 247/255.f, 1.f);
     inline ImVec4 accent_light = ImVec4(192/255.f, 132/255.f, 252/255.f, 1.f);
     inline ImVec4 accent_dark  = ImVec4(126/255.f, 34/255.f, 206/255.f, 1.f);
@@ -35,9 +31,7 @@ namespace UITheme {
     inline ImVec4 warning      = ImVec4(251/255.f, 191/255.f, 36/255.f, 1.f);
     inline ImVec4 danger       = ImVec4(248/255.f, 113/255.f, 113/255.f, 1.f);
 
-    // ═══════════════════════════════════════════════════════════
-    // BORDER (FROSTED GLASS PURPLE BORDERS)
-    // ═══════════════════════════════════════════════════════════
+    /** Frosted glass border styling */
     inline ImVec4 border       = ImVec4(168/255.f, 85/255.f, 247/255.f, 0.38f);
     inline ImVec4 border_light = ImVec4(192/255.f, 132/255.f, 252/255.f, 0.55f);
     inline ImVec4 border_dark  = ImVec4(35/255.f, 20/255.f, 60/255.f, 0.60f);

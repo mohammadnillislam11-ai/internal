@@ -13,9 +13,7 @@
 
 namespace func::esp {
 
-    // ═══════════════════════════════════════════════════════
-    // HELPER COLOR
-    // ═══════════════════════════════════════════════════════
+    /** Color and alpha helper utilities */
     inline ImU32 toU32(const ImVec4& c, float alphaMul = 1.f) {
         return IM_COL32(
             (int)(c.x * 255.f),
@@ -31,7 +29,7 @@ namespace func::esp {
     }
 
     inline ImU32 fadeDist(ImU32 base, float dist, float maxRange) {
-        float t = ImClamp(1.f - dist / maxRange, 0.35f, 1.f);
+        float t = ImClamp(1.f - dist / maxRange, 0.40f, 1.f);
         return withAlpha(base, t);
     }
 
@@ -43,15 +41,8 @@ namespace func::esp {
         return IM_COL32((int)(r*255), (int)(g*255), (int)(b*255), 255);
     }
 
-    inline ImU32 armorColor(float t) {
-        t = ImClamp(t, 0.f, 1.f);
-        return IM_COL32((int)(80 + 100 * t), (int)(180 + 60 * t), 255, 255);
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // FORMAT
-    // ═══════════════════════════════════════════════════════
-    inline bool ok(const Vector3& v) { return v.x > 0 && v.y > 0; }
+    /** Vector validation and string formatting routines */
+    inline bool ok(const Vector3& v) { return v.x > 0.f && v.y > 0.f; }
 
     inline void fmtDist(float d, char* out, size_t n) {
         if (d >= 1000.f) snprintf(out, n, "%.1fkm", d / 1000.f);
@@ -65,22 +56,14 @@ namespace func::esp {
         snprintf(out, n, "%.11s.", src);
     }
 
-    // ═══════════════════════════════════════════════════════
-    // CONSTANTS
-    // ═══════════════════════════════════════════════════════
+    /** Visual constants */
     static constexpr ImU32 C_SHADOW = IM_COL32(0, 0, 0, 180);
     static constexpr ImU32 C_BORDER = IM_COL32(255, 255, 255, 40);
-
-    // ── FONT SIZE (kecil, seimbang) ──
     static constexpr float ESP_FONT_SIZE = 12.f;
-    static constexpr float PANEL_ROW_H   = ESP_FONT_SIZE + 5.f;   // 17px
+    static constexpr float PANEL_ROW_H   = ESP_FONT_SIZE + 4.f;
+    static constexpr float PANEL_TOP_OFFSET = 18.f;
 
-    // ── PANEL OFFSET DARI KEPALA (jauh di atas) ──
-    static constexpr float PANEL_TOP_OFFSET = 35.f;
-
-    // ═══════════════════════════════════════════════════════
-    // SKELETON BOX — hitung bounding box dari bone points
-    // ═══════════════════════════════════════════════════════
+    /** Bounding box computed from bone joints */
     struct SkeletonBox {
         ImVec2 tl, br;
         bool   valid;
@@ -90,7 +73,7 @@ namespace func::esp {
         SkeletonBox sb{ {0,0}, {0,0}, false };
 
         const Vector3* pts[] = {
-            &p.Head, &p.Breast, &p.Hip,
+            &p.Head,      &p.Breast,    &p.Hip,
             &p.LShoulder, &p.RShoulder,
             &p.LForeArm,  &p.RForeArm,
             &p.LHand,     &p.RHand,
@@ -124,128 +107,112 @@ namespace func::esp {
             sb.valid = true;
         }
 
-        const float padX = 4.f;
-        const float padY = 3.f;
+        const float padX = 3.f;
+        const float padY = 2.f;
 
         sb.tl = ImVec2(minX - padX, minY - padY);
         sb.br = ImVec2(maxX + padX, maxY + padY);
         return sb;
     }
 
-    // ═══════════════════════════════════════════════════════
-    // NAME PANEL
-    // ═══════════════════════════════════════════════════════
+    /**
+     * @brief Renders clean name, distance, and health indicator above an entity.
+     * @param dl ImGui foreground draw list.
+     * @param p Player snapshot data.
+     * @param cx Entity horizontal center.
+     * @param top_y Entity topmost boundary Y position.
+     */
     inline void drawNamePanel(ImDrawList* dl, const PlayerData& p,
                               float cx, float top_y) {
-        if (!cfg::esp::name && !cfg::esp::distance &&
-            !cfg::esp::health && !cfg::esp::armor) return;
+        if (!cfg::esp::name && !cfg::esp::distance && !cfg::esp::health) return;
 
-        char nameBuf[24];
-        truncName(p.name, nameBuf, sizeof(nameBuf));
-        if (nameBuf[0] == 0)
-            snprintf(nameBuf, sizeof(nameBuf), "%s", p.isBot ? "BOT" : "Player");
+        char nameBuf[24] = {0};
+        if (cfg::esp::name) {
+            truncName(p.name, nameBuf, sizeof(nameBuf));
+            if (nameBuf[0] == 0)
+                snprintf(nameBuf, sizeof(nameBuf), "%s", p.isBot ? "BOT" : "Player");
+        }
 
-        char distBuf[16];
-        fmtDist(p.distance, distBuf, sizeof(distBuf));
+        char distBuf[16] = {0};
+        if (cfg::esp::distance) {
+            fmtDist(p.distance, distBuf, sizeof(distBuf));
+        }
 
         ImU32 nameCol = toU32(cfg::esp::name_col);
         ImU32 distCol = toU32(cfg::esp::distance_col);
-        ImU32 visTag  = IM_COL32(30, 100, 220, 240);
-        ImU32 botTag  = IM_COL32(200, 40, 40, 240);
-
-        const char* tag = cfg::esp::bot_tag ? (p.isBot ? "AI" : "PL") : nullptr;
-        ImU32 tagBg = p.isBot ? botTag : visTag;
-
-        ImU32 bgMain    = p.isVisible ? IM_COL32(12, 12, 16, 235) : IM_COL32(35, 35, 42, 215);
-        ImU32 textColor = p.isVisible ? nameCol : withAlpha(nameCol, 0.65f);
+        ImU32 bgMain  = p.isVisible ? IM_COL32(12, 12, 16, 230) : IM_COL32(28, 28, 34, 200);
 
         const float fs   = ESP_FONT_SIZE;
-        const float padX = 5.f;
+        const float padX = 4.f;
         const float padY = 2.f;
-        const float gap  = 3.f;
+        const float gap  = 4.f;
 
-        float tagW  = tag ? ImGui::CalcTextSize(tag).x + padX * 2.f : 0.f;
-        float nameW = cfg::esp::name
-                      ? ImGui::CalcTextSize(nameBuf).x + padX * 2.f : 0.f;
-        float distW = cfg::esp::distance
-                      ? ImGui::CalcTextSize(distBuf).x + padX * 2.f : 0.f;
+        float nameW = cfg::esp::name ? ImGui::CalcTextSize(nameBuf).x + padX * 2.f : 0.f;
+        float distW = cfg::esp::distance ? ImGui::CalcTextSize(distBuf).x + padX * 2.f : 0.f;
 
-        float rowH = PANEL_ROW_H;
-        float totalW = tagW;
-        if (nameW > 0.f) totalW += (totalW > 0.f ? gap : 0.f) + nameW;
+        float totalW = nameW;
         if (distW > 0.f) totalW += (totalW > 0.f ? gap : 0.f) + distW;
-        if (totalW <= 0.f) return;
 
-        float bx = cx - totalW * 0.5f;
-        float by = top_y - rowH - PANEL_TOP_OFFSET;
+        if (totalW > 0.f) {
+            float rowH = PANEL_ROW_H;
+            float bx = cx - totalW * 0.5f;
+            float by = top_y - rowH - PANEL_TOP_OFFSET;
 
-        dl->AddRectFilled({bx + 1, by + 1}, {bx + totalW + 1, by + rowH + 1},
-                          C_SHADOW, 4.f);
-        dl->AddRectFilled({bx, by}, {bx + totalW, by + rowH}, bgMain, 4.f);
-        dl->AddRect({bx, by}, {bx + totalW, by + rowH}, C_BORDER, 4.f, 0, 1.f);
+            dl->AddRectFilled({bx, by}, {bx + totalW, by + rowH}, bgMain, 3.f);
+            dl->AddRect({bx, by}, {bx + totalW, by + rowH}, C_BORDER, 3.f, 0, 1.f);
 
-        float cursorX = bx;
+            float cursorX = bx;
+            if (cfg::esp::name) {
+                ImVec2 ts = ImGui::CalcTextSize(nameBuf);
+                dl->AddText(ImGui::GetFont(), fs,
+                    {cursorX + padX, by + padY},
+                    p.isVisible ? nameCol : withAlpha(nameCol, 0.70f), nameBuf);
+                cursorX += nameW;
+            }
 
-        if (tag) {
-            dl->AddRectFilled({cursorX, by}, {cursorX + tagW, by + rowH},
-                              withAlpha(tagBg, p.isVisible ? 1.f : 0.65f),
-                              4.f, ImDrawFlags_RoundCornersLeft);
-            ImVec2 ts = ImGui::CalcTextSize(tag);
-            dl->AddText(ImGui::GetFont(), fs,
-                {cursorX + (tagW - ts.x) * 0.5f, by + padY},
-                IM_COL32(255, 255, 255, 255), tag);
-            cursorX += tagW;
-        }
+            if (cfg::esp::distance) {
+                if (cursorX > bx) cursorX += gap;
+                dl->AddText(ImGui::GetFont(), fs,
+                    {cursorX + padX, by + padY},
+                    p.isVisible ? distCol : withAlpha(distCol, 0.70f), distBuf);
+            }
 
-        if (cfg::esp::name) {
-            if (tag) cursorX += gap;
-            ImVec2 ts = ImGui::CalcTextSize(nameBuf);
-            dl->AddText(ImGui::GetFont(), fs,
-                {cursorX + (nameW - ts.x) * 0.5f, by + padY},
-                textColor, nameBuf);
-            cursorX += nameW;
-        }
+            // Health bar directly under the info pill
+            if (cfg::esp::health) {
+                float barY = by + rowH + 2.f;
+                float barH = 2.5f;
+                float hp01 = p.maxHP > 0 ? (float)p.curHP / (float)p.maxHP : 0.f;
+                hp01 = ImClamp(hp01, 0.f, 1.f);
 
-        if (cfg::esp::distance) {
-            if (cursorX > bx) cursorX += gap;
-            ImVec2 ts = ImGui::CalcTextSize(distBuf);
-            ImU32 dCol = p.isVisible ? distCol : withAlpha(distCol, 0.65f);
-            dl->AddText(ImGui::GetFont(), fs,
-                {cursorX + (distW - ts.x) * 0.5f, by + padY}, dCol, distBuf);
-        }
-
-        float barY = by + rowH + 2.f;
-        float barH = 3.f;
-        float barOffset = 0.f;
-
-        if (cfg::esp::health) {
+                dl->AddRectFilled({bx, barY}, {bx + totalW, barY + barH},
+                                  IM_COL32(0, 0, 0, 200), 1.5f);
+                dl->AddRectFilled({bx, barY}, {bx + totalW * hp01, barY + barH},
+                                  hpColor(hp01), 1.5f);
+            }
+        } else if (cfg::esp::health) {
+            // Standalone health bar if name and distance are disabled
+            float barW = 40.f;
+            float barH = 3.f;
+            float bx = cx - barW * 0.5f;
+            float by = top_y - barH - 8.f;
             float hp01 = p.maxHP > 0 ? (float)p.curHP / (float)p.maxHP : 0.f;
             hp01 = ImClamp(hp01, 0.f, 1.f);
 
-            dl->AddRectFilled({bx, barY}, {bx + totalW, barY + barH},
-                              IM_COL32(0, 0, 0, 210), barH * 0.5f);
-            dl->AddRectFilled({bx, barY}, {bx + totalW * hp01, barY + barH},
-                              hpColor(hp01), barH * 0.5f);
-            dl->AddRect({bx, barY}, {bx + totalW, barY + barH},
-                        C_BORDER, barH * 0.5f, 0, 1.f);
-            barOffset = barH + 1.f;
-        }
-
-        if (cfg::esp::armor && p.curArmor > 0) {
-            float arm01 = ImClamp((float)p.curArmor / 100.f, 0.f, 1.f);
-            float armY  = barY + barOffset;
-            float armH  = 2.5f;
-
-            dl->AddRectFilled({bx, armY}, {bx + totalW, armY + armH},
-                              IM_COL32(0, 0, 0, 210), armH * 0.5f);
-            dl->AddRectFilled({bx, armY}, {bx + totalW * arm01, armY + armH},
-                              armorColor(arm01), armH * 0.5f);
+            dl->AddRectFilled({bx, by}, {bx + barW, by + barH},
+                              IM_COL32(0, 0, 0, 200), 1.5f);
+            dl->AddRectFilled({bx, by}, {bx + barW * hp01, by + barH},
+                              hpColor(hp01), 1.5f);
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    // BOX
-    // ═══════════════════════════════════════════════════════
+    /**
+     * @brief Renders 2D bounding box (corners or clean outline).
+     * @param dl ImGui foreground draw list.
+     * @param tl Top-left coordinate.
+     * @param br Bottom-right coordinate.
+     * @param col Primary outline color.
+     * @param type Box rendering variant (0 = Corner brackets, 1 = Full outline).
+     */
     inline void drawBox(ImDrawList* dl, ImVec2 tl, ImVec2 br, ImU32 col, int type) {
         float thick = cfg::esp::box_thickness;
         float round = cfg::esp::box_rounding;
@@ -263,43 +230,35 @@ namespace func::esp {
                 {{br.x, br.y - len}, {br.x, br.y}},
             };
             for (auto& s : pts) {
-                dl->AddLine(s[0], s[1], withAlpha(col, 0.25f), thick + 3.f);
-                dl->AddLine({s[0].x + 1, s[0].y + 1},
-                            {s[1].x + 1, s[1].y + 1}, C_SHADOW, thick + 1.f);
                 dl->AddLine(s[0], s[1], col, thick);
             }
-        } else if (type == 1) {
-            dl->AddRect({tl.x + 2, tl.y + 2}, {br.x + 2, br.y + 2},
-                        IM_COL32(0, 0, 0, 120), round, 0, thick + 3.f);
-            dl->AddRect(tl, br, withAlpha(col, 0.35f), round, 0, thick + 2.f);
-            dl->AddRect(tl, br, col, round, 0, thick);
         } else {
-            dl->AddRect(tl, br, withAlpha(col, 0.18f), round, 0, thick + 5.f);
-            dl->AddRect(tl, br, withAlpha(col, 0.45f), round, 0, thick + 2.f);
             dl->AddRect(tl, br, col, round, 0, thick);
-            dl->AddRectFilled(tl, br, withAlpha(col, 0.06f), round);
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    // SKELETON
-    // ═══════════════════════════════════════════════════════
+    /** Bone link segment renderer */
     inline void sLine(ImDrawList* dl, const Vector3& a, const Vector3& b,
-                      ImU32 col, float t = 1.6f) {
+                      ImU32 col, float t = 1.0f) {
         if (!ok(a) || !ok(b)) return;
-        dl->AddLine({a.x, a.y}, {b.x, b.y}, withAlpha(col, 0.25f), t + 2.f);
         dl->AddLine({a.x, a.y}, {b.x, b.y}, col, t);
     }
 
-    inline void sDot(ImDrawList* dl, const Vector3& v, ImU32 col, float r = 2.4f) {
+    /** Bone joint dot renderer */
+    inline void sDot(ImDrawList* dl, const Vector3& v, ImU32 col, float r = 2.0f) {
         if (!ok(v)) return;
-        dl->AddCircleFilled({v.x, v.y}, r + 2.f, withAlpha(col, 0.25f));
         dl->AddCircleFilled({v.x, v.y}, r, col);
     }
 
+    /**
+     * @brief Renders anatomical bone connections and joint dots.
+     * @param dl ImGui foreground draw list.
+     * @param p Player snapshot data.
+     * @param col Skeleton line color.
+     */
     inline void drawSkeleton(ImDrawList* dl, const PlayerData& p, ImU32 col) {
-        sLine(dl, p.Head, p.Breast, col, 1.8f);
-        sLine(dl, p.Breast, p.Hip, col, 1.8f);
+        sLine(dl, p.Head, p.Breast, col, 1.2f);
+        sLine(dl, p.Breast, p.Hip, col, 1.2f);
 
         sLine(dl, p.Breast, p.LShoulder, col);
         sLine(dl, p.Breast, p.RShoulder, col);
@@ -308,187 +267,56 @@ namespace func::esp {
         sLine(dl, p.LForeArm, p.LHand, col);
         sLine(dl, p.RForeArm, p.RHand, col);
 
-        sLine(dl, p.Hip, p.LAnkle, col, 1.8f);
-        sLine(dl, p.Hip, p.RAnkle, col, 1.8f);
+        sLine(dl, p.Hip, p.LAnkle, col, 1.2f);
+        sLine(dl, p.Hip, p.RAnkle, col, 1.2f);
         sLine(dl, p.LAnkle, p.LToe, col);
         sLine(dl, p.RAnkle, p.RToe, col);
 
-        sDot(dl, p.Head, col, 2.8f);
-        sDot(dl, p.Breast, col, 2.4f);
-        sDot(dl, p.Hip, col, 2.4f);
-        sDot(dl, p.LShoulder, col, 2.0f);
-        sDot(dl, p.RShoulder, col, 2.0f);
-        sDot(dl, p.LHand, col, 2.0f);
-        sDot(dl, p.RHand, col, 2.0f);
-        sDot(dl, p.LAnkle, col, 2.0f);
-        sDot(dl, p.RAnkle, col, 2.0f);
+        sDot(dl, p.Head, col, 2.2f);
+        sDot(dl, p.Breast, col, 2.0f);
+        sDot(dl, p.Hip, col, 2.0f);
+        sDot(dl, p.LShoulder, col, 1.8f);
+        sDot(dl, p.RShoulder, col, 1.8f);
+        sDot(dl, p.LHand, col, 1.8f);
+        sDot(dl, p.RHand, col, 1.8f);
+        sDot(dl, p.LAnkle, col, 1.8f);
+        sDot(dl, p.RAnkle, col, 1.8f);
     }
 
-    // ═══════════════════════════════════════════════════════
-    // FIRING
-    // ═══════════════════════════════════════════════════════
-    inline void drawFiring(ImDrawList* dl, const PlayerData& p, float cx, float ty) {
-        if (!p.isFiring) return;
-        float t = ImGui::GetTime();
-        float pulse = 0.5f + 0.5f * sinf(t * 12.f);
-        float r = 3.f + pulse * 1.2f;
-        ImVec2 pos(cx, ty - 20.f);
-
-        dl->AddCircleFilled(pos, r + 4.f,
-            IM_COL32(255, 200, 40, (int)(70 * pulse)));
-        dl->AddCircleFilled(pos, r, IM_COL32(255, 200, 40, 255));
-        dl->AddCircle(pos, r + 1.f, IM_COL32(255, 255, 255, 210), 16, 1.2f);
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // WEAPON PILL
-    // ═══════════════════════════════════════════════════════
-    inline void drawWeapon(ImDrawList* dl, const PlayerData& p, ImVec2 foot) {
-        if (p.weaponType < 0) return;
-        static const char* kNames[] = {
-            "AR","SNIPER","SMG","SHOTGUN","PISTOL","MELEE",
-            "GRENADE","LMG","RIFLE","MARKSMAN","SPECIAL"
-        };
-        const char* wn = (p.weaponType < (int)(sizeof(kNames)/sizeof(*kNames)))
-                         ? kNames[p.weaponType] : "WPN";
-
-        const float fs   = ESP_FONT_SIZE - 2.f;
-        const float padX = 6.f;
-        const float padY = 3.f;
-
-        ImVec2 ts = ImGui::CalcTextSize(wn);
-        float pw = ts.x + padX * 2.f;
-        float ph = fs + padY * 2.f;
-        float px = foot.x - pw * 0.5f;
-        float py = foot.y + 4.f;
-
-        ImU32 wCol = toU32(cfg::esp::weapon_col);
-        ImU32 bg   = p.isVisible ? IM_COL32(0, 0, 0, 210) : IM_COL32(0, 0, 0, 150);
-
-        dl->AddRectFilled({px + 1, py + 1}, {px + pw + 1, py + ph + 1},
-                          C_SHADOW, 5.f);
-        dl->AddRectFilled({px, py}, {px + pw, py + ph}, bg, 5.f);
-        dl->AddRect({px, py}, {px + pw, py + ph}, C_BORDER, 5.f, 0, 1.f);
-        dl->AddText(ImGui::GetFont(), fs,
-            {px + padX, py + padY}, wCol, wn);
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // LOOT
-    // ═══════════════════════════════════════════════════════
-    inline const char* lootCat(uint32_t resID) {
-        uint32_t c = (resID >> 24) & 0xFF;
-        switch (c) {
-            case 0x01: return "GUN";
-            case 0x02: return "AMMO";
-            case 0x03: return "ARMOR";
-            case 0x04: return "HEAL";
-            case 0x05: return "NADE";
-            case 0x06: return "BAG";
-            default:   return "ITEM";
-        }
-    }
-
-    inline ImU32 lootColor(const char* cat) {
-        if (strcmp(cat, "GUN")   == 0) return IM_COL32(255, 100, 100, 255);
-        if (strcmp(cat, "AMMO")  == 0) return IM_COL32(255, 200, 80, 255);
-        if (strcmp(cat, "ARMOR") == 0) return IM_COL32(80, 180, 255, 255);
-        if (strcmp(cat, "HEAL")  == 0) return IM_COL32(80, 255, 120, 255);
-        if (strcmp(cat, "NADE")  == 0) return IM_COL32(200, 80, 255, 255);
-        if (strcmp(cat, "BAG")   == 0) return IM_COL32(160, 120, 60, 255);
-        return IM_COL32(200, 200, 200, 255);
-    }
-
-    inline void drawLootLabel(ImDrawList* dl, const LootItem& li) {
-        const char* cat = lootCat(li.resID);
-        ImU32 col = lootColor(cat);
-
-        char buf[64];
-        snprintf(buf, sizeof(buf), "%s  %.0fm", cat, li.distance);
-
-        ImVec2 ts = ImGui::CalcTextSize(buf);
-        float pad = 4.f;
-        float px = li.screenPos.x - ts.x * 0.5f - pad;
-        float py = li.screenPos.y;
-
-        dl->AddRectFilled({px + 1, py + 1},
-                          {px + ts.x + pad * 2 + 1, py + ts.y + pad * 2 + 1},
-                          C_SHADOW, 4.f);
-        dl->AddRectFilled({px, py},
-                          {px + ts.x + pad * 2, py + ts.y + pad * 2},
-                          IM_COL32(15, 15, 20, 220), 4.f);
-        dl->AddRect({px, py},
-                    {px + ts.x + pad * 2, py + ts.y + pad * 2},
-                    col, 4.f, 0, 1.5f);
-
-        dl->AddText(ImGui::GetFont(), ESP_FONT_SIZE - 2.f,
-                    {px + pad, py + pad}, col, buf);
-        dl->AddCircleFilled({li.screenPos.x, li.screenPos.y}, 3.f, col);
-    }
-
-    inline void drawLoot() {
-        if (!data::inMatch.load()) return;
-        ImDrawList* dl = ImGui::GetForegroundDrawList();
-
-        std::vector<LootItem> snap;
-        {
-            std::lock_guard<std::mutex> lk(data::loots_mutex);
-            snap = data::loots;
-        }
-
-        for (const auto& li : snap) {
-            if (li.screenPos.x < 0 || li.screenPos.y < 0) continue;
-            if (li.screenPos.x > g_sw || li.screenPos.y > g_sh) continue;
-            drawLootLabel(dl, li);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // CROSSHAIR  — cross lines + animated ring circle
-    // ═══════════════════════════════════════════════════════
+    /**
+     * @brief Renders center-screen crosshair with smooth animated pulsing ring.
+     * @param dl ImGui foreground draw list.
+     */
     inline void drawCrosshair(ImDrawList* dl) {
         if (g_sw < 10.f || g_sh < 10.f) return;
         float cx = g_sw * 0.5f, cy = g_sh * 0.5f;
 
-        // ── Config ──
         ImU32 c      = IM_COL32(220, 40, 40, 240);
-        ImU32 cShadow= IM_COL32(0, 0, 0, 120);
-        float gap    = 5.f;
-        float len    = 9.f;
-        float thick  = 1.5f;
+        float gap    = 4.f;
+        float len    = 8.f;
+        float thick  = 1.0f;
 
-        // ── Shadow lines (depth) ──
-        dl->AddLine({cx - gap - len + 1, cy + 1}, {cx - gap + 1, cy + 1}, cShadow, thick + 1.f);
-        dl->AddLine({cx + gap + 1,       cy + 1}, {cx + gap + len + 1, cy + 1}, cShadow, thick + 1.f);
-        dl->AddLine({cx + 1, cy - gap - len + 1}, {cx + 1, cy - gap + 1}, cShadow, thick + 1.f);
-        dl->AddLine({cx + 1, cy + gap + 1},       {cx + 1, cy + gap + len + 1}, cShadow, thick + 1.f);
-
-        // ── Cross lines ──
+        // Thin crosshair lines
         dl->AddLine({cx - gap - len, cy}, {cx - gap, cy}, c, thick);
         dl->AddLine({cx + gap,       cy}, {cx + gap + len, cy}, c, thick);
         dl->AddLine({cx, cy - gap - len}, {cx, cy - gap}, c, thick);
         dl->AddLine({cx, cy + gap},       {cx, cy + gap + len}, c, thick);
 
-        // ── Center dot ──
-        dl->AddCircleFilled({cx, cy}, 1.5f, c);
+        // Center dot
+        dl->AddCircleFilled({cx, cy}, 1.2f, c);
 
-        // ── Animated outer ring circle ──
+        // Outer pulsing ring
         float t      = (float)ImGui::GetTime();
-        float pulse  = 0.5f + 0.5f * sinf(t * 2.5f);          // slow pulse
-        float radius = 28.f + 3.f * pulse;                      // 28–31 px
-        int   alpha  = (int)(180 + 60.f * pulse);               // 180–240
-        ImU32 cRing  = IM_COL32(220, 40, 40, alpha);
-        ImU32 cRingS = IM_COL32(0, 0, 0, (int)(80 * pulse));
-
-        // Shadow ring
-        dl->AddCircle({cx, cy}, radius + 1.f, cRingS, 64, 1.2f);
-        // Main ring
-        dl->AddCircle({cx, cy}, radius, cRing, 64, 1.2f);
+        float pulse  = 0.5f + 0.5f * sinf(t * 2.5f);
+        float radius = 26.f + 3.f * pulse;
+        int   alpha  = (int)(160 + 80.f * pulse);
+        dl->AddCircle({cx, cy}, radius, IM_COL32(220, 40, 40, alpha), 64, 1.0f);
     }
 
-    // ═══════════════════════════════════════════════════════
-    // MAIN DRAW
-    // ═══════════════════════════════════════════════════════
+    /**
+     * @brief Master ESP dispatch routine. Iterates player snapshots and draws enabled visuals.
+     * Strictly gated by cfg::esp::enabled for 100% manual menu control.
+     */
     inline void draw() {
         if (!cfg::esp::enabled) return;
         if (!data::inMatch.load()) return;
@@ -502,21 +330,23 @@ namespace func::esp {
             snap = data::players;
         }
 
-        ImVec2 anchor(g_sw * 0.5f, g_sh * 0.95f);   // tracer from bottom-center
+        // Top-center anchor (matching reference project: screenWidth / 2, 40)
+        ImVec2 anchor(g_sw * 0.5f, 40.f);
 
         for (const auto& p : snap) {
-            // Skip dead or invalid players
+            // Skip dead or invalid entities
             if (p.curHP <= 0) continue;
             if (p.distance <= 0.f || p.distance > cfg::esp::max_range) continue;
 
-            // Screen-space positions must be within a 2x screen boundary
-            if (p.Head.x < -g_sw || p.Head.x > g_sw * 2.f) continue;
-            if (p.Head.y < -g_sh || p.Head.y > g_sh * 2.f) continue;
-            if (p.Toe.x  < -g_sw || p.Toe.x  > g_sw * 2.f) continue;
-            if (p.Toe.y  < -g_sh || p.Toe.y  > g_sh * 2.f) continue;
+            // Target must be strictly in front of camera (positive screen coordinates)
+            if (!ok(p.Head) || !ok(p.Toe)) continue;
 
-            // Minimum box height sanity check (at least 10 px tall)
-            if (fabsf(p.Head.y - p.Toe.y) < 10.f) continue;
+            // Target must be within screen dimensions (no drawing off-screen)
+            if (p.Head.x < 0.f || p.Head.x > g_sw || p.Head.y < 0.f || p.Head.y > g_sh) continue;
+            if (p.Toe.x  < 0.f || p.Toe.x  > g_sw || p.Toe.y  < 0.f || p.Toe.y  > g_sh) continue;
+
+            // Minimum height sanity check
+            if (fabsf(p.Head.y - p.Toe.y) < 8.f) continue;
 
             SkeletonBox sb = computeSkeletonBox(p);
             if (!sb.valid) continue;
@@ -524,9 +354,8 @@ namespace func::esp {
             ImVec2 tl = sb.tl;
             ImVec2 br = sb.br;
 
-            // Must have some on-screen presence
-            if (br.x < 0.f || tl.x > g_sw) continue;
-            if (br.y < 0.f || tl.y > g_sh) continue;
+            // Strictly within screen viewport bounds
+            if (br.x < 0.f || tl.x > g_sw || br.y < 0.f || tl.y > g_sh) continue;
 
             float cx = (tl.x + br.x) * 0.5f;
 
@@ -534,40 +363,30 @@ namespace func::esp {
                                         : toU32(cfg::esp::box_col);
             colBase = fadeDist(colBase, p.distance, cfg::esp::max_range);
 
-            // Tracer: only draw when player is animated/moving (speed > 0.5 m/s)
-            if (cfg::esp::tracer && p.speed > 0.5f) {
-                ImVec2 head(p.Head.x, p.Head.y);
-                float aa = ImClamp(1.f - p.distance / cfg::esp::max_range, 0.25f, 1.f);
-                // Thin tracer line: shadow + main (thickness 1.0f / 0.8f — thin)
-                dl->AddLine(anchor, head,
-                    withAlpha(toU32(cfg::esp::box_col), 0.20f * aa), 1.5f);
-                dl->AddLine(anchor, head,
-                    withAlpha(toU32(cfg::esp::box_col), 0.85f * aa), 0.8f);
+            // Thin single ESP Line (hairline thickness = 1.0f)
+            if (cfg::esp::tracer) {
+                dl->AddLine(anchor, ImVec2(cx, tl.y), colBase, 1.0f);
             }
 
-            if (cfg::esp::box)
+            // ESP Box
+            if (cfg::esp::box) {
                 drawBox(dl, tl, br, colBase, cfg::esp::box_type);
-
-            if (cfg::esp::skeleton)
-                drawSkeleton(dl, p, colBase);
-
-            if (cfg::esp::firing_ind)
-                drawFiring(dl, p, cx, tl.y);
-
-            if (cfg::esp::name || cfg::esp::distance ||
-                cfg::esp::health || cfg::esp::armor) {
-                PlayerData tmp = p;
-                if (tmp.name[0] == 0)
-                    snprintf(tmp.name, sizeof(tmp.name), "%s",
-                             p.isBot ? "BOT" : "Player");
-                drawNamePanel(dl, tmp, cx, tl.y);
             }
 
-            if (cfg::esp::weapon)
-                drawWeapon(dl, p, {cx, br.y});
+            // ESP Skeleton
+            if (cfg::esp::skeleton) {
+                drawSkeleton(dl, p, colBase);
+            }
+
+            // ESP Name, Distance & Health Panel
+            if (cfg::esp::name || cfg::esp::distance || cfg::esp::health) {
+                drawNamePanel(dl, p, cx, tl.y);
+            }
         }
 
-        if (cfg::esp::loot)      drawLoot();
-        if (cfg::esp::crosshair) drawCrosshair(dl);
+        // ESP Crosshair
+        if (cfg::esp::crosshair) {
+            drawCrosshair(dl);
+        }
     }
 }

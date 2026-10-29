@@ -13,9 +13,6 @@ namespace data {
     extern std::vector<PlayerData> players;
     extern std::mutex              players_mutex;
 
-    extern std::vector<LootItem>   loots;
-    extern std::mutex              loots_mutex;
-
     extern std::atomic<uint64_t>   localPlayerAddr;
     extern std::atomic<bool>       inMatch;
     extern matrix                  viewMatrix;

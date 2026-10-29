@@ -15,8 +15,6 @@ namespace data {
 
     std::vector<PlayerData>  players;
     std::mutex               players_mutex;
-    std::vector<LootItem>    loots;
-    std::mutex               loots_mutex;
     std::atomic<uint64_t>    localPlayerAddr{0};
     std::atomic<bool>        inMatch{false};
     matrix                   viewMatrix{};
@@ -27,9 +25,11 @@ namespace data {
     static std::unordered_map<uint64_t, int>  g_visCounter;
     static std::unordered_map<uint64_t, bool> g_visStable;
 
-    // ========================================================================
-    // HP
-    // ========================================================================
+    /**
+     * @brief Reads the current health points of a player entity.
+     * @param p Memory address of the player entity.
+     * @return Current HP value, or 0 if unresolvable.
+     */
     static int readHP(uint64_t p) {
         auto pool  = rpm<uint64_t>(p + Offsets::Player_HP);
         if (!pool) return 0;
@@ -40,9 +40,13 @@ namespace data {
         return rpm<int>(elem + Offsets::HP_Value);
     }
 
-    // ========================================================================
-    // NAME
-    // ========================================================================
+    /**
+     * @brief Reads the UTF-16 nickname string of a player entity.
+     * @param p Memory address of the player entity.
+     * @param buf Output buffer for ASCII/UTF-8 string.
+     * @param buflen Buffer length in bytes.
+     * @return Number of characters parsed into buf.
+     */
     static int readName(uint64_t p, char* buf, size_t buflen) {
         buf[0] = 0;
         auto sp = rpm<uint64_t>(p + Offsets::Player_Name);
@@ -62,9 +66,11 @@ namespace data {
         return n;
     }
 
-    // ========================================================================
-    // WEAPON TYPE
-    // ========================================================================
+    /**
+     * @brief Reads the weapon identifier currently equipped by a player.
+     * @param p Memory address of the player entity.
+     * @return Weapon type integer ID, or -1 on failure.
+     */
     static int readWeapon(uint64_t p) {
         auto w = rpm<uint64_t>(p + Offsets::Player_Weapon);
         if (!w) return -1;
@@ -73,9 +79,12 @@ namespace data {
         return rpm<int>(wd + 0x64);
     }
 
-    // ========================================================================
-    // BONE → SCREEN
-    // ========================================================================
+    /**
+     * @brief Transforms an entity bone node coordinate to 2D screen space.
+     * @param player Address of the player entity.
+     * @param offset Pointer offset to the bone transform node.
+     * @return Screen-space Vector3 coordinate.
+     */
     static Vector3 boneScreen(uint64_t player, uintptr_t offset) {
         uint64_t node = rpm<uint64_t>(player + offset);
         if (!node) return Vector3::Zero();
@@ -84,61 +93,19 @@ namespace data {
         return WorldToScreenPoint(viewMatrix, w);
     }
 
-    // ========================================================================
-    // SCAN LOOT
-    // ========================================================================
-    static void scanLoot(uint64_t BaseGame, const Vector3& localPos) {
-        std::vector<LootItem> tmp;
-
-        uint64_t match = rpm<uint64_t>(BaseGame + Offsets::BaseGame_Match);
-        if (!match) return;
-
-        uint64_t metaMgr = rpm<uint64_t>(match + Offsets::Match_MetaManager);
-        if (!metaMgr) return;
-
-        uint64_t dictPtr = rpm<uint64_t>(metaMgr + Offsets::MetaManager_DropObjects);
-        if (!dictPtr) return;
-
-        uint64_t entries = rpm<uint64_t>(dictPtr + 0x18);
-        int count = rpm<int>(dictPtr + 0x20);
-        if (!entries || count <= 0 || count > 500) return;
-
-        uint64_t base = entries + 0x20;
-        for (int i = 0; i < count; i++) {
-            uint64_t e = base + i * 0x18;
-            uint64_t dropObj = rpm<uint64_t>(e + 0x10);
-            if (!dropObj || dropObj < 0x100000) continue;
-
-            bool landed = rpm<bool>(dropObj + Offsets::DropObject_Landed);
-            if (!landed) continue;
-
-            Vector3 w = rpm<Vector3>(dropObj + Offsets::DropObject_Position);
-            if (w == Vector3::Zero()) continue;
-
-            float dist = calculate_distance(localPos, w);
-            if (dist > cfg::esp::loot_range) continue;
-
-            Vector3 sc = WorldToScreenPoint(viewMatrix, w);
-            if (sc.x < 0) continue;
-
-            LootItem li;
-            li.addr      = dropObj;
-            li.guid      = rpm<uint32_t>(dropObj + Offsets::DropObject_Guid);
-            li.resID     = rpm<uint32_t>(dropObj + Offsets::DropObject_ResID);
-            li.worldPos  = w;
-            li.screenPos = sc;
-            li.distance  = dist;
-            tmp.push_back(li);
+    /**
+     * @brief Core entity memory reader loop. Reads game matrices and active players.
+     * Gated strictly by cfg::esp::enabled to ensure 100% manual control from menu.
+     */
+    void update() {
+        if (!cfg::esp::enabled) {
+            if (!players.empty()) {
+                std::lock_guard<std::mutex> lk(players_mutex);
+                players.clear();
+            }
+            return;
         }
 
-        std::lock_guard<std::mutex> lk(loots_mutex);
-        loots = std::move(tmp);
-    }
-
-    // ========================================================================
-    // UPDATE
-    // ========================================================================
-    void update() {
         if (proc::pid <= 0 || proc::lib == 0) return;
 
         std::vector<PlayerData> tmp;
@@ -164,10 +131,6 @@ namespace data {
             {
                 std::lock_guard<std::mutex> lk(players_mutex);
                 players.clear();
-            }
-            {
-                std::lock_guard<std::mutex> lk(loots_mutex);
-                loots.clear();
             }
             return;
         }
@@ -204,14 +167,6 @@ namespace data {
         Vector3 localPos = Vector3::Zero();
         uint64_t headNode = rpm<uint64_t>(localPlayer + Offsets::Bone_Head);
         if (headNode) localPos = GetNodePosition(headNode);
-
-        // ── LOOT ──
-        if (cfg::esp::loot) {
-            scanLoot(BaseGame, localPos);
-        } else {
-            std::lock_guard<std::mutex> lk(loots_mutex);
-            loots.clear();
-        }
 
         // ── PLAYERS ──
         uint64_t dictAddr = rpm<uint64_t>(BaseGame + Offsets::Match_PlayerDict);
@@ -331,9 +286,9 @@ namespace data {
         }
     }
 
-    // ========================================================================
-    // THREAD
-    // ========================================================================
+    /**
+     * @brief Background thread worker routine with randomized sleep jitter.
+     */
     static void loop() {
         uint32_t seed = 0x9E3779B1u;
         while (g_run.load(std::memory_order_relaxed)) {

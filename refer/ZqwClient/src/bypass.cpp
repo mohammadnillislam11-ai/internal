@@ -12,9 +12,7 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-// ═══════════════════════════════════════════════════════════
-// OFFSET libanogs.so
-// ═══════════════════════════════════════════════════════════
+/** Security library hook offsets */
 static constexpr uint64_t OFF_ANTI_FRIDA       = 0x3516DC;
 static constexpr uint64_t OFF_ANTI_DEBUG       = 0x365954;
 static constexpr uint64_t OFF_ANTI_MONO_MAIN   = 0x307EF0;
@@ -28,9 +26,10 @@ static constexpr uint64_t OFF_DETECT_CHEAT_DLL2= 0x319CE4;
 static constexpr uint64_t OFF_DETECT_CHEAT_DLL3= 0x2D7A78;
 static constexpr uint64_t OFF_ANTI_MONO_DUP    = 0x318EF0;
 
-// ═══════════════════════════════════════════════════════════
-// CARI BASE libanogs.so
-// ═══════════════════════════════════════════════════════════
+/**
+ * @brief Locates virtual base address of libanogs.so via procfs maps.
+ * @return Virtual base address, or 0 if unmapped.
+ */
 static uint64_t find_libanogs_base() {
     if (proc::pid <= 0) return 0;
 
@@ -56,9 +55,7 @@ static uint64_t find_libanogs_base() {
     return base;
 }
 
-// ═══════════════════════════════════════════════════════════
-// HOOK HANDLERS — semua return 0 (skip / tidak aktif)
-// ═══════════════════════════════════════════════════════════
+/** Hook intercept handlers returning neutral zero status */
 static void* orig_anti_frida = nullptr;
 static int hook_anti_frida(void* a1, void* a2) {
     LOGI("[hook] anti_frida called → return 0");
@@ -135,9 +132,9 @@ static int hook_anti_mono_dup(void* a1) {
     return 0;
 }
 
-// ═══════════════════════════════════════════════════════════
-// INIT BYPASS
-// ═══════════════════════════════════════════════════════════
+/**
+ * @brief Initializes ShadowHook engine and installs security handler stubs.
+ */
 extern "C" void init_bypass() {
     LOGI("=== NINMODS Bypass (ShadowHook) init ===");
 

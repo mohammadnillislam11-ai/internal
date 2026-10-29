@@ -7,9 +7,7 @@
 #include <cstring>
 #include <cstdio>
 
-// ============================================================
-//  GLOBAL VARIABLES - DECLARATIONS
-// ============================================================
+/** Global state variable declarations */
 extern std::string g_license_expiry_date;
 extern std::string g_license_user_name;
 extern std::string g_license_key_number;
@@ -43,17 +41,13 @@ extern std::vector<std::string> g_server_disabled_features;
 extern bool g_server_block_menu;
 extern bool g_server_force_logout;
 
-// ============================================================
-//  STRUCT
-// ============================================================
+/** Dynamic memory buffer structure */
 struct MemoryStruct {
     char* memory;
     size_t size;
 };
 
-// ============================================================
-//  FUNCTIONS - DECLARATIONS
-// ============================================================
+/** Crypto and decode function declarations */
 std::string base64_decode(const std::string& input);
 std::string AESDecrypt(const std::string& ciphertext_b64,
                        const std::string& iv_b64,

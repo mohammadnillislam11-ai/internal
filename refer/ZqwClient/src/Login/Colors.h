@@ -1,9 +1,7 @@
 #pragma once
 #include "imgui.h"
 
-// ============================================================================
-// LOGIN PAGE PALETTE
-// ============================================================================
+/** Color palette definition */
 static inline ImU32 LC_Accent()       { return IM_COL32(180,  30,  30, 255); }
 static inline ImU32 LC_AccentDark()   { return IM_COL32(120,  20,  20, 255); }
 static inline ImU32 LC_AccentBright() { return IM_COL32(220,  40,  40, 255); }

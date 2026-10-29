@@ -1,9 +1,9 @@
-// src/Login/Jni_Stuff.cpp
+/**
+ * @file Jni_Stuff.cpp
+ * @brief Standalone local client state definitions (bypass all external licensing).
+ */
 #include "Jni_Stuff.h"
 
-// ============================================================
-//  GLOBAL VARIABLES - DEFINISI (ALWAYS ACTIVATED / NO NETWORK)
-// ============================================================
 std::string g_license_expiry_date = "PERMANENT";
 std::string g_license_user_name = "USER";
 std::string g_license_key_number = "FREE";

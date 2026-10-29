@@ -1,5 +1,4 @@
 /**
- *  ============================================================================
  *  MIT License
  *
  *  Copyright (c) 2016 Eric Phillips
@@ -21,7 +20,6 @@
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  *  DEALINGS IN THE SOFTWARE.
- *  ============================================================================
  */
 
 #pragma once
@@ -376,10 +374,13 @@ struct Quaternion {
         return (v * Rad2Deg) + 180.f;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Slerp — ditambahkan (tidak ada di versi asli MIT Eric Phillips)
-    // Interpolasi spherical antara a → b dengan parameter t ∈ [0, 1].
-    // ═══════════════════════════════════════════════════════════════════════
+    /**
+     * @brief Spherical linear interpolation between quaternions a and b.
+     * @param a Start quaternion.
+     * @param b Target quaternion.
+     * @param t Interpolation parameter in [0, 1].
+     * @return Interpolated normalized quaternion.
+     */
     static inline Quaternion Slerp(const Quaternion& a, const Quaternion& b, float t) {
         if (t <= 0.f) return a;
         if (t >= 1.f) return b;
@@ -414,7 +415,6 @@ struct Quaternion {
             a.w*s0 + bb.w*s1
         ).normalized();
     }
-    // ═══════════════════════════════════════════════════════════════════════
 
     inline Vector3 euler() const { return ToEuler(*this); }
     inline Quaternion normalized() const { return Normalize(*this); }
