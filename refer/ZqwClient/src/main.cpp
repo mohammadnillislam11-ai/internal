@@ -161,7 +161,8 @@ static int start_overlay() {
     }
     printf(FG_BGREEN "  [✓] GUI ready\n" RST);
 
-    touch::init(max_size, min_size, (uint8_t)displayInfo.orientation);
+    uint8_t initial_ori = (displayInfo.orientation != 0) ? (uint8_t)displayInfo.orientation : 1;
+    touch::init(max_size, min_size, initial_ori);
 
     // Open menu directly without login screens
     ui::bar::g_open = true;

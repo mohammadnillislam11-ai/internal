@@ -449,17 +449,26 @@ namespace ui::menu {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
 
-        float card1H = 110.f;
+        float card1H = 154.f;
         ImVec2 cp = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp, cw, card1H);
-        NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("Display"));
-        ImGui::SetCursorScreenPos({cp.x+16, cp.y+44});
+        NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("Display & Touch"));
+        ImGui::SetCursorScreenPos({cp.x+16, cp.y+38});
 
         char buf[64];
         snprintf(buf, sizeof(buf), "%.0f x %.0f", g_sw, g_sh);
         NS_InfoRow(oxorany("Screen"), buf);
         snprintf(buf, sizeof(buf), "%.1f", ImGui::GetIO().Framerate);
         NS_InfoRow(oxorany("FPS"), buf);
+
+        uint8_t curOri = touch::getOrientation();
+        snprintf(buf, sizeof(buf), (curOri == 3) ? "Inverted (270°)" : "Landscape (90°)");
+        NS_InfoRow(oxorany("Touch Ori"), buf);
+
+        ImGui::SetCursorScreenPos({cp.x+16, cp.y+122});
+        if (NS_Button("f_flip_ori", "Rotate Touch 180°", {160.f, 22.f}, false)) {
+            touch::toggleOrientation();
+        }
 
         ImGui::SetCursorScreenPos({cp.x, cp.y+card1H+12});
         ImGui::Dummy({0,0});

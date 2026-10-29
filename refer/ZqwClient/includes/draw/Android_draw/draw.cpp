@@ -26,7 +26,7 @@ ImGuiWindow *g_window = nullptr;
 extern bool g_hideRecord;
 
 bool initGUI_draw(uint32_t _screen_x, uint32_t _screen_y, bool log) {
-    orientation = displayInfo.orientation;
+    orientation = (displayInfo.orientation != 0) ? displayInfo.orientation : 1;
 
     if (!init_egl(_screen_x, _screen_y, log)) return false;
     if (!ImGui_init()) return false;
@@ -152,9 +152,12 @@ bool ImGui_init() {
 
 void drawBegin() {
     screen_config();
-    if (::orientation != displayInfo.orientation) {
-        ::orientation = displayInfo.orientation;
-        touch::update(displayInfo.width, displayInfo.height, displayInfo.orientation);
+    uint32_t cur_ori = (displayInfo.orientation != 0) ? displayInfo.orientation : 1;
+    if (::orientation != cur_ori) {
+        ::orientation = cur_ori;
+        int screen_w = (native_window_screen_x > 0) ? native_window_screen_x : 2400;
+        int screen_h = (native_window_screen_y > 0) ? native_window_screen_y : 1080;
+        touch::update(screen_w, screen_h, (uint8_t)cur_ori);
         if (g_window) {
             g_window->Pos.x = 100;
             g_window->Pos.y = 125;
