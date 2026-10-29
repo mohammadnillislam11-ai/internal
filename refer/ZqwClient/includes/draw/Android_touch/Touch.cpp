@@ -30,7 +30,9 @@ namespace touch {
         input_absinfo absX{}, absY{};
         float absXMultiplier{1.0f}, absYMultiplier{1.0f};
 
-        input(const char *_path, int32_t _screen_w, int32_t _screen_h) : path(_path) {
+        int32_t screen_w{0}, screen_h{0};
+
+        input(const char *_path, int32_t _screen_w, int32_t _screen_h) : path(_path), screen_w(_screen_w), screen_h(_screen_h) {
             fd = open(_path, O_RDONLY);
             if (fd == -1) {
                 fd = open(_path, O_RDWR);
@@ -80,6 +82,8 @@ namespace touch {
         }
 
         void calculateMultipliers(int32_t _screen_w, int32_t _screen_h) {
+            screen_w = _screen_w;
+            screen_h = _screen_h;
             if (_screen_w <= 0 || _screen_h <= 0) return;
             auto max = fmax((float) absX.maximum, (float) absY.maximum);
             auto min = fmin((float) absX.maximum, (float) absY.maximum);
@@ -179,26 +183,37 @@ namespace touch {
                 } else if (event.type == EV_SYN && event.code == SYN_REPORT) {
                     float screen_x = raw_x;
                     float screen_y = raw_y;
+                    float sw = (float)dev.screen_w;
+                    float sh = (float)dev.screen_h;
+                    float maxX = (float)dev.absX.maximum;
+                    float maxY = (float)dev.absY.maximum;
+                    if (sw <= 0.f) sw = 2400.f;
+                    if (sh <= 0.f) sh = 1080.f;
+                    if (maxX <= 0.f) maxX = 1080.f;
+                    if (maxY <= 0.f) maxY = 2400.f;
 
                     switch (orientation) {
                         case 1: // Landscape (ROTATION_90)
-                            screen_x = raw_y * dev.absXMultiplier;
-                            screen_y = (dev.absX.maximum - raw_x) * dev.absYMultiplier;
+                            screen_x = raw_y * (sw / maxY);
+                            screen_y = (maxX - raw_x) * (sh / maxX);
                             break;
                         case 2: // Reverse Portrait (ROTATION_180)
-                            screen_x = (dev.absX.maximum - raw_x) * dev.absXMultiplier;
-                            screen_y = (dev.absY.maximum - raw_y) * dev.absYMultiplier;
+                            screen_x = (maxX - raw_x) * (sw / maxX);
+                            screen_y = (maxY - raw_y) * (sh / maxY);
                             break;
                         case 3: // Reverse Landscape (ROTATION_270)
-                            screen_x = (dev.absY.maximum - raw_y) * dev.absXMultiplier;
-                            screen_y = raw_x * dev.absYMultiplier;
+                            screen_x = (maxY - raw_y) * (sw / maxY);
+                            screen_y = raw_x * (sh / maxX);
                             break;
-                        case 0: // Portrait
+                        case 0: // Natural / Portrait
                         default:
-                            screen_x = raw_x * dev.absXMultiplier;
-                            screen_y = raw_y * dev.absYMultiplier;
+                            screen_x = raw_x * (sw / maxX);
+                            screen_y = raw_y * (sh / maxY);
                             break;
                     }
+
+                    screen_x = std::clamp(screen_x, 0.0f, sw);
+                    screen_y = std::clamp(screen_y, 0.0f, sh);
 
                     if (isDown) {
                         last_screen_x = screen_x;

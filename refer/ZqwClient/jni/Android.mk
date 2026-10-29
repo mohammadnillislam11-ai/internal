@@ -80,6 +80,8 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../includes/protect \
     $(LOCAL_PATH)/../src \
     $(LOCAL_PATH)/../src/ui \
+    $(LOCAL_PATH)/../src/ui/theme \
+    $(LOCAL_PATH)/../src/ui/fonts \
     $(LOCAL_PATH)/../src/ui/png \
     $(LOCAL_PATH)/../src/ui/png/images \
     $(LOCAL_PATH)/../src/ui/styles \

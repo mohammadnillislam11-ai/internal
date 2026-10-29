@@ -80,19 +80,19 @@ static void render_fps_icon(float alpha) {
 
   float fps = ImGui::GetIO().Framerate;
 
-  ImU32 bg_col = IM_COL32(20, 14, 38, (int)(230 * alpha));
-  ImU32 border_col = g_fps_drag ? IM_COL32(216, 180, 254, (int)(255 * alpha))
-                                : IM_COL32(168, 85, 247, (int)(200 * alpha));
+  ImU32 bg_col = IM_COL32(16, 18, 24, (int)(240 * alpha));
+  ImU32 border_col = g_fps_drag ? IM_COL32(120, 185, 255, (int)(255 * alpha))
+                                : IM_COL32(90, 160, 255, (int)(200 * alpha));
 
   // Outer glow
   float pillR = h * 0.5f;
   dl->AddRectFilled({g_fps_x - 3, g_fps_y - 3},
                     {g_fps_x + w + 3, g_fps_y + h + 3},
-                    IM_COL32(126, 34, 206, (int)(45 * alpha)), pillR + 3.f);
+                    IM_COL32(90, 160, 255, (int)(35 * alpha)), pillR + 3.f);
   // Shadow
   dl->AddRectFilled({g_fps_x + 2, g_fps_y + 4},
                     {g_fps_x + w + 2, g_fps_y + h + 4},
-                    IM_COL32(0, 0, 0, (int)(100 * alpha)), pillR);
+                    IM_COL32(0, 0, 0, (int)(120 * alpha)), pillR);
   // Background pill
   dl->AddRectFilled({g_fps_x, g_fps_y}, {g_fps_x + w, g_fps_y + h}, bg_col,
                     pillR);
@@ -100,21 +100,21 @@ static void render_fps_icon(float alpha) {
   dl->AddRect({g_fps_x, g_fps_y}, {g_fps_x + w, g_fps_y + h}, border_col, pillR,
               0, g_fps_drag ? 2.f : 1.5f);
 
-  // Accent strip left (neon purple)
+  // Accent strip left (electric blue)
   dl->AddRectFilled({g_fps_x + 6.f, g_fps_y + 6.f},
                     {g_fps_x + 9.f, g_fps_y + h - 6.f},
-                    IM_COL32(192, 132, 252, (int)(255 * alpha)), 2.f);
+                    IM_COL32(90, 160, 255, (int)(255 * alpha)), 2.f);
 
   /** Brand label "nin" and live FPS reading */
   ImFont *font = ImGui::GetFont();
   if (font) {
     // Text "nin"
     dl->AddText(font, 16.f, {g_fps_x + 16.f, g_fps_y + (h - 16.f) * 0.5f},
-                IM_COL32(235, 220, 255, (int)(255 * alpha)), "nin");
+                IM_COL32(240, 245, 255, (int)(255 * alpha)), "nin");
 
     // Separator
     dl->AddText(font, 12.f, {g_fps_x + 46.f, g_fps_y + (h - 12.f) * 0.5f},
-                IM_COL32(168, 85, 247, (int)(180 * alpha)), "|");
+                IM_COL32(90, 160, 255, (int)(180 * alpha)), "|");
 
     // FPS Text
     int fpsInt = (int)(fps + 0.5f);

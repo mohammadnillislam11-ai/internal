@@ -191,6 +191,7 @@ static int start_overlay() {
     while (true) {
         global_anim_time += 0.016f;
         drawBegin();
+        func::esp::draw();
         ui::menu::render();
         drawEnd();
         usleep(2000);

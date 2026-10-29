@@ -1,6 +1,7 @@
 #include "Android_draw/draw.h"
 #include "protect/oxorany.hpp"
 #include "../../includes/font/font_data.hpp"
+#include "ui/fonts/fonts.h"
 
 EGLDisplay display = EGL_NO_DISPLAY;
 EGLConfig config;
@@ -142,6 +143,7 @@ bool ImGui_init() {
     espFont    = espFontCfg;
 
     io.FontDefault = mainFont;
+    fonts::init();
     io.Fonts->Build();
 
     ImGui::GetStyle().ScaleAllSizes(1.25f);
@@ -152,7 +154,7 @@ bool ImGui_init() {
 
 void drawBegin() {
     screen_config();
-    uint32_t cur_ori = (displayInfo.orientation != 0) ? displayInfo.orientation : 1;
+    uint32_t cur_ori = displayInfo.orientation;
     if (::orientation != cur_ori) {
         ::orientation = cur_ori;
         int screen_w = (native_window_screen_x > 0) ? native_window_screen_x : 2400;
