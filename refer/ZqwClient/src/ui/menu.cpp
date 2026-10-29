@@ -558,30 +558,22 @@ namespace ui::menu {
         bg->AddLine({wp.x, wp.y+headerH}, {wp.x+ws.x, wp.y+headerH},
                     col(UITheme::border, ma), 1.f);
 
-        float logoSize = 30.f;
-        float logoX = wp.x + 18.f;
-        float logoY = wp.y + (headerH - logoSize) * 0.5f;
-        bg->AddRectFilled({logoX, logoY}, {logoX+logoSize, logoY+logoSize},
-                          col(UITheme::accent, ma), 7.f);
-        ImVec2 ls = ImGui::CalcTextSize("N");
-        bg->AddText({logoX + (logoSize-ls.x)*0.5f, logoY + (logoSize-ls.y)*0.5f},
-                    IM_COL32(255,255,255,255), "N");
+        float titleX = wp.x + 20.f;
+        dl->AddText(ImGui::GetFont(), 17.f, {titleX, wp.y + 12.f},
+                    col(UITheme::accent_light, ma), "NINMODS");
+        dl->AddText(ImGui::GetFont(), 9.f, {titleX, wp.y + 33.f},
+                    col(UITheme::text_dim, ma), "VIP CLIENT");
 
-        dl->AddText(ImGui::GetFont(), 15.f, {logoX + logoSize + 12.f, wp.y + 13.f},
-                    IM_COL32(255, 255, 255, (int)(255 * ma)), "NINMODS");
-        dl->AddText(ImGui::GetFont(), 9.f, {logoX + logoSize + 12.f, wp.y + 32.f},
-                    col(UITheme::accent_light, ma), "VIP CLIENT");
-
-        bg->AddLine({logoX + logoSize + 100.f, wp.y+18.f},
-                    {logoX + logoSize + 100.f, wp.y+38.f},
+        bg->AddLine({titleX + 90.f, wp.y+18.f},
+                    {titleX + 90.f, wp.y+38.f},
                     col(UITheme::border, ma), 1.f);
 
         const char* tabTitles[] = {"Dashboard", "ESP", "Settings"};
         bg->AddText(ImGui::GetFont(), 11.f,
-            {logoX + logoSize + 116.f, wp.y + 24.f},
+            {titleX + 104.f, wp.y + 24.f},
             col(UITheme::text_dim, ma), "/");
         bg->AddText(ImGui::GetFont(), 13.f,
-            {logoX + logoSize + 128.f, wp.y + 21.f},
+            {titleX + 116.f, wp.y + 21.f},
             col(UITheme::text, ma), tabTitles[tab]);
 
         float closeW = 28.f;

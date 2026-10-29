@@ -36,7 +36,7 @@ namespace ui::bar {
     }
 
     static void render_fps_icon(float alpha) {
-        const float w = 128.f, h = 56.f;
+        const float w = 112.f, h = 38.f;
         get_fps_pos(w, h);
 
         ImDrawList* dl = ImGui::GetForegroundDrawList();
@@ -93,30 +93,29 @@ namespace ui::bar {
                           col(UITheme::accent, alpha), 2.f);
 
         // ============================================
-        // LOGO / ICON INDICATOR (NINMODS "N")
+        // TEXT NAME "nin" & FPS (NO LOGO)
         // ============================================
-        float cx = g_fps_x + 34.f, cy = g_fps_y + h * 0.5f, radius = 18.f;
-        dl->AddCircleFilled({cx, cy}, radius, col(UITheme::accent_dark, alpha * 0.7f));
-        dl->AddCircle({cx, cy}, radius, col(UITheme::accent, alpha), 16, 1.5f);
-        ImVec2 nsz = ImGui::CalcTextSize("N");
-        dl->AddText(ImGui::GetFont(), 15.f,
-                    {cx - nsz.x * 0.5f, cy - nsz.y * 0.5f},
-                    IM_COL32(255, 255, 255, (int)(255 * alpha)), "N");
-
-        // ============================================
-        // FPS TEXT
-        // ============================================
-        int fpsInt = (int)(fps + 0.5f);
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%d FPS", fpsInt);
-
         ImFont* font = ImGui::GetFont();
         if (font) {
+            // Text "nin"
+            dl->AddText(font, 16.f,
+                        {g_fps_x + 14.f, g_fps_y + (h - 16.f) * 0.5f},
+                        col(UITheme::accent_light, alpha), "nin");
+
+            // Separator
+            dl->AddText(font, 12.f,
+                        {g_fps_x + 44.f, g_fps_y + (h - 12.f) * 0.5f},
+                        col(UITheme::text_dim, alpha), "|");
+
+            // FPS Text
+            int fpsInt = (int)(fps + 0.5f);
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d FPS", fpsInt);
             ImU32 text_col = fps >= 50.f ? IM_COL32(52, 199, 89, 255)
                             : fps >= 30.f ? IM_COL32(255, 180, 40, 255)
                                           : IM_COL32(255, 69, 58, 255);
-            dl->AddText(font, 18.f,
-                        {g_fps_x + 58.f, g_fps_y + (h - 18.f) * 0.5f},
+            dl->AddText(font, 14.f,
+                        {g_fps_x + 54.f, g_fps_y + (h - 14.f) * 0.5f},
                         text_col, buf);
         }
     }
