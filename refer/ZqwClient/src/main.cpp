@@ -50,7 +50,7 @@ extern "C" void init_bypass();
 // ═══════════════════════════════════════════════════════════
 // GLOBAL
 // ═══════════════════════════════════════════════════════════
-bool g_hideRecord = true;
+bool g_hideRecord = false;
 
 // ═══════════════════════════════════════════════════════════
 // TARGET GAME
@@ -81,8 +81,9 @@ static bool launch_target_silent() {
     pid_t pid = fork();
     if (pid < 0) return false;
     if (pid == 0) {
-        execl("/system/bin/am", "am", "start", "-n",
-              GetTargetActivity(), (char*)nullptr);
+        execl("/system/bin/am", "am", "start",
+              "--activity-brought-to-front",
+              "-n", GetTargetActivity(), (char*)nullptr);
         _exit(127);
     }
     int status = 0;
@@ -135,6 +136,12 @@ static int start_overlay() {
 
     screen_config();
 
+    // Fallback if dimensions are 0
+    if (displayInfo.width <= 0 || displayInfo.height <= 0) {
+        displayInfo.width = 1080;
+        displayInfo.height = 2400;
+    }
+
     int max_size = (displayInfo.height > displayInfo.width)
                    ? displayInfo.height : displayInfo.width;
     int min_size = (displayInfo.height < displayInfo.width)
@@ -144,6 +151,9 @@ static int start_overlay() {
     g_sh = static_cast<float>(min_size);
     native_window_screen_x = max_size;
     native_window_screen_y = min_size;
+
+    printf(FG_BWHITE "  [i] Display size: %d x %d (ori: %d)\n" RST,
+           max_size, min_size, displayInfo.orientation);
 
     if (!initGUI_draw(native_window_screen_x, native_window_screen_y, true)) {
         printf(FG_BRED "  [!] initGUI FAILED!\n" RST);
@@ -196,9 +206,15 @@ static int start_overlay() {
         drawEnd();
         usleep(2000);
 
+        if (++dbgCounter <= 3) {
+            printf(FG_BCYAN "  [✓] Frame #%d rendered OK (open=%d)\n" RST,
+                   dbgCounter, (int)ui::bar::g_open);
+            fflush(stdout);
+        }
+
         // Debug log tiap ~5 detik
-        if (++dbgCounter >= 2500) {
-            dbgCounter = 0;
+        if (dbgCounter >= 2500) {
+            dbgCounter = 3;
             size_t nPlayers = 0;
             {
                 std::lock_guard<std::mutex> lk(data::players_mutex);

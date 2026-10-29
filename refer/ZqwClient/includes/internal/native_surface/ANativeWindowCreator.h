@@ -427,6 +427,11 @@ namespace android {
                                                                                              height, 1, flags,
                                                                                              nullptr,
                                                                                              value, -1);
+                    if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer) {
+                        SurfaceComposerClientTransaction transaction;
+                        transaction.SetLayer(result, 0x7fffffff);
+                        transaction.Apply(false, true);
+                    }
                 } else {
                     // Android 10+
                     // ⚠️ FIX: layerMetadata.setInt32 + flags 0x40 hanya kalau `hide = true`
@@ -442,13 +447,16 @@ namespace android {
                                                                                              height, 1, flags,
                                                                                              parentHandle,
                                                                                              layerMetadata, nullptr);
-                }
-
-                // ⚠️ FIX: SetTrustedOverlay HANYA kalau `hide = true`
-                if (12 <= Functionals::GetInstance().systemVersion && hide) {
-                    static SurfaceComposerClientTransaction transaction;
-                    transaction.SetTrustedOverlay(result, true);
-                    transaction.Apply(false, true);
+                    // ⚠️ Set layer to 0x7fffffff (topmost Z-order) so overlay renders on top of all apps
+                    if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer) {
+                        SurfaceComposerClientTransaction transaction;
+                        transaction.SetLayer(result, 0x7fffffff);
+                        if (12 <= Functionals::GetInstance().systemVersion && hide &&
+                            Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay) {
+                            transaction.SetTrustedOverlay(result, true);
+                        }
+                        transaction.Apply(false, true);
+                    }
                 }
 
                 return {result.get()};
