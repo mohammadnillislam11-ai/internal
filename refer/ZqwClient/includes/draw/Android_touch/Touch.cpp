@@ -7,45 +7,69 @@
 #include <cmath>
 #include <unistd.h>
 #include <vector>
+#include <string>
+#include <algorithm>
 #include <atomic>
+#include <mutex>
 #include "imgui.h"
 #include "Android_touch/Touch.hpp"
 
 namespace touch {
+    struct TouchEvent {
+        float x;
+        float y;
+        bool down;
+    };
+
+    static std::mutex g_touch_mutex;
+    static std::vector<TouchEvent> g_touch_events;
+
     struct input {
+        std::string path;
         int fd{-1};
         bool canBeUsed{false};
         input_absinfo absX{}, absY{};
         float absXMultiplier{1.0f}, absYMultiplier{1.0f};
 
-        input(const char *_path, int32_t _screen_w, int32_t _screen_h) {
-            // First try read-only, safe under all SELinux domains
+        input(const char *_path, int32_t _screen_w, int32_t _screen_h) : path(_path) {
             fd = open(_path, O_RDONLY);
             if (fd == -1) {
-                // Fallback to read-write if required
                 fd = open(_path, O_RDWR);
             }
             if (fd == -1)
                 return;
 
-            // Check multi-touch position capability
-            bool ok = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &absX) != -1 &&
-                       ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &absY) != -1 &&
-                       absX.maximum > 0 && absY.maximum > 0);
+            // Check device name and reject non-touchscreen devices (sensors, accelerometers, power keys)
+            char devName[256] = {0};
+            ioctl(fd, EVIOCGNAME(sizeof(devName)), devName);
+            std::string sName = devName;
+            std::transform(sName.begin(), sName.end(), sName.begin(), ::tolower);
 
-            if (!ok) {
-                // Fallback to ABS_X / ABS_Y (single-touch or legacy)
-                ok = (ioctl(fd, EVIOCGABS(ABS_X), &absX) != -1 &&
-                      ioctl(fd, EVIOCGABS(ABS_Y), &absY) != -1 &&
-                      absX.maximum > 0 && absY.maximum > 0);
-            }
-
-            canBeUsed = ok;
-            if (!canBeUsed) {
+            if (sName.find("sensor") != std::string::npos ||
+                sName.find("accel") != std::string::npos ||
+                sName.find("gyro") != std::string::npos ||
+                sName.find("pwr") != std::string::npos ||
+                sName.find("power") != std::string::npos ||
+                sName.find("button") != std::string::npos ||
+                sName.find("volume") != std::string::npos ||
+                sName.find("headset") != std::string::npos ||
+                sName.find("keyboard") != std::string::npos ||
+                sName.find("pen") != std::string::npos ||
+                sName.find("stylus") != std::string::npos ||
+                sName.find("key") != std::string::npos) {
                 close();
                 return;
             }
 
+            // Real touchscreen MUST have ABS_MT_POSITION_X and ABS_MT_POSITION_Y
+            if (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &absX) == -1 ||
+                ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &absY) == -1 ||
+                absX.maximum <= 0 || absY.maximum <= 0) {
+                close();
+                return;
+            }
+
+            canBeUsed = true;
             calculateMultipliers(_screen_w, _screen_h);
         }
 
@@ -68,7 +92,6 @@ namespace touch {
 
     static std::atomic<bool> g_touch_running{true};
     static uint8_t orientation = 1;
-    static ImGuiIO *imgui_io = nullptr;
     static std::vector<input> inputs;
 
     uint8_t getOrientation() {
@@ -82,15 +105,32 @@ namespace touch {
         fflush(stdout);
     }
 
+    void poll() {
+        std::vector<TouchEvent> pending;
+        {
+            std::lock_guard<std::mutex> lock(g_touch_mutex);
+            if (g_touch_events.empty()) return;
+            pending.swap(g_touch_events);
+        }
+        ImGuiIO& io = ImGui::GetIO();
+        for (const auto& ev : pending) {
+            io.AddMousePosEvent(ev.x, ev.y);
+            io.AddMouseButtonEvent(0, ev.down);
+            io.MousePos = ImVec2(ev.x, ev.y);
+            io.MouseDown[0] = ev.down;
+        }
+    }
+
     void input_thread(input dev) {
-        printf("  [Touch] Event thread started for fd=%d (absX_max=%d, absY_max=%d)\n",
-               dev.fd, dev.absX.maximum, dev.absY.maximum);
+        printf("  [Touch] Listener thread active on %s\n", dev.path.c_str());
         fflush(stdout);
 
         input_event events[64]{0};
         bool isDown = false;
-        float x = 0.0f, y = 0.0f;
-        int dbgTouchCount = 0;
+        bool lastDown = false;
+        float raw_x = 0.0f, raw_y = 0.0f;
+        float last_screen_x = -1.f, last_screen_y = -1.f;
+        int clickCount = 0;
 
         while (dev.fd > 0 && g_touch_running.load()) {
             auto event_readed_count = read(dev.fd, events, sizeof(events));
@@ -103,70 +143,70 @@ namespace touch {
             for (long j = 0; j < event_readed_count; j++) {
                 auto &event = events[j];
 
-                // 1. Check BTN_TOUCH or BTN_LEFT (EV_KEY)
                 if (event.type == EV_KEY) {
                     if (event.code == BTN_TOUCH || event.code == BTN_LEFT) {
                         isDown = (event.value != 0);
                     }
-                }
-                // 2. Check ABS events (EV_ABS)
-                else if (event.type == EV_ABS) {
+                } else if (event.type == EV_ABS) {
                     if (event.code == ABS_MT_TRACKING_ID) {
-                        // -1 or 0xFFFFFFFF means touch released
                         isDown = (event.value != -1 && (uint32_t)event.value != 0xFFFFFFFF);
-                    } else if (event.code == ABS_MT_POSITION_X || event.code == ABS_X) {
-                        x = (float) event.value;
-                    } else if (event.code == ABS_MT_POSITION_Y || event.code == ABS_Y) {
-                        y = (float) event.value;
+                    } else if (event.code == ABS_MT_POSITION_X) {
+                        raw_x = (float) event.value;
+                    } else if (event.code == ABS_MT_POSITION_Y) {
+                        raw_y = (float) event.value;
                     }
-                }
-                // 3. SYN_REPORT -> submit coordinates & state to ImGui
-                else if (event.type == EV_SYN && event.code == SYN_REPORT) {
-                    if (!imgui_io)
-                        imgui_io = &ImGui::GetIO();
+                } else if (event.type == EV_SYN && event.code == SYN_REPORT) {
+                    float screen_x = raw_x;
+                    float screen_y = raw_y;
 
-                    if (imgui_io) {
-                        float screen_x = x;
-                        float screen_y = y;
+                    switch (orientation) {
+                        case 1: // Landscape (ROTATION_90)
+                            screen_x = raw_y * dev.absXMultiplier;
+                            screen_y = (dev.absX.maximum - raw_x) * dev.absYMultiplier;
+                            break;
+                        case 2: // Reverse Portrait (ROTATION_180)
+                            screen_x = (dev.absX.maximum - raw_x) * dev.absXMultiplier;
+                            screen_y = (dev.absY.maximum - raw_y) * dev.absYMultiplier;
+                            break;
+                        case 3: // Reverse Landscape (ROTATION_270)
+                            screen_x = (dev.absY.maximum - raw_y) * dev.absXMultiplier;
+                            screen_y = raw_x * dev.absYMultiplier;
+                            break;
+                        case 0: // Portrait
+                        default:
+                            screen_x = raw_x * dev.absXMultiplier;
+                            screen_y = raw_y * dev.absYMultiplier;
+                            break;
+                    }
 
-                        switch (orientation) {
-                            case 1: // Landscape (ROTATION_90)
-                                screen_x = y * dev.absXMultiplier;
-                                screen_y = (dev.absX.maximum - x) * dev.absYMultiplier;
-                                break;
-                            case 2: // Reverse Portrait (ROTATION_180)
-                                screen_x = (dev.absX.maximum - x) * dev.absXMultiplier;
-                                screen_y = (dev.absY.maximum - y) * dev.absYMultiplier;
-                                break;
-                            case 3: // Reverse Landscape (ROTATION_270)
-                                screen_x = (dev.absY.maximum - y) * dev.absXMultiplier;
-                                screen_y = x * dev.absYMultiplier;
-                                break;
-                            case 0: // Portrait
-                            default:
-                                screen_x = x * dev.absXMultiplier;
-                                screen_y = y * dev.absYMultiplier;
-                                break;
+                    if (isDown) {
+                        last_screen_x = screen_x;
+                        last_screen_y = screen_y;
+                        {
+                            std::lock_guard<std::mutex> lock(g_touch_mutex);
+                            g_touch_events.push_back({screen_x, screen_y, true});
                         }
 
-                        // Clamp to ImGui display boundaries
-                        if (imgui_io->DisplaySize.x > 100.f)
-                            screen_x = fmax(0.0f, fmin(screen_x, imgui_io->DisplaySize.x));
-                        if (imgui_io->DisplaySize.y > 100.f)
-                            screen_y = fmax(0.0f, fmin(screen_y, imgui_io->DisplaySize.y));
+                        if (!lastDown && ++clickCount <= 10) {
+                            printf("  [Touch #%d] Tap DOWN at (%.1f, %.1f) [ori: %d]\n",
+                                   clickCount, screen_x, screen_y, (int)orientation);
+                            fflush(stdout);
+                        }
+                    } else if (lastDown) {
+                        // Finger lifted: deliver release at the exact point of touch
+                        {
+                            std::lock_guard<std::mutex> lock(g_touch_mutex);
+                            g_touch_events.push_back({last_screen_x, last_screen_y, false});
+                        }
 
-                        // Set ImGui mouse state (both legacy & modern 1.87+ APIs)
-                        imgui_io->MousePos = ImVec2(screen_x, screen_y);
-                        imgui_io->MouseDown[0] = isDown;
-                        imgui_io->AddMousePosEvent(screen_x, screen_y);
-                        imgui_io->AddMouseButtonEvent(0, isDown);
-
-                        if (isDown && ++dbgTouchCount <= 10) {
-                            printf("  [Touch #%d] Click at (%.1f, %.1f) [raw: x=%.0f, y=%.0f, ori=%d]\n",
-                                   dbgTouchCount, screen_x, screen_y, x, y, (int)orientation);
+                        if (clickCount <= 10) {
+                            printf("  [Touch #%d] Tap UP at (%.1f, %.1f)\n",
+                                   clickCount, last_screen_x, last_screen_y);
                             fflush(stdout);
                         }
                     }
+
+                    lastDown = isDown;
                 }
             }
         }
@@ -179,11 +219,9 @@ namespace touch {
         g_touch_running.store(true);
         orientation = _orientation;
         if (orientation == 0) {
-            // Free Fire is strictly a landscape game!
-            orientation = 1;
+            orientation = 1; // Landscape for Free Fire
         }
 
-        // Ensure permissions for all input event devices
         system("chmod 666 /dev/input/event* >/dev/null 2>&1");
 
         bool result = false;
@@ -196,7 +234,6 @@ namespace touch {
         }
 
         dirent *ptr;
-        int devCount = 0;
         while ((ptr = readdir(dir))) {
             if (strstr(ptr->d_name, "event")) {
                 char event_path[128];
@@ -204,22 +241,22 @@ namespace touch {
                 input _input(event_path, _screen_w, _screen_h);
                 if (_input.canBeUsed) {
                     result = true;
-                    devCount++;
-                    printf("  [✓] Found touch device: %s (absX: 0..%d, absY: 0..%d)\n",
+                    printf("  [✓] Primary touchscreen selected: %s (absX: 0..%d, absY: 0..%d)\n",
                            event_path, _input.absX.maximum, _input.absY.maximum);
                     fflush(stdout);
                     inputs.push_back(_input);
                     std::thread(input_thread, _input).detach();
+                    break; // STOP searching! A phone has only ONE primary touchscreen!
                 }
             }
         }
         closedir(dir);
 
         if (!result) {
-            printf("  [!] WARNING: No touch device could be opened in /dev/input/!\n");
+            printf("  [!] WARNING: No touchscreen detected in /dev/input/!\n");
         } else {
-            printf("  [✓] Touch system initialized (%d device(s), ori=%d, screen=%dx%d)\n",
-                   devCount, (int)orientation, _screen_w, _screen_h);
+            printf("  [✓] Touch system initialized (ori=%d, screen=%dx%d)\n",
+                   (int)orientation, _screen_w, _screen_h);
         }
         fflush(stdout);
 
@@ -248,6 +285,7 @@ namespace touch {
         for (auto &_input: inputs)
             _input.close();
         inputs.clear();
-        imgui_io = nullptr;
+        std::lock_guard<std::mutex> lock(g_touch_mutex);
+        g_touch_events.clear();
     }
 }

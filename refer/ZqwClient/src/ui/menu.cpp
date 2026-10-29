@@ -92,10 +92,11 @@ namespace ui::menu {
         ImGui::PushID(id);
         float avail = ImGui::GetContentRegionAvail().x;
         ImVec2 pos = ImGui::GetCursorScreenPos();
-        float h = 28.f;
-        ImGui::InvisibleButton("btn", ImVec2(avail, h));
-        bool clicked = ImGui::IsItemClicked();
+        float h = 30.f;
+        bool pressed = ImGui::InvisibleButton("btn", ImVec2(avail, h));
         bool hover = ImGui::IsItemHovered();
+        bool tap = hover && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 6.0f);
+        bool clicked = pressed || tap || ImGui::IsItemClicked();
         if (clicked) *value = !*value;
         ImDrawList* dl = ImGui::GetWindowDrawList();
         if (dl) {
@@ -106,7 +107,7 @@ namespace ui::menu {
             ImU32 lblCol = NS_Lerp(C_TextSec(), C_TextMain(), ImMax(on, hov*0.5f));
             dl->AddText(ImGui::GetFont(), 12.f,
                 {pos.x, pos.y+(h-lh)*0.5f}, lblCol, label);
-            float tw = 34.f, th = 18.f;
+            float tw = 36.f, th = 20.f;
             float tx = pos.x + avail - tw, ty = pos.y + (h - th) * 0.5f;
             dl->AddRectFilled({tx, ty}, {tx+tw, ty+th},
                 NS_Lerp(IM_COL32(42,42,50,(int)(content_alpha*255)), C_Accent(), on), th*0.5f);
@@ -185,9 +186,9 @@ namespace ui::menu {
                 accent ? IM_COL32(255,255,255,255) : C_TextMain(), label);
         }
         ImGui::SetCursorScreenPos(pos);
-        ImGui::InvisibleButton("btn", size);
-        bool clicked = ImGui::IsItemClicked();
-        ImGui::Dummy(size);
+        bool pressed = ImGui::InvisibleButton("btn", size);
+        bool tap = hover && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 6.0f);
+        bool clicked = pressed || tap || ImGui::IsItemClicked();
         ImGui::PopID();
         return clicked;
     }
@@ -512,35 +513,39 @@ namespace ui::menu {
         ma = ma + ((bar::g_open ? 1.f : 0.f) - ma) * ImClamp(12.f*dt, 0.f, 1.f);
 
         if (ma > 0.01f) {
-            int da = (int)(200*ma*bar::game_alpha());
-            ImGui::GetBackgroundDrawList()->AddRectFilled({0,0},{g_sw,g_sh},IM_COL32(0,0,0,da));
+            int da = (int)(45 * ma * bar::game_alpha());
+            ImGui::GetBackgroundDrawList()->AddRectFilled({0,0},{g_sw,g_sh},IM_COL32(12,8,24,da));
         }
         if (ma < 0.01f) return;
 
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ma);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
-        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 8.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 4.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 3));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 18.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 6.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 6));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(4, 4));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 4.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 5.f);
         ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 20.f);
         ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 12.f);
         ImGui::PushStyleColor(ImGuiCol_WindowBg, {0,0,0,0});
         ImGui::PushStyleColor(ImGuiCol_Border, {0,0,0,0});
 
-        ImVec2 wsz(960.f, 620.f);
-        if (g_sw > 100.f && wsz.x > g_sw - 20.f) wsz.x = g_sw - 20.f;
-        if (g_sh > 100.f && wsz.y > g_sh - 20.f) wsz.y = g_sh - 20.f;
+        // Ergonomic, responsive window size suitable for all mobile screen resolutions
+        ImVec2 wsz(720.f, 470.f);
+        if (g_sw > 100.f && wsz.x > g_sw - 30.f) wsz.x = g_sw - 30.f;
+        if (g_sh > 100.f && wsz.y > g_sh - 30.f) wsz.y = g_sh - 30.f;
 
-        if (g_menu_pos.x < 0.f || (g_sw > 100.f && g_menu_pos.x > g_sw)) {
+        if (g_menu_pos.x < 0.f || (g_sw > 100.f && g_menu_pos.x > g_sw - 50.f) || (g_sh > 100.f && g_menu_pos.y > g_sh - 50.f)) {
             g_menu_pos = {(g_sw - wsz.x) * 0.5f, (g_sh - wsz.y) * 0.5f};
-            if (g_menu_pos.x < 10.f) g_menu_pos.x = 10.f;
-            if (g_menu_pos.y < 10.f) g_menu_pos.y = 10.f;
+            if (g_menu_pos.x < 15.f) g_menu_pos.x = 15.f;
+            if (g_menu_pos.y < 15.f) g_menu_pos.y = 15.f;
         }
+        if (g_sw > 100.f && g_menu_pos.x + wsz.x > g_sw) g_menu_pos.x = ImMax(10.f, g_sw - wsz.x - 10.f);
+        if (g_sh > 100.f && g_menu_pos.y + wsz.y > g_sh) g_menu_pos.y = ImMax(10.f, g_sh - wsz.y - 10.f);
+
         ImGui::SetNextWindowSize(wsz, ImGuiCond_Always);
         ImGui::SetNextWindowPos(g_menu_pos, ImGuiCond_Always);
 
@@ -606,12 +611,31 @@ namespace ui::menu {
 
         ImGui::SetCursorScreenPos({closeX, closeY});
         ImGui::PushID(9999);
-        if (ImGui::InvisibleButton("hide", {closeW, closeW})) {
+        if (ImGui::InvisibleButton("hide", {closeW, closeW}) ||
+            (hoverClose && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 5.f))) {
             bar::g_open = false;
             printf("  [Menu] Closed by user -> Floating pill active\n");
             fflush(stdout);
         }
         ImGui::PopID();
+
+        // ── Header Dragging (strict bounds excluding close button) ──
+        bool inHeaderDrag = (mp.x >= wp.x && mp.x <= (wp.x + ws.x - closeW - 20.f) &&
+                             mp.y >= wp.y && mp.y <= (wp.y + headerH));
+        if (inHeaderDrag && ImGui::IsMouseClicked(0)) {
+            drag = true;
+            doff = {mp.x - g_menu_pos.x, mp.y - g_menu_pos.y};
+        }
+        if (drag) {
+            if (ImGui::IsMouseDown(0)) {
+                ImVec2 np = {mp.x - doff.x, mp.y - doff.y};
+                if (g_sw > ws.x) np.x = ImClamp(np.x, 0.f, g_sw - ws.x);
+                if (g_sh > ws.y) np.y = ImClamp(np.y, 0.f, g_sh - ws.y);
+                g_menu_pos = np;
+            } else {
+                drag = false;
+            }
+        }
 
         float sbY = wp.y + headerH;
         float sbBot = wp.y + ws.y - footerH;
@@ -621,9 +645,9 @@ namespace ui::menu {
                     col(UITheme::border, ma), 1.f);
 
         float navStartY = sbY + 14.f;
-        float navItemH = 36.f;
+        float navItemH = 38.f;
         for (int i = 0; i < 3; i++) {
-            float ny = navStartY + i * (navItemH + 2);
+            float ny = navStartY + i * (navItemH + 4);
             bool act = (tab == i);
             bool hov = ImGui::IsMouseHoveringRect({wp.x, ny},
                                                    {wp.x+sidebarW, ny+navItemH});
@@ -642,10 +666,13 @@ namespace ui::menu {
             ImU32 txtCol = act ? col(UITheme::text, ma) :
                           (hov ? col(UITheme::text, ma) : col(UITheme::text_dim, ma));
             dl->AddText(ImGui::GetFont(), 12.f,
-                {wp.x+34, ny+11}, txtCol, tabTitles[i]);
+                {wp.x+34, ny+12}, txtCol, tabTitles[i]);
             ImGui::SetCursorScreenPos({wp.x, ny});
             ImGui::PushID(i+500);
-            if (ImGui::InvisibleButton("nav", {sidebarW, navItemH})) tab = i;
+            if (ImGui::InvisibleButton("nav", {sidebarW, navItemH}) ||
+                (hov && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 5.f))) {
+                tab = i;
+            }
             ImGui::PopID();
         }
 
@@ -657,20 +684,27 @@ namespace ui::menu {
         dl->AddText(ImGui::GetFont(), 8.f, {wp.x+14, sFootY+24},
                     col(UITheme::accent_light, ma), "ACTIVE");
 
-        float contentX = wp.x + sidebarW + 20.f;
-        float contentY = wp.y + headerH + 18.f;
-        float contentW = ws.x - sidebarW - 40.f;
-        float contentH = ws.y - headerH - footerH - 54.f;
+        float contentX = wp.x + sidebarW + 16.f;
+        float contentY = wp.y + headerH + 12.f;
+        float contentW = ws.x - sidebarW - 32.f;
+        float contentH = ws.y - headerH - footerH - 24.f;
 
         ImGui::SetCursorScreenPos({contentX, contentY});
 
-        ImGui::PushStyleColor(ImGuiCol_ScrollbarBg,           IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab,         col(UITheme::accent, ma * 0.7f));
+        ImGui::PushStyleColor(ImGuiCol_ScrollbarBg,           IM_COL32(30, 20, 45, (int)(120 * ma)));
+        ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab,         col(UITheme::accent, ma * 0.85f));
         ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered,  col(UITheme::accent_light, ma));
         ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive,   col(UITheme::accent_light, ma));
 
         ImGui::BeginChild("content", {contentW, contentH}, false,
                           ImGuiWindowFlags_NoBackground);
+
+        // Mobile touch drag-scroll support inside content
+        if (ImGui::IsWindowHovered() && ImGui::IsMouseDragging(0, 4.0f)) {
+            float scroll_y = ImGui::GetScrollY();
+            scroll_y -= ImGui::GetIO().MouseDelta.y;
+            ImGui::SetScrollY(scroll_y);
+        }
 
         dl = ImGui::GetWindowDrawList();
         content_w = ImGui::GetContentRegionAvail().x;
@@ -714,23 +748,6 @@ namespace ui::menu {
         float fvw = ImGui::CalcTextSize(fv).x;
         dl->AddText(ImGui::GetFont(), 10.f,
             {wp.x + ws.x - fvw - 16, fy + 16}, col(UITheme::text_dim, ma), fv);
-
-        if ((mp.x>=wp.x && mp.x<=wp.x+ws.x && mp.y>=wp.y && mp.y<=wp.y+headerH)) {
-            if (ImGui::IsMouseClicked(0)) {
-                drag = true;
-                doff = {mp.x-wp.x, mp.y-wp.y};
-            }
-        }
-        if (drag) {
-            if (ImGui::IsMouseDown(0)) {
-                ImVec2 np{mp.x-doff.x, mp.y-doff.y};
-                np.x = ImClamp(np.x, 0.f, g_sw-ws.x);
-                np.y = ImClamp(np.y, 0.f, g_sh-ws.y);
-                g_menu_pos = np;
-            } else {
-                drag = false;
-            }
-        }
 
         ImGui::End();
         ImGui::PopStyleColor(2);

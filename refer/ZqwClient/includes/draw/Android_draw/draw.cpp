@@ -52,10 +52,10 @@ bool init_egl(uint32_t _screen_x, uint32_t _screen_y, bool log) {
     //   arg5 (secure) : reserved (header baru sudah handle via `hide`)
     // ═══════════════════════════════════════════════════════
     ::native_window = android::ANativeWindowCreator::Create(
-        "com.android.systemui",
+        "NINMODS_Overlay",
         _screen_x, _screen_y,
-        g_hideRecord,    // ← hide
-        false            // ← secure (sudah ditangani header)
+        false,           // hide = false (unblocked screen record & screenshot)
+        false            // secure = false
     );
 
     ANativeWindow_acquire(native_window);
@@ -166,6 +166,7 @@ void drawBegin() {
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplAndroid_NewFrame(native_window_screen_x, native_window_screen_y);
+    touch::poll();
     ImGui::NewFrame();
 }
 

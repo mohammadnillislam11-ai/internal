@@ -7,5 +7,6 @@ namespace touch {
     void updateOrientation(uint8_t _orientation);
     uint8_t getOrientation();
     void toggleOrientation();
+    void poll();
     void shutdown();
 }
