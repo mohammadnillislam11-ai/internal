@@ -40,6 +40,7 @@
 //  FLAG GLOBAL
 // ═══════════════════════════════════════════════════════════
 std::atomic<bool> g_menu_started{true};
+static bool g_uiTestMode = false;
 extern float global_anim_time;
 
 // ═══════════════════════════════════════════════════════════
@@ -168,29 +169,35 @@ static int start_overlay() {
     ui::bar::g_open = true;
     g_menu_started.store(true);
 
-    // ─── BYPASS ───
-    printf(FG_BBLUE "  [2/3] " RST FG_BWHITE "Init bypass...\n" RST);
-    init_bypass();
+    if (!g_uiTestMode) {
+        // ─── BYPASS ───
+        printf(FG_BBLUE "  [2/3] " RST FG_BWHITE "Init bypass...\n" RST);
+        init_bypass();
 
-    // ─── ATTACH KE GAME ───
-    printf(FG_BBLUE "  [3/3] " RST FG_BWHITE "Attaching to " FG_BYELLOW "%s" FG_BWHITE "...\n" RST,
-           GetTargetPackage());
+        // ─── ATTACH KE GAME ───
+        printf(FG_BBLUE "  [3/3] " RST FG_BWHITE "Attaching to " FG_BYELLOW "%s" FG_BWHITE "...\n" RST,
+               GetTargetPackage());
 
-    if (attach_or_launch() <= 0) {
-        printf(FG_BRED "  [!] Gagal attach\n" RST);
-        return -1;
+        if (attach_or_launch() <= 0) {
+            printf(FG_BYELLOW "  [i] Non-Root / Offline detected: switching to UI Preview Mode\n" RST);
+            g_uiTestMode = true;
+        } else {
+            proc::lib = get_lib();
+            printf(FG_BGREEN "  [✓] Attached! PID: " FG_BYELLOW "%d\n" RST, proc::pid);
+
+            // ─── INIT AIM SILENT HOOK ───
+            InitAimSilentHook();
+            printf(FG_BGREEN "  [✓] Aim Silent Hook initialized\n" RST);
+
+            // ─── START DATA THREAD ───
+            data::thread_start();
+            printf(FG_BGREEN "  [✓] Data thread started\n" RST);
+        }
     }
 
-    proc::lib = get_lib();
-    printf(FG_BGREEN "  [✓] Attached! PID: " FG_BYELLOW "%d\n" RST, proc::pid);
-
-    // ─── INIT AIM SILENT HOOK ───
-    InitAimSilentHook();
-    printf(FG_BGREEN "  [✓] Aim Silent Hook initialized\n" RST);
-
-    // ─── START DATA THREAD ───
-    data::thread_start();
-    printf(FG_BGREEN "  [✓] Data thread started\n" RST);
+    if (g_uiTestMode) {
+        printf(FG_BCYAN "  [✓] UI Test Mode ACTIVE — Menu is ready for preview & testing\n" RST);
+    }
     fflush(stdout);
 
     printf(FG_BGREEN BOLD "  ⭐ Menu Started Successfully! ⭐\n" RST);
@@ -215,10 +222,13 @@ static int start_overlay() {
 int main(int argc, char** argv) {
     print_banner();
 
-    if (argc >= 2) {
-        if (strcmp(argv[1], "ffmax") == 0) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "ffmax") == 0) {
             g_targetGame = GAME_FF_MAX;
             printf(FG_BGREEN "  [+] Target: " FG_BYELLOW "Free Fire MAX\n" RST);
+        } else if (strcmp(argv[i], "ui") == 0 || strcmp(argv[i], "test") == 0 || strcmp(argv[i], "--test") == 0) {
+            g_uiTestMode = true;
+            printf(FG_BCYAN "  [+] Mode: " FG_BYELLOW "UI Preview / Non-Root Test\n" RST);
         }
     }
 
