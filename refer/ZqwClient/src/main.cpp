@@ -40,6 +40,7 @@
 //  FLAG GLOBAL
 // ═══════════════════════════════════════════════════════════
 std::atomic<bool> g_menu_started{true};
+extern float global_anim_time;
 
 // ═══════════════════════════════════════════════════════════
 // BYPASS
@@ -153,7 +154,7 @@ static int start_overlay() {
     touch::init(max_size, min_size, (uint8_t)displayInfo.orientation);
 
     // Open menu directly without login screens
-    bar::g_open = true;
+    ui::bar::g_open = true;
     g_menu_started.store(true);
 
     // ─── BYPASS ───
