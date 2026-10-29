@@ -166,8 +166,8 @@ void drawBegin() {
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplAndroid_NewFrame(native_window_screen_x, native_window_screen_y);
-    touch::poll();
     ImGui::NewFrame();
+    touch::poll();
 }
 
 void drawEnd() {

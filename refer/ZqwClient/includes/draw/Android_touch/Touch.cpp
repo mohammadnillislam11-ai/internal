@@ -206,20 +206,8 @@ namespace touch {
                         s_phys_x.store(screen_x);
                         s_phys_y.store(screen_y);
                         s_phys_down.store(true);
-
-                        if (!lastDown && ++clickCount <= 10) {
-                            printf("  [Touch #%d] Tap DOWN at (%.1f, %.1f) [ori: %d]\n",
-                                   clickCount, screen_x, screen_y, (int)orientation);
-                            fflush(stdout);
-                        }
                     } else if (lastDown) {
                         s_phys_down.store(false);
-
-                        if (clickCount <= 10) {
-                            printf("  [Touch #%d] Tap UP at (%.1f, %.1f)\n",
-                                   clickCount, last_screen_x, last_screen_y);
-                            fflush(stdout);
-                        }
                     }
 
                     lastDown = isDown;

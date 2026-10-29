@@ -106,6 +106,9 @@ namespace ui::menu {
 
         bool hovered, held;
         bool pressed = ImGui::ButtonBehavior(bb, uid, &hovered, &held);
+        if (!pressed && hovered && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 8.0f)) {
+            pressed = true;
+        }
         if (pressed) {
             *value = !*value;
             ImGui::MarkItemEdited(uid);
@@ -187,6 +190,9 @@ namespace ui::menu {
 
         bool hovered, held;
         bool pressed = ImGui::ButtonBehavior(bb, uid, &hovered, &held);
+        if (!pressed && hovered && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 8.0f)) {
+            pressed = true;
+        }
 
         std::string key = std::string(id)+"#b";
         float hov = NS_Anim(key+"hov", hovered?1.f:0.f, 20.f);
@@ -356,11 +362,22 @@ namespace ui::menu {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
 
+        // ── ESP Master Enable card ──
+        float cardEnH = 68.f;
+        ImVec2 cpEn = ImGui::GetCursorScreenPos();
+        NS_CardBegin(dl, cpEn, cw, cardEnH);
+        NS_CardTitle(dl, {cpEn.x+16, cpEn.y+14}, oxorany("ESP"), "Master Switch");
+        ImGui::SetCursorScreenPos({cpEn.x+16, cpEn.y+40});
+        NS_Toggle("esp_enabled", oxorany("Enable ESP"), &cfg::esp::enabled);
+
+        ImGui::SetCursorScreenPos({cpEn.x, cpEn.y+cardEnH+12});
+        ImGui::Dummy({0,0});
+
         float colW = (cw - 32 - 24) * 0.5f;
         float card1H = 240.f;
         ImVec2 cp = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp, cw, card1H);
-        NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("ESP"), "Master");
+        NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("ESP Features"), "Toggles");
         ImGui::SetCursorScreenPos({cp.x+16, cp.y+44});
 
         ImGui::PushID("esp_cols");
@@ -547,18 +564,19 @@ namespace ui::menu {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, {0,0,0,0});
         ImGui::PushStyleColor(ImGuiCol_Border, {0,0,0,0});
 
+        float sw = (g_sw > 100.f) ? g_sw : 2400.f;
+        float sh = (g_sh > 100.f) ? g_sh : 1080.f;
+
         // Ergonomic, responsive window size matching reference project (660 x 440)
         ImVec2 wsz(660.f, 440.f);
-        if (g_sw > 100.f && wsz.x > g_sw - 30.f) wsz.x = g_sw - 30.f;
-        if (g_sh > 100.f && wsz.y > g_sh - 30.f) wsz.y = g_sh - 30.f;
+        if (wsz.x > sw - 20.f) wsz.x = sw - 20.f;
+        if (wsz.y > sh - 20.f) wsz.y = sh - 20.f;
 
-        if (g_menu_pos.x < 0.f || (g_sw > 100.f && g_menu_pos.x > g_sw - 40.f) || (g_sh > 100.f && g_menu_pos.y > g_sh - 40.f)) {
-            g_menu_pos = {(g_sw - wsz.x) * 0.5f, (g_sh - wsz.y) * 0.5f};
-            if (g_menu_pos.x < 15.f) g_menu_pos.x = 15.f;
-            if (g_menu_pos.y < 15.f) g_menu_pos.y = 15.f;
+        if (g_menu_pos.x < 0.f || g_menu_pos.y < 0.f) {
+            g_menu_pos = {(sw - wsz.x) * 0.5f, (sh - wsz.y) * 0.5f};
         }
-        if (g_sw > 100.f && g_menu_pos.x + wsz.x > g_sw) g_menu_pos.x = ImMax(10.f, g_sw - wsz.x - 10.f);
-        if (g_sh > 100.f && g_menu_pos.y + wsz.y > g_sh) g_menu_pos.y = ImMax(10.f, g_sh - wsz.y - 10.f);
+        g_menu_pos.x = ImClamp(g_menu_pos.x, 5.f, sw - wsz.x - 5.f);
+        g_menu_pos.y = ImClamp(g_menu_pos.y, 5.f, sh - wsz.y - 5.f);
 
         ImGui::SetNextWindowSize(wsz, ImGuiCond_Always);
         ImGui::SetNextWindowPos(g_menu_pos, ImGuiCond_Always);
@@ -591,16 +609,16 @@ namespace ui::menu {
         bg->AddLine({wp.x, wp.y+headerH}, {wp.x+ws.x, wp.y+headerH},
                     col(UITheme::border, ma), 1.f);
 
-        // Header drag mechanism using ImGui active item tracking
+        // Header drag mechanism using ImGui active item tracking with physical screen clamping
         float closeW = 34.f;
         ImGui::SetCursorScreenPos(wp);
         ImGui::InvisibleButton("##header_drag", ImVec2(ws.x - closeW - 24.f, headerH));
-        if (ImGui::IsItemActive()) {
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0, 1.0f)) {
             ImVec2 delta = ImGui::GetIO().MouseDelta;
             g_menu_pos.x += delta.x;
             g_menu_pos.y += delta.y;
-            if (g_sw > ws.x) g_menu_pos.x = ImClamp(g_menu_pos.x, 10.f, g_sw - ws.x - 10.f);
-            if (g_sh > ws.y) g_menu_pos.y = ImClamp(g_menu_pos.y, 10.f, g_sh - ws.y - 10.f);
+            g_menu_pos.x = ImClamp(g_menu_pos.x, 5.f, sw - ws.x - 5.f);
+            g_menu_pos.y = ImClamp(g_menu_pos.y, 5.f, sh - ws.y - 5.f);
         }
 
         float titleX = wp.x + 20.f;
@@ -639,8 +657,6 @@ namespace ui::menu {
         if (ImGui::InvisibleButton("hide", {closeW, closeW}) ||
             (hoverClose && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 5.f))) {
             bar::g_open = false;
-            printf("  [Menu] Closed by user -> Floating pill active\n");
-            fflush(stdout);
         }
         ImGui::PopID();
 
@@ -706,8 +722,8 @@ namespace ui::menu {
         ImGui::BeginChild("content", {contentW, contentH}, false,
                           ImGuiWindowFlags_NoBackground);
 
-        // Mobile touch drag-scroll support inside content
-        if (ImGui::IsWindowHovered() && ImGui::IsMouseDragging(0, 4.0f)) {
+        // Mobile touch drag-scroll support inside content (higher threshold prevents stealing taps)
+        if (ImGui::IsWindowHovered() && ImGui::IsMouseDragging(0, 12.0f)) {
             float scroll_y = ImGui::GetScrollY();
             scroll_y -= ImGui::GetIO().MouseDelta.y;
             ImGui::SetScrollY(scroll_y);

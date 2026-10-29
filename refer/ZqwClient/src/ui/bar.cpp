@@ -71,8 +71,6 @@ namespace ui::bar {
         if (ImGui::IsMouseReleased(0)) {
             if (g_fps_potential && !g_fps_drag) {
                 g_open = true;
-                printf("  [Floating Bar] Tapped! Menu opened\n");
-                fflush(stdout);
             }
             g_fps_potential = false;
             g_fps_drag = false;

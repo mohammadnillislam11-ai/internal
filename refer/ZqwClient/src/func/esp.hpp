@@ -490,6 +490,7 @@ namespace func::esp {
     // MAIN DRAW
     // ═══════════════════════════════════════════════════════
     inline void draw() {
+        if (!cfg::esp::enabled) return;
         if (!data::inMatch.load()) return;
         if (g_sw < 10.f || g_sh < 10.f) return;
 

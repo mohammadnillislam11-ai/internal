@@ -199,35 +199,12 @@ static int start_overlay() {
     // ═══════════════════════════════════════════════════════
     //  MAIN LOOP
     // ═══════════════════════════════════════════════════════
-    int dbgCounter = 0;
     while (true) {
         global_anim_time += 0.016f;
         drawBegin();
         ui::menu::render();
         drawEnd();
         usleep(2000);
-
-        if (++dbgCounter <= 3) {
-            printf(FG_BCYAN "  [✓] Frame #%d rendered OK (open=%d)\n" RST,
-                   dbgCounter, (int)ui::bar::g_open);
-            fflush(stdout);
-        }
-
-        // Debug log tiap ~5 detik
-        if (dbgCounter >= 2500) {
-            dbgCounter = 3;
-            size_t nPlayers = 0;
-            {
-                std::lock_guard<std::mutex> lk(data::players_mutex);
-                nPlayers = data::players.size();
-            }
-            printf(FG_BCYAN "[DBG] " RST
-                   "inMatch=%d | players=%zu | aim=%d\n",
-                   (int)data::inMatch.load(std::memory_order_relaxed),
-                   nPlayers,
-                   (int)AimSilentEnabled);
-            fflush(stdout);
-        }
     }
     return 0;
 }
