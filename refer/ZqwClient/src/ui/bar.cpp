@@ -25,16 +25,16 @@ static ImVec2 g_fps_down(0, 0);
 static constexpr float FPS_DRAG_THRESHOLD = 10.f;
 
 static void get_fps_pos(float w, float h) {
+  const float sw = ImGui::GetIO().DisplaySize.x;
+  const float sh = ImGui::GetIO().DisplaySize.y;
   if (g_fps_x < 0.f || g_fps_y < 0.f) {
-    // Default position: Top-Left (always visible on all phone screen
-    // resolutions)
     g_fps_x = 50.f;
     g_fps_y = 120.f;
   }
-  if (g_sw > 0)
-    g_fps_x = ImMax(10.f, ImMin(g_fps_x, g_sw - w - 10.f));
-  if (g_sh > 0)
-    g_fps_y = ImMax(10.f, ImMin(g_fps_y, g_sh - h - 10.f));
+  if (sw > 100.f)
+    g_fps_x = ImMax(10.f, ImMin(g_fps_x, sw - w - 10.f));
+  if (sh > 100.f)
+    g_fps_y = ImMax(10.f, ImMin(g_fps_y, sh - h - 10.f));
 }
 
 static void render_fps_icon(float alpha) {
