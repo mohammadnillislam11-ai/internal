@@ -444,18 +444,46 @@ namespace func::esp {
     }
 
     // ═══════════════════════════════════════════════════════
-    // CROSSHAIR
+    // CROSSHAIR  — cross lines + animated ring circle
     // ═══════════════════════════════════════════════════════
     inline void drawCrosshair(ImDrawList* dl) {
+        if (g_sw < 10.f || g_sh < 10.f) return;
         float cx = g_sw * 0.5f, cy = g_sh * 0.5f;
-        float gap = 6.f, len = 10.f;
-        ImU32 c = IM_COL32(220, 40, 40, 240);
 
-        dl->AddLine({cx - gap - len, cy}, {cx - gap, cy}, c, 1.8f);
-        dl->AddLine({cx + gap, cy}, {cx + gap + len, cy}, c, 1.8f);
-        dl->AddLine({cx, cy - gap - len}, {cx, cy - gap}, c, 1.8f);
-        dl->AddLine({cx, cy + gap}, {cx, cy + gap + len}, c, 1.8f);
+        // ── Config ──
+        ImU32 c      = IM_COL32(220, 40, 40, 240);
+        ImU32 cShadow= IM_COL32(0, 0, 0, 120);
+        float gap    = 5.f;
+        float len    = 9.f;
+        float thick  = 1.5f;
+
+        // ── Shadow lines (depth) ──
+        dl->AddLine({cx - gap - len + 1, cy + 1}, {cx - gap + 1, cy + 1}, cShadow, thick + 1.f);
+        dl->AddLine({cx + gap + 1,       cy + 1}, {cx + gap + len + 1, cy + 1}, cShadow, thick + 1.f);
+        dl->AddLine({cx + 1, cy - gap - len + 1}, {cx + 1, cy - gap + 1}, cShadow, thick + 1.f);
+        dl->AddLine({cx + 1, cy + gap + 1},       {cx + 1, cy + gap + len + 1}, cShadow, thick + 1.f);
+
+        // ── Cross lines ──
+        dl->AddLine({cx - gap - len, cy}, {cx - gap, cy}, c, thick);
+        dl->AddLine({cx + gap,       cy}, {cx + gap + len, cy}, c, thick);
+        dl->AddLine({cx, cy - gap - len}, {cx, cy - gap}, c, thick);
+        dl->AddLine({cx, cy + gap},       {cx, cy + gap + len}, c, thick);
+
+        // ── Center dot ──
         dl->AddCircleFilled({cx, cy}, 1.5f, c);
+
+        // ── Animated outer ring circle ──
+        float t      = (float)ImGui::GetTime();
+        float pulse  = 0.5f + 0.5f * sinf(t * 2.5f);          // slow pulse
+        float radius = 28.f + 3.f * pulse;                      // 28–31 px
+        int   alpha  = (int)(180 + 60.f * pulse);               // 180–240
+        ImU32 cRing  = IM_COL32(220, 40, 40, alpha);
+        ImU32 cRingS = IM_COL32(0, 0, 0, (int)(80 * pulse));
+
+        // Shadow ring
+        dl->AddCircle({cx, cy}, radius + 1.f, cRingS, 64, 1.2f);
+        // Main ring
+        dl->AddCircle({cx, cy}, radius, cRing, 64, 1.2f);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -463,6 +491,7 @@ namespace func::esp {
     // ═══════════════════════════════════════════════════════
     inline void draw() {
         if (!data::inMatch.load()) return;
+        if (g_sw < 10.f || g_sh < 10.f) return;
 
         ImDrawList* dl = ImGui::GetForegroundDrawList();
 
@@ -472,13 +501,21 @@ namespace func::esp {
             snap = data::players;
         }
 
-        ImVec2 anchor(g_sw * 0.5f, 0.f);
+        ImVec2 anchor(g_sw * 0.5f, g_sh * 0.95f);   // tracer from bottom-center
 
         for (const auto& p : snap) {
-            if (p.Head.x < 0 || p.Head.y < 0) continue;
-            if (p.Toe.x  < 0 || p.Toe.y  < 0) continue;
+            // Skip dead or invalid players
+            if (p.curHP <= 0) continue;
+            if (p.distance <= 0.f || p.distance > cfg::esp::max_range) continue;
 
-            if (p.distance > cfg::esp::max_range) continue;
+            // Screen-space positions must be within a 2x screen boundary
+            if (p.Head.x < -g_sw || p.Head.x > g_sw * 2.f) continue;
+            if (p.Head.y < -g_sh || p.Head.y > g_sh * 2.f) continue;
+            if (p.Toe.x  < -g_sw || p.Toe.x  > g_sw * 2.f) continue;
+            if (p.Toe.y  < -g_sh || p.Toe.y  > g_sh * 2.f) continue;
+
+            // Minimum box height sanity check (at least 10 px tall)
+            if (fabsf(p.Head.y - p.Toe.y) < 10.f) continue;
 
             SkeletonBox sb = computeSkeletonBox(p);
             if (!sb.valid) continue;
@@ -486,8 +523,9 @@ namespace func::esp {
             ImVec2 tl = sb.tl;
             ImVec2 br = sb.br;
 
-            if (br.x < -100 || tl.x > g_sw + 100) continue;
-            if (br.y < -100 || tl.y > g_sh + 100) continue;
+            // Must have some on-screen presence
+            if (br.x < 0.f || tl.x > g_sw) continue;
+            if (br.y < 0.f || tl.y > g_sh) continue;
 
             float cx = (tl.x + br.x) * 0.5f;
 
@@ -495,13 +533,15 @@ namespace func::esp {
                                         : toU32(cfg::esp::box_col);
             colBase = fadeDist(colBase, p.distance, cfg::esp::max_range);
 
-            if (cfg::esp::tracer) {
+            // Tracer: only draw when player is animated/moving (speed > 0.5 m/s)
+            if (cfg::esp::tracer && p.speed > 0.5f) {
                 ImVec2 head(p.Head.x, p.Head.y);
                 float aa = ImClamp(1.f - p.distance / cfg::esp::max_range, 0.25f, 1.f);
+                // Thin tracer line: shadow + main (thickness 1.0f / 0.8f — thin)
                 dl->AddLine(anchor, head,
-                    withAlpha(toU32(cfg::esp::box_col), 0.35f * aa), 4.f);
+                    withAlpha(toU32(cfg::esp::box_col), 0.20f * aa), 1.5f);
                 dl->AddLine(anchor, head,
-                    withAlpha(toU32(cfg::esp::box_col), 0.95f * aa), 1.8f);
+                    withAlpha(toU32(cfg::esp::box_col), 0.85f * aa), 0.8f);
             }
 
             if (cfg::esp::box)
