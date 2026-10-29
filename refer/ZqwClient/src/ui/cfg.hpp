@@ -3,21 +3,21 @@
 
 namespace cfg {
 namespace esp {
-    // ── Master Switch ──
-    inline bool  enabled      = false;   // Starts OFF: ESP only works when user turns it ON from menu
+    // ── Master Switch (Default: OFF) ──
+    inline bool  enabled      = false;   // 100% Manual control: nothing runs until turned ON from menu
 
-    // ── Features ──
-    inline bool  box          = true;
-    inline int   box_type     = 3;
-    inline bool  name         = true;
-    inline bool  health       = true;
-    inline bool  armor        = true;
-    inline bool  distance     = true;
-    inline bool  weapon       = true;
-    inline bool  bot_tag      = true;
+    // ── Features (All default to OFF) ──
+    inline bool  box          = false;
+    inline int   box_type     = 0;
+    inline bool  name         = false;
+    inline bool  health       = false;
+    inline bool  armor        = false;
+    inline bool  distance     = false;
+    inline bool  weapon       = false;
+    inline bool  bot_tag      = false;
     inline bool  skeleton     = false;
     inline bool  tracer       = false;
-    inline bool  crosshair    = false;   // Starts OFF: only shows when turned ON
+    inline bool  crosshair    = false;
     inline bool  firing_ind   = false;
     inline bool  loot         = false;
 
