@@ -590,23 +590,27 @@ namespace ui::menu {
             {titleX + 116.f, wp.y + 21.f},
             col(UITheme::text, ma), tabTitles[tab]);
 
-        float closeW = 28.f;
-        float closeX = wp.x + ws.x - closeW - 14.f;
+        float closeW = 34.f;
+        float closeX = wp.x + ws.x - closeW - 12.f;
         float closeY = wp.y + (headerH - closeW) * 0.5f;
         bool hoverClose = ImGui::IsMouseHoveringRect({closeX, closeY},
                                                       {closeX+closeW, closeY+closeW});
         if (hoverClose) bg->AddRectFilled({closeX, closeY},
                                           {closeX+closeW, closeY+closeW},
-                                          col(UITheme::danger, ma), 5.f);
-        float cX = closeX+14, cY = closeY+14, cr = 4.f;
+                                          col(UITheme::danger, ma), 6.f);
+        float cX = closeX + closeW * 0.5f, cY = closeY + closeW * 0.5f, cr = 5.f;
         bg->AddLine({cX-cr,cY-cr},{cX+cr,cY+cr},
-            hoverClose ? IM_COL32(255,255,255,255) : col(UITheme::text_dim, ma), 1.5f);
+            hoverClose ? IM_COL32(255,255,255,255) : col(UITheme::text_dim, ma), 1.8f);
         bg->AddLine({cX-cr,cY+cr},{cX+cr,cY-cr},
-            hoverClose ? IM_COL32(255,255,255,255) : col(UITheme::text_dim, ma), 1.5f);
+            hoverClose ? IM_COL32(255,255,255,255) : col(UITheme::text_dim, ma), 1.8f);
 
         ImGui::SetCursorScreenPos({closeX, closeY});
         ImGui::PushID(9999);
-        if (ImGui::InvisibleButton("hide", {closeW, closeW})) bar::g_open = false;
+        if (ImGui::InvisibleButton("hide", {closeW, closeW})) {
+            bar::g_open = false;
+            printf("  [Menu] Closed by user -> Floating pill active\n");
+            fflush(stdout);
+        }
         ImGui::PopID();
 
         float sbY = wp.y + headerH;
@@ -690,11 +694,17 @@ namespace ui::menu {
         float fbX = wp.x + 18.f;
         float fbY = fy + 8.f;
         ImGui::SetCursorScreenPos({fbX, fbY});
-        if (NS_Button("f_save", "Save", {70, 28}, true)) {}
+        if (NS_Button("f_save", "Save", {64, 28}, true)) {}
         ImGui::SameLine(0, 8);
-        if (NS_Button("f_load", "Load", {70, 28}, false)) {}
+        if (NS_Button("f_load", "Load", {64, 28}, false)) {}
         ImGui::SameLine(0, 8);
-        if (NS_Button("f_reset", "Reset", {70, 28}, false)) {}
+        if (NS_Button("f_reset", "Reset", {64, 28}, false)) {}
+        ImGui::SameLine(0, 8);
+        if (NS_Button("f_hide", "Hide", {64, 28}, false)) {
+            bar::g_open = false;
+            printf("  [Menu] Minimized to floating bar\n");
+            fflush(stdout);
+        }
 
         const char* fh = "NINMODS";
         float fhw = ImGui::CalcTextSize(fh).x;
