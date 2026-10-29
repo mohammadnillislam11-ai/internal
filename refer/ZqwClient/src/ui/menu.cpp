@@ -89,40 +89,51 @@ namespace ui::menu {
     }
 
     static bool NS_Toggle(const char* id, const char* label, bool* value) {
-        ImGui::PushID(id);
-        float avail = ImGui::GetContentRegionAvail().x;
-        ImVec2 pos = ImGui::GetCursorScreenPos();
-        float h = 30.f;
-        bool pressed = ImGui::InvisibleButton("btn", ImVec2(avail, h));
-        bool hover = ImGui::IsItemHovered();
-        bool tap = hover && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 6.0f);
-        bool clicked = pressed || tap || ImGui::IsItemClicked();
-        if (clicked) *value = !*value;
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        if (dl) {
-            std::string key = std::string(id) + "#t";
-            float on = NS_Anim(key+"on", *value ? 1.f : 0.f, 16.f);
-            float hov = NS_Anim(key+"hov", hover ? 1.f : 0.f, 18.f);
-            float lh = ImGui::CalcTextSize(label).y;
-            ImU32 lblCol = NS_Lerp(C_TextSec(), C_TextMain(), ImMax(on, hov*0.5f));
-            dl->AddText(ImGui::GetFont(), 12.f,
-                {pos.x, pos.y+(h-lh)*0.5f}, lblCol, label);
-            float tw = 36.f, th = 20.f;
-            float tx = pos.x + avail - tw, ty = pos.y + (h - th) * 0.5f;
-            dl->AddRectFilled({tx, ty}, {tx+tw, ty+th},
-                NS_Lerp(IM_COL32(42,42,50,(int)(content_alpha*255)), C_Accent(), on), th*0.5f);
-            if (on > 0.5f) {
-                dl->AddRect({tx, ty}, {tx+tw, ty+th},
-                    (C_Accent() & 0x00FFFFFF) | ((ImU32)(80*on) << 24),
-                    th*0.5f, 0, 1.f);
-            }
-            float knobR = th*0.5f - 2.f;
-            float knobX = tx + 2.f + (tw - th) * on;
-            dl->AddCircleFilled({knobX+knobR, ty+th*0.5f}, knobR,
-                on > 0.5f ? IM_COL32(255,255,255,255) : IM_COL32(200,200,210,255));
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        if (window->SkipItems) return false;
+
+        ImGuiContext& g = *GImGui;
+        const ImGuiStyle& style = g.Style;
+        const ImGuiID uid = window->GetID(id);
+
+        const float h = 28.f;
+        const float tw = 36.f, th = 18.f;
+        const float avail = ImGui::GetContentRegionAvail().x;
+        const ImRect bb(window->DC.CursorPos, ImVec2(window->DC.CursorPos.x + avail, window->DC.CursorPos.y + h));
+
+        ImGui::ItemSize(bb, style.FramePadding.y);
+        if (!ImGui::ItemAdd(bb, uid)) return false;
+
+        bool hovered, held;
+        bool pressed = ImGui::ButtonBehavior(bb, uid, &hovered, &held);
+        if (pressed) {
+            *value = !*value;
+            ImGui::MarkItemEdited(uid);
         }
-        ImGui::PopID();
-        return clicked;
+
+        std::string key = std::string(id) + "#t";
+        float on = NS_Anim(key+"on", *value ? 1.f : 0.f, 16.f);
+        float hov = NS_Anim(key+"hov", hovered ? 1.f : 0.f, 18.f);
+
+        ImDrawList* dl = window->DrawList;
+        float lh = ImGui::CalcTextSize(label).y;
+        ImU32 lblCol = NS_Lerp(C_TextSec(), C_TextMain(), ImMax(on, hov*0.5f));
+        dl->AddText(ImGui::GetFont(), 12.f, {bb.Min.x, bb.Min.y + (h-lh)*0.5f}, lblCol, label);
+
+        float tx = bb.Min.x + avail - tw;
+        float ty = bb.Min.y + (h - th) * 0.5f;
+        ImU32 bgCol = NS_Lerp(IM_COL32(40,40,48,(int)(content_alpha*255)), C_Accent(), on);
+        dl->AddRectFilled({tx, ty}, {tx+tw, ty+th}, bgCol, th*0.5f);
+        if (on > 0.05f) {
+            dl->AddRect({tx, ty}, {tx+tw, ty+th},
+                (C_Accent() & 0x00FFFFFF) | ((ImU32)(80*on) << 24), th*0.5f, 0, 1.f);
+        }
+        float knobR = th*0.5f - 2.f;
+        float knobX = tx + 2.f + (tw - th) * on;
+        dl->AddCircleFilled({knobX+knobR, ty+th*0.5f}, knobR,
+            on > 0.5f ? IM_COL32(255,255,255,255) : IM_COL32(200,200,210,255));
+
+        return pressed;
     }
 
     static bool NS_Slider(const char* id, const char* label, float* value,
@@ -163,34 +174,37 @@ namespace ui::menu {
     }
 
     static bool NS_Button(const char* id, const char* label, ImVec2 size, bool accent = true) {
-        ImGui::PushID(id);
-        ImVec2 pos = ImGui::GetCursorScreenPos();
-        bool hover = ImGui::IsMouseHoveringRect(pos, {pos.x+size.x, pos.y+size.y});
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        if (dl) {
-            std::string key = std::string(id)+"#b";
-            float hov = NS_Anim(key+"hov", hover?1.f:0.f, 20.f);
-            ImVec2 a = pos, b = {pos.x+size.x, pos.y+size.y};
-            ImU32 bg = accent ? NS_Lerp(C_Accent(), C_AccentBright(), hov)
-                              : NS_Lerp(C_BgCard(), C_BgCardHov(), hov);
-            dl->AddRectFilled(a, b, bg, 5.f);
-            if (accent && hov > 0.1f) {
-                dl->AddRect(a, b, (C_AccentBright() & 0x00FFFFFF) | ((ImU32)(120*hov) << 24),
-                            5.f, 0, 1.f);
-            }
-            if (!accent) {
-                dl->AddRect(a, b, C_Border(), 5.f, 0, 1.f);
-            }
-            float lw = ImGui::CalcTextSize(label).x;
-            dl->AddText({pos.x + (size.x-lw)*0.5f, pos.y + size.y*0.5f - 7},
-                accent ? IM_COL32(255,255,255,255) : C_TextMain(), label);
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        if (window->SkipItems) return false;
+
+        ImGuiContext& g = *GImGui;
+        const ImGuiStyle& style = g.Style;
+        const ImGuiID uid = window->GetID(id);
+
+        const ImRect bb(window->DC.CursorPos, ImVec2(window->DC.CursorPos.x + size.x, window->DC.CursorPos.y + size.y));
+        ImGui::ItemSize(bb, style.FramePadding.y);
+        if (!ImGui::ItemAdd(bb, uid)) return false;
+
+        bool hovered, held;
+        bool pressed = ImGui::ButtonBehavior(bb, uid, &hovered, &held);
+
+        std::string key = std::string(id)+"#b";
+        float hov = NS_Anim(key+"hov", hovered?1.f:0.f, 20.f);
+        ImU32 bg = accent ? NS_Lerp(C_Accent(), C_AccentBright(), hov)
+                          : NS_Lerp(C_BgCard(), C_BgCardHov(), hov);
+        window->DrawList->AddRectFilled(bb.Min, bb.Max, bg, 5.f);
+        if (accent && hov > 0.1f) {
+            window->DrawList->AddRect(bb.Min, bb.Max,
+                (C_AccentBright() & 0x00FFFFFF) | ((ImU32)(120*hov) << 24), 5.f, 0, 1.f);
         }
-        ImGui::SetCursorScreenPos(pos);
-        bool pressed = ImGui::InvisibleButton("btn", size);
-        bool tap = hover && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 6.0f);
-        bool clicked = pressed || tap || ImGui::IsItemClicked();
-        ImGui::PopID();
-        return clicked;
+        if (!accent) {
+            window->DrawList->AddRect(bb.Min, bb.Max, C_Border(), 5.f, 0, 1.f);
+        }
+        float lw = ImGui::CalcTextSize(label).x;
+        window->DrawList->AddText({bb.Min.x + (size.x-lw)*0.5f, bb.Min.y + size.y*0.5f - 7},
+            accent ? IM_COL32(255,255,255,255) : C_TextMain(), label);
+
+        return pressed;
     }
 
     static void NS_InfoRow(const char* label, const char* value, ImU32 valueColor = 0) {
@@ -533,12 +547,12 @@ namespace ui::menu {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, {0,0,0,0});
         ImGui::PushStyleColor(ImGuiCol_Border, {0,0,0,0});
 
-        // Ergonomic, responsive window size suitable for all mobile screen resolutions
-        ImVec2 wsz(720.f, 470.f);
+        // Ergonomic, responsive window size matching reference project (660 x 440)
+        ImVec2 wsz(660.f, 440.f);
         if (g_sw > 100.f && wsz.x > g_sw - 30.f) wsz.x = g_sw - 30.f;
         if (g_sh > 100.f && wsz.y > g_sh - 30.f) wsz.y = g_sh - 30.f;
 
-        if (g_menu_pos.x < 0.f || (g_sw > 100.f && g_menu_pos.x > g_sw - 50.f) || (g_sh > 100.f && g_menu_pos.y > g_sh - 50.f)) {
+        if (g_menu_pos.x < 0.f || (g_sw > 100.f && g_menu_pos.x > g_sw - 40.f) || (g_sh > 100.f && g_menu_pos.y > g_sh - 40.f)) {
             g_menu_pos = {(g_sw - wsz.x) * 0.5f, (g_sh - wsz.y) * 0.5f};
             if (g_menu_pos.x < 15.f) g_menu_pos.x = 15.f;
             if (g_menu_pos.y < 15.f) g_menu_pos.y = 15.f;
@@ -577,6 +591,18 @@ namespace ui::menu {
         bg->AddLine({wp.x, wp.y+headerH}, {wp.x+ws.x, wp.y+headerH},
                     col(UITheme::border, ma), 1.f);
 
+        // Header drag mechanism using ImGui active item tracking
+        float closeW = 34.f;
+        ImGui::SetCursorScreenPos(wp);
+        ImGui::InvisibleButton("##header_drag", ImVec2(ws.x - closeW - 24.f, headerH));
+        if (ImGui::IsItemActive()) {
+            ImVec2 delta = ImGui::GetIO().MouseDelta;
+            g_menu_pos.x += delta.x;
+            g_menu_pos.y += delta.y;
+            if (g_sw > ws.x) g_menu_pos.x = ImClamp(g_menu_pos.x, 10.f, g_sw - ws.x - 10.f);
+            if (g_sh > ws.y) g_menu_pos.y = ImClamp(g_menu_pos.y, 10.f, g_sh - ws.y - 10.f);
+        }
+
         float titleX = wp.x + 20.f;
         dl->AddText(ImGui::GetFont(), 17.f, {titleX, wp.y + 12.f},
                     col(UITheme::accent_light, ma), "NINMODS");
@@ -595,7 +621,6 @@ namespace ui::menu {
             {titleX + 116.f, wp.y + 21.f},
             col(UITheme::text, ma), tabTitles[tab]);
 
-        float closeW = 34.f;
         float closeX = wp.x + ws.x - closeW - 12.f;
         float closeY = wp.y + (headerH - closeW) * 0.5f;
         bool hoverClose = ImGui::IsMouseHoveringRect({closeX, closeY},
@@ -619,24 +644,6 @@ namespace ui::menu {
         }
         ImGui::PopID();
 
-        // ── Header Dragging (strict bounds excluding close button) ──
-        bool inHeaderDrag = (mp.x >= wp.x && mp.x <= (wp.x + ws.x - closeW - 20.f) &&
-                             mp.y >= wp.y && mp.y <= (wp.y + headerH));
-        if (inHeaderDrag && ImGui::IsMouseClicked(0)) {
-            drag = true;
-            doff = {mp.x - g_menu_pos.x, mp.y - g_menu_pos.y};
-        }
-        if (drag) {
-            if (ImGui::IsMouseDown(0)) {
-                ImVec2 np = {mp.x - doff.x, mp.y - doff.y};
-                if (g_sw > ws.x) np.x = ImClamp(np.x, 0.f, g_sw - ws.x);
-                if (g_sh > ws.y) np.y = ImClamp(np.y, 0.f, g_sh - ws.y);
-                g_menu_pos = np;
-            } else {
-                drag = false;
-            }
-        }
-
         float sbY = wp.y + headerH;
         float sbBot = wp.y + ws.y - footerH;
         bg->AddRectFilled({wp.x, sbY}, {wp.x+sidebarW, sbBot},
@@ -649,8 +656,15 @@ namespace ui::menu {
         for (int i = 0; i < 3; i++) {
             float ny = navStartY + i * (navItemH + 4);
             bool act = (tab == i);
-            bool hov = ImGui::IsMouseHoveringRect({wp.x, ny},
-                                                   {wp.x+sidebarW, ny+navItemH});
+            ImGui::SetCursorScreenPos({wp.x, ny});
+            ImGui::PushID(i+500);
+            if (ImGui::InvisibleButton("nav", {sidebarW, navItemH}) ||
+                (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 5.f))) {
+                tab = i;
+            }
+            bool hov = ImGui::IsItemHovered();
+            ImGui::PopID();
+
             if (act) {
                 bg->AddRectFilled({wp.x, ny}, {wp.x+sidebarW, ny+navItemH},
                                   col(UITheme::accent, ma * 0.25f));
@@ -667,13 +681,6 @@ namespace ui::menu {
                           (hov ? col(UITheme::text, ma) : col(UITheme::text_dim, ma));
             dl->AddText(ImGui::GetFont(), 12.f,
                 {wp.x+34, ny+12}, txtCol, tabTitles[i]);
-            ImGui::SetCursorScreenPos({wp.x, ny});
-            ImGui::PushID(i+500);
-            if (ImGui::InvisibleButton("nav", {sidebarW, navItemH}) ||
-                (hov && ImGui::IsMouseReleased(0) && !ImGui::IsMouseDragging(0, 5.f))) {
-                tab = i;
-            }
-            ImGui::PopID();
         }
 
         float sFootY = sbBot - 40.f;

@@ -15,14 +15,13 @@
 #include "Android_touch/Touch.hpp"
 
 namespace touch {
-    struct TouchEvent {
-        float x;
-        float y;
-        bool down;
-    };
-
-    static std::mutex g_touch_mutex;
-    static std::vector<TouchEvent> g_touch_events;
+    static std::atomic<bool> s_phys_down{false};
+    static std::atomic<float> s_phys_x{0.0f};
+    static std::atomic<float> s_phys_y{0.0f};
+    static bool s_touching = false;
+    static double s_touch_start_time = 0.0;
+    static float s_last_x = 0.0f;
+    static float s_last_y = 0.0f;
 
     struct input {
         std::string path;
@@ -106,18 +105,40 @@ namespace touch {
     }
 
     void poll() {
-        std::vector<TouchEvent> pending;
-        {
-            std::lock_guard<std::mutex> lock(g_touch_mutex);
-            if (g_touch_events.empty()) return;
-            pending.swap(g_touch_events);
-        }
         ImGuiIO& io = ImGui::GetIO();
-        for (const auto& ev : pending) {
-            io.AddMousePosEvent(ev.x, ev.y);
-            io.AddMouseButtonEvent(0, ev.down);
-            io.MousePos = ImVec2(ev.x, ev.y);
-            io.MouseDown[0] = ev.down;
+        double now = ImGui::GetTime();
+
+        bool physDown = s_phys_down.load();
+        float x = s_phys_x.load();
+        float y = s_phys_y.load();
+
+        if (physDown) {
+            if (!s_touching) {
+                s_touch_start_time = now;
+                s_touching = true;
+            }
+            s_last_x = x;
+            s_last_y = y;
+            io.AddMousePosEvent(x, y);
+            io.AddMouseButtonEvent(0, true);
+            io.MousePos = ImVec2(x, y);
+            io.MouseDown[0] = true;
+        } else {
+            if (s_touching && (now - s_touch_start_time < 0.060)) {
+                // Reference mechanism from PrabirxLive.cpp:
+                // Hold MouseDown for at least 60ms so ImGui's ButtonBehavior reliably captures fast finger taps!
+                io.AddMousePosEvent(s_last_x, s_last_y);
+                io.AddMouseButtonEvent(0, true);
+                io.MousePos = ImVec2(s_last_x, s_last_y);
+                io.MouseDown[0] = true;
+            } else if (s_touching) {
+                // Finger released after minimum hold duration
+                io.AddMousePosEvent(s_last_x, s_last_y);
+                io.AddMouseButtonEvent(0, false);
+                io.MousePos = ImVec2(s_last_x, s_last_y);
+                io.MouseDown[0] = false;
+                s_touching = false;
+            }
         }
     }
 
@@ -182,10 +203,9 @@ namespace touch {
                     if (isDown) {
                         last_screen_x = screen_x;
                         last_screen_y = screen_y;
-                        {
-                            std::lock_guard<std::mutex> lock(g_touch_mutex);
-                            g_touch_events.push_back({screen_x, screen_y, true});
-                        }
+                        s_phys_x.store(screen_x);
+                        s_phys_y.store(screen_y);
+                        s_phys_down.store(true);
 
                         if (!lastDown && ++clickCount <= 10) {
                             printf("  [Touch #%d] Tap DOWN at (%.1f, %.1f) [ori: %d]\n",
@@ -193,11 +213,7 @@ namespace touch {
                             fflush(stdout);
                         }
                     } else if (lastDown) {
-                        // Finger lifted: deliver release at the exact point of touch
-                        {
-                            std::lock_guard<std::mutex> lock(g_touch_mutex);
-                            g_touch_events.push_back({last_screen_x, last_screen_y, false});
-                        }
+                        s_phys_down.store(false);
 
                         if (clickCount <= 10) {
                             printf("  [Touch #%d] Tap UP at (%.1f, %.1f)\n",
@@ -285,7 +301,7 @@ namespace touch {
         for (auto &_input: inputs)
             _input.close();
         inputs.clear();
-        std::lock_guard<std::mutex> lock(g_touch_mutex);
-        g_touch_events.clear();
+        s_phys_down.store(false);
+        s_touching = false;
     }
 }
