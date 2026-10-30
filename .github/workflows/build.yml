@@ -25,7 +25,14 @@ jobs:
           set -o pipefail
           cd ninmods
           chmod +x compile.sh 2>/dev/null || true
-          ndk-build -B V=1 2>&1 | tee build.log || (echo "=== NDK BUILD ERROR LOG ===" && tail -n 100 build.log && exit 1)
+          if ! ndk-build -B V=1 2>&1 | tee build.log; then
+            echo "=== NDK BUILD ERROR LOG ==="
+            tail -n 100 build.log
+            grep -E "error:" build.log | head -n 25 | while read -r errline; do
+              echo "::error title=NDK Error::$errline"
+            done
+            exit 1
+          fi
 
       - name: Upload Build Log on Failure
         if: failure()
