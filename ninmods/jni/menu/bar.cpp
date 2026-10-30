@@ -52,7 +52,7 @@ namespace ui::bar {
     static constexpr float FPS_DRAG_THRESHOLD = 10.f;
 
     static void get_fps_pos(float w, float h) {
-        if (g_fps_x < 0.f || g_fps_y < 0.f) {
+        if (g_fps_x < 0.f || g_fps_y < 0.f || (g_sw > 0.f && g_fps_x > g_sw)) {
             g_fps_x = g_sw - w - 25.f;
             g_fps_y = g_sh - h - 25.f;
         }

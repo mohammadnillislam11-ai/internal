@@ -23,7 +23,6 @@
 #include "clipboard.h"
 #include "config_store.h"
 #include "logger.h"
-#include "libraries/network/license_client.h"
 #include "Font.h"
 #include "Icon.h"
 #include "Iconcpp.h"
@@ -188,95 +187,15 @@ int main(int argc, char** argv) {
     logger::log_info("==================================================");
     logger::log_info("NINMODS Client 2.0 (Multi-ABI ARM64 / ARM32)");
     logger::log_info("Log destination: %s", logger::get_log_path().c_str());
+    logger::log_info("Mode: OPEN CLIENT (Zero License Restriction)");
     logger::log_info("==================================================");
 
     // 1. Initialize native security shield (AntiDebug, AntiDump, AntiLibPatch, FridaDetect)
     shield::start_watchdog();
     logger::log_info("[+] Native security watchdog active.");
 
-    // 2. VIP License Verification - Terminal Driven (Fast, Direct, Zero On-Screen UI Friction)
+    // 2. Load stored user settings (ESP, Aim settings)
     storage::load_config();
-    std::string active_key = storage::get_saved_license();
-
-    // Check CLI argument first: ./client.sh <key>
-    if (active_key.empty() && argc > 1 && argv[1] != nullptr && strlen(argv[1]) >= 2) {
-        std::string cli_arg = argv[1];
-        while (!cli_arg.empty() && (cli_arg.back() == '\r' || cli_arg.back() == '\n' || cli_arg.back() == ' ')) cli_arg.pop_back();
-        while (!cli_arg.empty() && (cli_arg.front() == ' ' || cli_arg.front() == '\t')) cli_arg.erase(cli_arg.begin());
-        if (cli_arg != "0" && cli_arg != "exit") {
-            active_key = cli_arg;
-            std::cout << "[+] Found key from CLI argument: " << active_key << std::endl;
-        }
-    }
-
-    if (!active_key.empty()) {
-        std::cout << "[*] Verifying saved license online..." << std::flush;
-        auto auth_res = auth::verify_license_online(active_key);
-        if (auth_res.success) {
-            auth::g_licensed = true;
-            auth::g_expiration_date = auth_res.expiration_date;
-            auth::g_days_left = auth_res.days_left;
-            auth::g_exp_year = auth_res.exp_year;
-            auth::g_exp_month = auth_res.exp_month;
-            auth::g_exp_day = auth_res.exp_day;
-            storage::set_saved_license(active_key);
-            std::cout << " [OK]\n[+] Expiry: " << auth_res.expiration_date;
-            if (auth_res.days_left > 0) std::cout << " (" << auth_res.days_left << " days left)";
-            std::cout << std::endl;
-            auth::start_heartbeat_watchdog(active_key);
-        } else {
-            std::cout << " [FAIL]\n[-] Saved key invalid: " << auth_res.message << std::endl;
-            active_key.clear();
-        }
-    }
-
-    // If not licensed yet, ask directly in terminal (standard terminal input)
-    while (!auth::g_licensed && g_app_running.load()) {
-        std::cout << "\n[?] Enter VIP License Key (or '0' to exit): " << std::flush;
-        std::string input_line;
-        if (!std::getline(std::cin, input_line)) {
-            usleep(100000);
-            continue;
-        }
-
-        while (!input_line.empty() && (input_line.back() == '\r' || input_line.back() == '\n' || input_line.back() == ' ')) input_line.pop_back();
-        while (!input_line.empty() && (input_line.front() == ' ' || input_line.front() == '\t')) input_line.erase(input_line.begin());
-
-        if (input_line == "0" || input_line == "exit" || input_line == "quit" || input_line == "q") {
-            std::cout << "[*] Exiting client.\n" << std::flush;
-            return 0;
-        }
-
-        if (input_line.length() < 2) {
-            std::cout << "[-] License key is too short. Please try again." << std::endl;
-            continue;
-        }
-
-        std::cout << "[*] Verifying license with server..." << std::flush;
-        auto res = auth::verify_license_online(input_line);
-        if (res.success) {
-            auth::g_licensed = true;
-            auth::g_expiration_date = res.expiration_date;
-            auth::g_days_left = res.days_left;
-            auth::g_exp_year = res.exp_year;
-            auth::g_exp_month = res.exp_month;
-            auth::g_exp_day = res.exp_day;
-            storage::set_saved_license(input_line);
-            std::cout << " [OK]\n==================================================" << std::endl;
-            std::cout << "[OK] VIP LICENSE ACTIVATED SUCCESSFULLY!" << std::endl;
-            std::cout << "[+] Expiry Date: " << res.expiration_date;
-            if (res.days_left > 0) std::cout << " (" << res.days_left << " days left)";
-            std::cout << "\n==================================================\n" << std::endl;
-            auth::start_heartbeat_watchdog(input_line);
-            break;
-        } else {
-            std::cout << " [FAIL]\n[-] Rejected: " << res.message << ". Please try again." << std::endl;
-        }
-    }
-
-    if (!auth::g_licensed) {
-        return 0;
-    }
 
     // 3. Start background terminal command listener for exit commands ('0' or 'exit')
     std::thread terminal_listener([]() {
@@ -365,52 +284,38 @@ int main(int argc, char** argv) {
         ImGui_ImplAndroid_NewFrame(screenW, screenH);
         ImGui::NewFrame();
 
-        // Stepwise License Verification Gate
-        // Engine only attaches and runs after license key is verified
-        if (auth::g_licensed) {
-            if (!s_engine_hooked) {
-                logger::log_info("[OK] VIP License Validated! Attaching Engine to Game Process...");
-                if (!auth::g_expiration_date.empty()) {
-                    if (auth::g_exp_year > 0) {
-                        logger::log_info("[+] License Expiry: %s (Month: %02d | Year: %04d | Days Left: %d)",
-                                         auth::g_expiration_date.c_str(),
-                                         auth::g_exp_month,
-                                         auth::g_exp_year,
-                                         auth::g_days_left);
-                    } else {
-                        logger::log_info("[+] License Expiry: %s", auth::g_expiration_date.c_str());
-                    }
-                }
-                engine::init();
-                proc::lib = (uintptr_t)engine::mem::g_lib_base;
-                proc::pid = engine::mem::g_pid;
-                s_engine_hooked = true;
-            }
-
-            // Engine Update & Feature Slots
-            engine::update();
+        // Engine attaches immediately on start
+        if (!s_engine_hooked) {
+            logger::log_info("[+] Attaching Engine to Game Process (%s)...", engine::TARGET_PACKAGE);
+            engine::init();
             proc::lib = (uintptr_t)engine::mem::g_lib_base;
             proc::pid = engine::mem::g_pid;
+            s_engine_hooked = true;
+        }
 
-            // Periodic Live Terminal Game Status (Every ~3 seconds at 60 FPS = 180 frames)
-            static int s_info_tick = 0;
-            if (++s_info_tick >= 180) {
-                s_info_tick = 0;
-                size_t entity_count = 0;
-                {
-                    std::lock_guard<std::mutex> lk(engine::data::g_players_mutex);
-                    entity_count = engine::data::g_players.size();
-                }
-                bool in_match = engine::data::g_in_match.load(std::memory_order_relaxed);
-                uint64_t target_addr = engine::aim::get_current_target();
-                logger::log_info("[GAME-INFO] PID: %d | Status: %s | Entities: %zu | Aim Circle: %.0fpx | Target: %s | FPS: %.1f",
-                                 engine::mem::g_pid,
-                                 (engine::mem::g_pid <= 0) ? "DORMANT" : (in_match ? "IN_MATCH" : "LOBBY"),
-                                 entity_count,
-                                 cfg::aim::fov,
-                                 (target_addr != 0) ? "LOCKED" : "IDLE",
-                                 ImGui::GetIO().Framerate);
+        // Engine Update & Memory Operations
+        engine::update();
+        proc::lib = (uintptr_t)engine::mem::g_lib_base;
+        proc::pid = engine::mem::g_pid;
+
+        // ─── DEBUG LOG TIAP 5 DETIK (Exact ZqwClient format) ───
+        static int dbgCounter = 0;
+        if (++dbgCounter >= 300) {  // ~5 detik
+            dbgCounter = 0;
+
+            size_t nPlayers = 0;
+            {
+                std::lock_guard<std::mutex> lk(engine::data::g_players_mutex);
+                nPlayers = engine::data::g_players.size();
             }
+
+            printf("\033[96m[DBG] \033[0m"
+                   "inMatch=%d | players=%zu | aim=%d | nobita=%d\n",
+                   (int)engine::data::g_in_match.load(std::memory_order_relaxed),
+                   nPlayers,
+                   (int)cfg::aim::silent,
+                   (int)cfg::aim::nobita);
+            fflush(stdout);
         }
 
         // ImGui Menu & UI Rendering (Floating Puck & Main Menu)
@@ -435,7 +340,6 @@ int main(int argc, char** argv) {
     // Clean teardown when exit requested
     logger::log_info("[SHUTDOWN] Releasing graphics, input, and memory resources...");
     storage::save_config();
-    auth::stop_heartbeat_watchdog();
     engine::shutdown();
     touch::shutdown();
 

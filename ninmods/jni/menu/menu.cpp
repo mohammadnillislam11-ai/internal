@@ -45,7 +45,7 @@ namespace ui::menu {
     // ============================================
     // STATE
     // ============================================
-    static float  ma     = 0.f;
+    static float  ma     = 1.f;
     static int    tab    = 0;
     static bool   drag   = false;
     static ImVec2 doff(0, 0);
@@ -555,7 +555,9 @@ namespace ui::menu {
         ImGui::PushStyleColor(ImGuiCol_Border, {0,0,0,0});
 
         ImVec2 wsz(960.f, 620.f);
-        if (g_menu_pos.x < 0.f) {
+        if (wsz.x > g_sw && g_sw > 0.f) wsz.x = g_sw * 0.95f;
+        if (wsz.y > g_sh && g_sh > 0.f) wsz.y = g_sh * 0.95f;
+        if (g_menu_pos.x < 0.f || (g_sw > 0.f && g_menu_pos.x > g_sw)) {
             g_menu_pos = {(g_sw - wsz.x) * 0.5f, (g_sh - wsz.y) * 0.5f};
         }
         ImGui::SetNextWindowSize(wsz, ImGuiCond_Always);
