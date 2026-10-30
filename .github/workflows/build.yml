@@ -24,26 +24,27 @@ jobs:
         run: |
           cd ninmods
           chmod +x compile.sh run.sh 2>/dev/null || true
-          ndk-build -B V=1 2>&1 | tee build_output.log || {
-            echo "=== NDK BUILD FAILED, LAST 80 LINES ==="
-            tail -n 80 build_output.log
-            exit 1
-          }
+          ndk-build -B V=1
+          echo "=== Contents of ninmods after build ==="
+          ls -la
+          echo "=== Contents of libs if exists ==="
+          ls -la libs/ || true
+          ls -la libs/arm64-v8a/ || true
 
       - name: Verify Output Binary
         run: |
-          if [ -f ninmods/libs/arm64-v8a/client.sh ]; then
-            echo "Build SUCCESS!"
-            ls -lh ninmods/libs/arm64-v8a/client.sh
-            file ninmods/libs/arm64-v8a/client.sh
-          elif [ -f libs/arm64-v8a/client.sh ]; then
-            echo "Found in root libs/:"
-            mkdir -p ninmods/libs/arm64-v8a
-            cp libs/arm64-v8a/client.sh ninmods/libs/arm64-v8a/
-            ls -lh ninmods/libs/arm64-v8a/client.sh
+          echo "=== Current working directory and find client.sh ==="
+          pwd
+          find . -name "client.sh" -ls
+
+          TARGET_FILE=$(find . -name "client.sh" | head -n 1)
+          if [ -n "$TARGET_FILE" ]; then
+            echo "Found compiled client.sh at: $TARGET_FILE"
+            mkdir -p output_binaries
+            cp "$TARGET_FILE" output_binaries/client.sh
+            ls -lh output_binaries/client.sh
           else
-            echo "Searching for client.sh:"
-            find . -name "client.sh"
+            echo "ERROR: client.sh not generated anywhere!"
             exit 1
           fi
 
@@ -51,5 +52,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: client.sh-arm64
-          path: ninmods/libs/arm64-v8a/client.sh
+          path: output_binaries/client.sh
           if-no-files-found: error
