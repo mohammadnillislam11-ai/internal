@@ -14,6 +14,7 @@
 #include "imgui_notify.h"
 #include <cstdio>
 #include <string>
+#include <cfloat>
 
 #ifndef ICON_FA_BARS
 #define ICON_FA_BARS "\xef\x83\x89"

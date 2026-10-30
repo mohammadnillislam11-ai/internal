@@ -403,8 +403,11 @@ namespace android {
                 String8 windowName(name);
                 LayerMetadata layerMetadata;
 
-                // Flags: 0 (completely unblocked screen recording & screenshot, no FLAG_SECURE)
+                // Flags default: 0 (transparan, tidak secure)
                 uint32_t flags = 0;
+
+                // Hanya set secure flag kalau memang diminta
+                if (secure) flags |= 0x80;
 
                 if (12 <= Functionals::GetInstance().systemVersion) {
                     static void *fakeParentHandleForBinder = nullptr;
@@ -414,17 +417,38 @@ namespace android {
                 StrongPointer<void> result{};
 
                 if (Functionals::GetInstance().systemVersion <= 9) {
+                    int value = -1;
+                    // Android 8-9: hide pakai windowType magic
+                    if (hide) value = 441731;
+
                     result = reinterpret_cast<StrongPointer<void> (*)(void *, void *, uint32_t, uint32_t, int32_t,
                                                                       uint32_t, void *, int32_t, int32_t)>(
                             Functionals::GetInstance().SurfaceComposerClient__CreateSurface)(data, windowName, width,
                                                                                              height, 1, flags,
                                                                                              nullptr,
-                                                                                             -1, -1);
+                                                                                             value, -1);
                 } else {
+                    // Android 10+
+                    // ⚠️ FIX: layerMetadata.setInt32 + flags 0x40 hanya kalau `hide = true`
+                    if (hide) {
+                        if (Functionals::GetInstance().systemVersion > 9 &&
+                            Functionals::GetInstance().systemVersion < 12) {
+                            layerMetadata.setInt32(2, 441731);
+                        } else {
+                            flags |= 0x40;   // SECURE flag
+                        }
+                    }
                     result = Functionals::GetInstance().SurfaceComposerClient__CreateSurface(data, windowName, width,
                                                                                              height, 1, flags,
                                                                                              parentHandle,
                                                                                              layerMetadata, nullptr);
+                }
+
+                // ⚠️ FIX: SetTrustedOverlay HANYA kalau `hide = true`
+                if (12 <= Functionals::GetInstance().systemVersion && hide) {
+                    static SurfaceComposerClientTransaction transaction;
+                    transaction.SetTrustedOverlay(result, true);
+                    transaction.Apply(false, true);
                 }
 
                 return {result.get()};
@@ -505,15 +529,15 @@ namespace android {
                 return mDisplayInfo;
             }
 
-            return DisplayInfo{
-                    .orientation = static_cast<uint32_t>(displayInfo.orientation),
-                    .width = displayInfo.layerStackSpaceRect.width,
-                    .height = displayInfo.layerStackSpaceRect.height,
-            };
+            DisplayInfo info{};
+            info.orientation = static_cast<uint32_t>(displayInfo.orientation);
+            info.width = displayInfo.layerStackSpaceRect.width;
+            info.height = displayInfo.layerStackSpaceRect.height;
+            return info;
         }
 
         static ANativeWindow *
-        Create(const char *name, int32_t width = -1, int32_t height = -1, bool hide = false, bool secure = false) {
+        Create(const char *name, int32_t width = -1, int32_t height = -1, bool hide = true, bool secure = false) {
             auto &surfaceComposerClient = GetComposerInstance();
 
             while (-1 == width || -1 == height) {

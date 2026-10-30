@@ -86,6 +86,9 @@ bool InitEGL(int width, int height) {
         EGL_GREEN_SIZE,      8,
         EGL_BLUE_SIZE,       8,
         EGL_ALPHA_SIZE,      8,
+        EGL_BUFFER_SIZE,     32,
+        EGL_DEPTH_SIZE,      16,
+        EGL_STENCIL_SIZE,    8,
         EGL_NONE
     };
 
@@ -118,6 +121,7 @@ bool InitEGL(int width, int height) {
         return false;
     }
 
+    eglSwapInterval(g_EglDisplay, 1); // Enable hardware VSync for smooth GPU rendering
     return true;
 }
 
@@ -162,6 +166,14 @@ void InitImGui() {
 }
 
 int main(int argc, char** argv) {
+    std::cout << R"(
+ _   _  ___  _   _ __  __  ___   ___  ____  
+| \ | ||_ _|| \ | |  \/  |/ _ \ / _ \/ ___| 
+|  \| | | | |  \| | |\/| | | | | | | \___ \ 
+| |\  | | | | |\  | |  | | |_| | |_| |___) |
+|_| \_||___||_| \_|_|  |_|\___/ \___/|____/ 
+)" << std::endl;
+
     // 0. Initialize persistent logging system (terminal + /data/local/tmp/ninmods.log)
     logger::init("/data/local/tmp/ninmods.log");
     logger::log_info("==================================================");
