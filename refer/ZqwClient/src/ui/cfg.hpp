@@ -15,6 +15,8 @@ namespace esp {
     inline bool  distance     = false;   // ESP Distance
     inline bool  skeleton     = false;   // ESP Skeleton bones
     inline bool  crosshair    = false;   // ESP Crosshair ring
+    inline bool  firing_ind   = false;   // Target ESP / Firing indicator
+    inline bool  bot_tag      = false;   // Bot tag
 
     /** Geometry and range parameters */
     inline float max_range     = 250.f;

@@ -1,76 +1,80 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "widgets.hpp"
-#include "Android_draw/draw.h"
-#include <functional>
+#include "../Icon/Icon.h"
+#include "imgui.h"
+#include "imgui_internal.h"
+#include <string>
 
-namespace ui {
+#ifndef ICON_FA_CROWN
+#define ICON_FA_CROWN "\xef\x94\xa1"
+#endif
 
-namespace widgets {
-    using namespace style;
+/**
+ * @brief Renders an animated capsule toggle button with outline, circle indicator, and optional crown icon.
+ * @param label Button display name.
+ * @param v Pointer to boolean state variable.
+ * @param has_crown True to render gold crown icon on the right.
+ * @return True if button was clicked this frame.
+ */
+bool BooyahToggle(const char* label, bool* v, bool has_crown) {
+    if (!v) return false;
 
-    void separator(float a) {
-        if (a < 0.01f) return;
+    ImVec2 p = ImGui::GetCursorScreenPos();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    
+    float height = 36.0f; 
+    float width = ImGui::GetColumnWidth() - 15.0f;
+    if (width < 60.0f) width = 140.0f;
+    float radius = height * 0.5f;
 
-        ImGuiWindow* w = ImGui::GetCurrentWindow();
-        ImVec2 pos = w->DC.CursorPos;
-        float ww = content_w > 0 ? content_w : ImGui::GetContentRegionAvail().x;
+    ImGui::InvisibleButton(label, ImVec2(width, height));
+    bool clicked = ImGui::IsItemClicked();
+    if (clicked) *v = !*v;
 
-        ImDrawList* dl = w->DrawList;
-        float y = pos.y + 4.f * S;
+    ImGuiID id = ImGui::GetID(label);
+    float animPos = ImGui::GetStateStorage()->GetFloat(id, *v ? 1.0f : 0.0f);
+    animPos = ImLerp(animPos, *v ? 1.0f : 0.0f, ImClamp(ImGui::GetIO().DeltaTime * 14.0f, 0.0f, 1.0f));
+    ImGui::GetStateStorage()->SetFloat(id, animPos);
 
-        dl->AddRectFilledMultiColor(
-            ImVec2(pos.x, y), ImVec2(pos.x + ww * 0.4f, y + 1),
-            col(UITheme::border, a * 0.6f), col(UITheme::border, 0.f),
-            col(UITheme::border, 0.f), col(UITheme::border, a * 0.6f)
-        );
-        dl->AddRectFilledMultiColor(
-            ImVec2(pos.x + ww * 0.6f, y), ImVec2(pos.x + ww, y + 1),
-            col(UITheme::border, 0.f), col(UITheme::border, a * 0.6f),
-            col(UITheme::border, a * 0.6f), col(UITheme::border, 0.f)
-        );
+    ImU32 bg_col = ImGui::GetColorU32(ImLerp(ImVec4(0.12f, 0.09f, 0.14f, 1.0f), BooyahPinkBg, animPos));
+    ImU32 outline_col = ImGui::GetColorU32(ImLerp(ImVec4(0.20f, 0.15f, 0.22f, 1.0f), BooyahPink, animPos));
+    ImU32 circle_col = ImGui::GetColorU32(ImLerp(BooyahGray, BooyahPink, animPos));
+    ImU32 text_col = ImGui::GetColorU32(ImLerp(BooyahGray, BooyahWhite, animPos));
 
-        ImGui::Dummy(ImVec2(0, 8.f * S));
+    draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height), bg_col, radius);
+    draw_list->AddRect(p, ImVec2(p.x + width, p.y + height), outline_col, radius, 0, 1.5f);
+    
+    draw_list->AddCircleFilled(ImVec2(p.x + 20.0f, p.y + height / 2.0f), 8.0f, circle_col);
+    
+    draw_list->AddText(ImVec2(p.x + 40.0f, p.y + height / 2.0f - ImGui::GetTextLineHeight() / 2.0f), text_col, label);
+
+    if (has_crown) {
+        draw_list->AddText(ImVec2(p.x + width - 25.0f, p.y + height / 2.0f - ImGui::GetTextLineHeight() / 2.0f),
+                           ImColor(255, 180, 0), ICON_FA_CROWN);
     }
-
-    bool button(const char* name, float a, std::function<void()> callback) {
-        if (a < 0.01f) return false;
-
-        ImGuiWindow* w = ImGui::GetCurrentWindow();
-        if (w->SkipItems) return false;
-
-        std::string ids = std::string("btn_") + name;
-        ImGuiID id = w->GetID(ids.c_str());
-
-        float ww = content_w > 0 ? content_w : ImGui::GetContentRegionAvail().x;
-        float h = 30.f * S;
-
-        ImVec2 pos = w->DC.CursorPos;
-        ImRect r(pos, ImVec2(pos.x + ww, pos.y + h));
-
-        ImGui::ItemSize(r);
-        if (!ImGui::ItemAdd(r, id)) return false;
-
-        bool hov = ImGui::IsMouseHoveringRect(r.Min, r.Max) && !popup();
-        bool press = hov && ImGui::IsMouseClicked(0);
-
-        if (press) {
-            if (callback) callback();
-        }
-
-        ImDrawList* dl = w->DrawList;
-        ImVec4 bg = hov ? UITheme::widget : UITheme::panel;
-        dl->AddRectFilled(r.Min, r.Max, col(bg, a));
-        dl->AddRect(r.Min, r.Max, col(UITheme::border, a));
-
-        ImGui::PushFont(fontMedium);
-        ImVec2 ts = ImGui::CalcTextSize(name);
-        dl->AddText(ImVec2(r.GetCenter().x - ts.x * 0.5f, r.GetCenter().y - ts.y * 0.5f), 
-                    col(UITheme::text, a), name);
-        ImGui::PopFont();
-
-        ImGui::Dummy(ImVec2(0, h + 4.f * S));
-        
-        return press;
-    }
+    
+    return clicked;
 }
+
+/**
+ * @brief Renders a styled slider with title, live percentage/value readout, and pink grabber.
+ * @param label Slider display name.
+ * @param v Pointer to float value variable.
+ * @param v_min Minimum range value.
+ * @param v_max Maximum range value.
+ * @param fmt Format string for value display (default: "%.2f").
+ */
+void BooyahSlider(const char* label, float* v, float v_min, float v_max, const char* fmt) {
+    if (!v) return;
+
+    ImGui::TextColored(BooyahWhite, "%s", label);
+    ImGui::SameLine(ImGui::GetWindowWidth() - 75.0f);
+    ImGui::TextColored(BooyahPink, fmt, *v);
+    
+    ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 12.0f);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, BooyahFrameBg);
+    ImGui::SliderFloat((std::string("##") + label).c_str(), v, v_min, v_max, "");
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
+    ImGui::Spacing();
 }

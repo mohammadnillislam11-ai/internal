@@ -24,7 +24,14 @@ jobs:
         run: |
           cd refer/ZqwClient
           chmod +x compile.sh h.sh 2>/dev/null || true
-          ndk-build -B V=1
+          ndk-build -B V=1 2>&1 | tee build.log
+
+      - name: Upload Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-log
+          path: refer/ZqwClient/build.log
 
       - name: Verify Output Binary
         run: |

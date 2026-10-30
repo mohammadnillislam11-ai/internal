@@ -1,110 +1,46 @@
 #pragma once
 #include "imgui.h"
-#include "imgui_internal.h"
-#include <string>
-#include <unordered_map>
-#include <cmath>
-#include <algorithm>
 
-inline float g_sw, g_sh;
+/**
+ * @file styles.h
+ * @brief Premium Pink Theme Palette and Styling Engine adapted from BOYHHA.
+ */
 
-namespace UITheme {
-    /** Translucent purple acrylic glass background palettes */
-    inline ImVec4 bg           = ImVec4(14/255.f, 10/255.f, 26/255.f, 0.82f);
-    inline ImVec4 bg_two       = ImVec4(20/255.f, 14/255.f, 36/255.f, 0.75f);
-    inline ImVec4 sidebar      = ImVec4(20/255.f, 14/255.f, 36/255.f, 0.78f);
-    inline ImVec4 panel        = ImVec4(30/255.f, 20/255.f, 54/255.f, 0.60f);
-    inline ImVec4 widget       = ImVec4(44/255.f, 28/255.f, 76/255.f, 0.65f);
+inline float g_sw = 0.f;
+inline float g_sh = 0.f;
 
-    /** Neon purple accent shades */
-    inline ImVec4 accent       = ImVec4(168/255.f, 85/255.f, 247/255.f, 1.f);
-    inline ImVec4 accent_light = ImVec4(192/255.f, 132/255.f, 252/255.f, 1.f);
-    inline ImVec4 accent_dark  = ImVec4(126/255.f, 34/255.f, 206/255.f, 1.f);
+inline ImVec4 BooyahBg          = ImVec4(0.07f, 0.05f, 0.08f, 1.00f);
+inline ImVec4 BooyahSidebar     = ImVec4(0.04f, 0.03f, 0.05f, 1.00f);
+inline ImVec4 BooyahPink        = ImVec4(1.00f, 0.28f, 0.60f, 1.00f); // #FF4799 Vibrant Premium Pink
+inline ImVec4 BooyahPinkBg      = ImVec4(0.35f, 0.08f, 0.20f, 1.00f); // Deep pink translucent pill bg
+inline ImVec4 BooyahPinkLight   = ImVec4(1.00f, 0.55f, 0.78f, 1.00f); // Highlight pink
+inline ImVec4 BooyahWhite       = ImVec4(0.96f, 0.96f, 0.97f, 1.00f);
+inline ImVec4 BooyahGray        = ImVec4(0.45f, 0.42f, 0.47f, 1.00f);
+inline ImVec4 BooyahBorder      = ImVec4(0.22f, 0.14f, 0.22f, 1.00f);
+inline ImVec4 BooyahFrameBg     = ImVec4(0.12f, 0.09f, 0.14f, 1.00f);
+inline ImVec4 BooyahFrameHover  = ImVec4(0.16f, 0.12f, 0.18f, 1.00f);
+inline ImVec4 BooyahFrameActive = ImVec4(0.22f, 0.15f, 0.25f, 1.00f);
 
-    // TEXT
-    inline ImVec4 text         = ImVec4(245/255.f, 240/255.f, 255/255.f, 1.f);
-    inline ImVec4 text_light   = ImVec4(255/255.f, 255/255.f, 255/255.f, 1.f);
-    inline ImVec4 text_dim     = ImVec4(180/255.f, 165/255.f, 210/255.f, 1.f);
-
-    // STATUS
-    inline ImVec4 success      = ImVec4(52/255.f, 211/255.f, 153/255.f, 1.f);
-    inline ImVec4 warning      = ImVec4(251/255.f, 191/255.f, 36/255.f, 1.f);
-    inline ImVec4 danger       = ImVec4(248/255.f, 113/255.f, 113/255.f, 1.f);
-
-    /** Frosted glass border styling */
-    inline ImVec4 border       = ImVec4(168/255.f, 85/255.f, 247/255.f, 0.38f);
-    inline ImVec4 border_light = ImVec4(192/255.f, 132/255.f, 252/255.f, 0.55f);
-    inline ImVec4 border_dark  = ImVec4(35/255.f, 20/255.f, 60/255.f, 0.60f);
-    inline ImVec4 subtab_bg    = ImVec4(24/255.f, 16/255.f, 42/255.f, 0.70f);
-
-    // BUTTON (PURPLE GLASS)
-    inline ImVec4 ButtonColor   = ImVec4(147/255.f, 51/255.f, 234/255.f, 0.85f);
-    inline ImVec4 ButtonHovered = ImVec4(168/255.f, 85/255.f, 247/255.f, 0.95f);
-    inline ImVec4 ButtonActive  = ImVec4(126/255.f, 34/255.f, 206/255.f, 1.f);
-
-    inline void ButtonStyle() {
-        ImGui::PushStyleColor(ImGuiCol_Button, ButtonColor);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ButtonHovered);
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ButtonActive);
-    }
-    inline void PopButtonStyle() {
-        ImGui::PopStyleColor(3);
-    }
-}
-
-namespace style {
-    inline std::unordered_map<std::string, float> anims;
-    inline std::unordered_map<std::string, ImVec4> anim_colors;
-    inline float content_w = 0.f;
-    inline float content_alpha = 1.f;
-    inline bool popup_open = false;
-    inline std::string active_popup = "";
-    inline constexpr float S = 2.5f;
-
-    static float dt = 0.016f;
-    static bool clicked = false;
-
-    static inline float lrp(float a, float b, float t) { return a + (b - a) * t; }
-    static inline ImVec4 lrp_col(const ImVec4& a, const ImVec4& b, float t) {
-        return ImVec4(lrp(a.x, b.x, t), lrp(a.y, b.y, t), lrp(a.z, b.z, t), lrp(a.w, b.w, t));
-    }
-
-    inline void tick() {
-        clicked = false;
-        static float lt = 0.f;
-        float ct = ImGui::GetTime();
-        if (lt > 0.f) { dt = ct - lt; dt = ImClamp(dt, 0.001f, 0.1f); }
-        lt = ct;
-    }
-
-    inline float anim(const std::string& id, float tgt, float spd = 12.f) {
-        auto it = anims.find(id);
-        if (it == anims.end()) { anims[id] = tgt; return tgt; }
-        float t = ImClamp(spd * dt, 0.f, 1.f);
-        it->second = lrp(it->second, tgt, t);
-        if (fabsf(it->second - tgt) < 0.001f) it->second = tgt;
-        return it->second;
-    }
-
-    inline ImVec4 anim_col(const std::string& id, const ImVec4& tgt, float spd = 12.f) {
-        auto it = anim_colors.find(id);
-        if (it == anim_colors.end()) { anim_colors[id] = tgt; return tgt; }
-        float t = ImClamp(spd * dt, 0.f, 1.f);
-        it->second = lrp_col(it->second, tgt, t);
-        return it->second;
-    }
-
-    inline ImU32 col(const ImVec4& c, float a = 1.f) {
-        return IM_COL32((int)(c.x * 255), (int)(c.y * 255), (int)(c.z * 255), (int)(c.w * 255 * a * content_alpha));
-    }
-
-    inline bool popup() { return popup_open || !active_popup.empty(); }
-    inline void close_popup() { active_popup = ""; popup_open = false; }
-
-    inline void popups() {
-        if (active_popup.empty()) return;
-        float pa = anim(active_popup + "_pa", 1.f, 18.f);
-        if (pa < 0.01f) { active_popup = ""; return; }
-        if (pa > 0.15f && ImGui::IsMouseClicked(0) && !clicked) { active_popup = ""; popup_open = false; }
-    }
+/**
+ * @brief Applies BOYHHA style and geometry rules configured with Premium Pink theme.
+ */
+inline void SetBooyahTheme() {
+    ImGuiStyle* style = &ImGui::GetStyle();
+    style->WindowRounding = 12.0f;
+    style->ChildRounding  = 8.0f;
+    style->FrameRounding  = 6.0f;
+    style->WindowBorderSize = 1.0f;    
+    style->FrameBorderSize  = 0.0f;
+    
+    style->Colors[ImGuiCol_WindowBg]         = BooyahBg;
+    style->Colors[ImGuiCol_ChildBg]          = BooyahSidebar;
+    style->Colors[ImGuiCol_Border]           = BooyahBorder;
+    style->Colors[ImGuiCol_Text]             = BooyahWhite;
+    style->Colors[ImGuiCol_CheckMark]        = BooyahPink;
+    style->Colors[ImGuiCol_SliderGrab]       = BooyahPink;
+    style->Colors[ImGuiCol_SliderGrabActive] = BooyahPinkLight;
+    style->Colors[ImGuiCol_FrameBg]          = BooyahFrameBg;
+    style->Colors[ImGuiCol_FrameBgHovered]   = BooyahFrameHover;
+    style->Colors[ImGuiCol_FrameBgActive]    = BooyahFrameActive;
+    style->Colors[ImGuiCol_Separator]        = BooyahBorder;
 }

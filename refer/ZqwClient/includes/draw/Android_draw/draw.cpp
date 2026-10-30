@@ -1,7 +1,9 @@
 #include "Android_draw/draw.h"
 #include "protect/oxorany.hpp"
 #include "../../includes/font/font_data.hpp"
-#include "ui/fonts/fonts.h"
+#include "ui/Icon/Font.h"
+#include "ui/Icon/Iconcpp.h"
+#include "ui/Icon/Icon.h"
 
 EGLDisplay display = EGL_NO_DISPLAY;
 EGLConfig config;
@@ -129,9 +131,29 @@ bool ImGui_init() {
     cfg.PixelSnapH           = true;
     cfg.RasterizerDensity    = 2.0f;
 
-    // Menu font
+    // Menu & Icon font from BOYHHA
+    ImFontConfig CustomFont;
+    CustomFont.FontDataOwnedByAtlas = false;
+    CustomFont.PixelSnapH = true;
+    CustomFont.OversampleH = 2;
+    CustomFont.OversampleV = 2;
+    float fontSize = 20.0f;
+
     ImFont* mainFont = io.Fonts->AddFontFromMemoryTTF(
-        (void*)font_ttf, (int)sizeof(font_ttf), 20.f, &cfg);
+        (void*)Custom, sizeof(Custom), fontSize, &CustomFont);
+
+    static const ImWchar icons_ranges[] = { 0xe000, 0xf8ff, 0 };
+    ImFontConfig icons_config;
+    icons_config.MergeMode = true;
+    icons_config.PixelSnapH = true;
+    icons_config.OversampleH = 2;
+    icons_config.OversampleV = 2;
+    io.Fonts->AddFontFromMemoryCompressedTTF(
+        font_awesome_data,
+        font_awesome_size,
+        fontSize,
+        &icons_config,
+        icons_ranges);
 
     // ESP font
     ImFont* espFontCfg = io.Fonts->AddFontFromMemoryTTF(
@@ -143,7 +165,6 @@ bool ImGui_init() {
     espFont    = espFontCfg;
 
     io.FontDefault = mainFont;
-    fonts::init();
     io.Fonts->Build();
 
     ImGui::GetStyle().ScaleAllSizes(1.25f);
