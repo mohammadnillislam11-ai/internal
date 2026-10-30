@@ -46,8 +46,6 @@ bool render() {
         std::string saved = storage::get_saved_license();
         if (!saved.empty()) {
             snprintf(s_license_key, sizeof(s_license_key), "%s", saved.c_str());
-        } else {
-            s_license_key[0] = '\0';
         }
         s_key_initialized = true;
     }
