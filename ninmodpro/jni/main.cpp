@@ -281,6 +281,9 @@ int main(int argc, char** argv) {
     // 3. Start background terminal command listener for exit commands ('0' or 'exit')
     std::thread terminal_listener([]() {
         while (g_app_running.load()) {
+            if (!std::cin.good() || std::cin.eof()) {
+                break;
+            }
             std::string line;
             if (std::getline(std::cin, line)) {
                 while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
@@ -289,6 +292,8 @@ int main(int argc, char** argv) {
                     request_exit(0);
                     break;
                 }
+            } else {
+                break;
             }
             usleep(100000);
         }
