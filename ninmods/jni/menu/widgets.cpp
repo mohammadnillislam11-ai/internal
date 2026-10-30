@@ -4,7 +4,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "Icon.h"
-#include "aheasing.h"
+#include <string>
 
 #ifndef ICON_FA_CROWN
 #define ICON_FA_CROWN "\xef\x94\xa1"
@@ -13,75 +13,57 @@
 namespace ui::widgets {
 
 bool Toggle(const char* label, bool* v, bool has_crown) {
-    ImGuiWindow* window = ImGui::GetCurrentWindow();
-    if (window->SkipItems) return false;
+    if (!v) return false;
 
-    ImGuiContext& g = *GImGui;
-    const ImGuiStyle& style = g.Style;
-    const ImGuiID id = window->GetID(label);
+    ImVec2 p = ImGui::GetCursorScreenPos();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-    const float height = 22.0f;
-    const float width  = 42.0f;
-    const float radius = height * 0.5f;
+    float height = 36.0f;
+    float width = ImGui::GetColumnWidth() - 15.0f;
+    if (width < 60.0f) width = 140.0f;
+    float radius = height * 0.5f;
 
-    ImVec2 label_size = ImGui::CalcTextSize(label, nullptr, true);
-    ImVec2 pos = window->DC.CursorPos;
-    ImRect total_bb(pos, pos + ImVec2(ImGui::GetContentRegionAvail().x, height));
-    ImGui::ItemSize(total_bb, style.FramePadding.y);
-    if (!ImGui::ItemAdd(total_bb, id)) return false;
+    ImGui::InvisibleButton(label, ImVec2(width, height));
+    bool clicked = ImGui::IsItemClicked();
+    if (clicked) *v = !*v;
 
-    bool hovered, held;
-    bool pressed = ImGui::ButtonBehavior(total_bb, id, &hovered, &held);
-    if (pressed) {
-        *v = !(*v);
-        ImGui::MarkItemEdited(id);
-    }
+    ImGuiID id = ImGui::GetID(label);
+    float animPos = ImGui::GetStateStorage()->GetFloat(id, *v ? 1.0f : 0.0f);
+    animPos = ImLerp(animPos, *v ? 1.0f : 0.0f, ImClamp(ImGui::GetIO().DeltaTime * 14.0f, 0.0f, 1.0f));
+    ImGui::GetStateStorage()->SetFloat(id, animPos);
 
-    // Animation progress (0.0f = OFF, 1.0f = ON) with official AHEasing
-    float animPos = *v ? 1.0f : 0.0f;
-    float animEased = static_cast<float>(SineEaseInOut(static_cast<AHFloat>(animPos)));
+    ImU32 bg_col = ImGui::GetColorU32(ImLerp(ImVec4(0.12f, 0.09f, 0.14f, 1.0f), ui::theme::PrimaryBg, animPos));
+    ImU32 outline_col = ImGui::GetColorU32(ImLerp(ImVec4(0.20f, 0.15f, 0.22f, 1.0f), ui::theme::Primary, animPos));
+    ImU32 circle_col = ImGui::GetColorU32(ImLerp(ui::theme::TextGray, ui::theme::Primary, animPos));
+    ImU32 text_col = ImGui::GetColorU32(ImLerp(ui::theme::TextGray, ui::theme::TextWhite, animPos));
 
-    ImU32 bg_col = ImGui::GetColorU32(ImLerp(ImVec4(0.10f, 0.08f, 0.14f, 1.0f), ui::theme::PrimaryBg, animEased));
-    ImU32 outline_col = ImGui::GetColorU32(ImLerp(ImVec4(0.20f, 0.15f, 0.28f, 1.0f), ui::theme::Primary, animEased));
-    ImU32 circle_col = ImGui::GetColorU32(ImLerp(ui::theme::TextGray, ui::theme::Primary, animEased));
-    ImU32 text_col = ImGui::GetColorU32(ImLerp(ui::theme::TextGray, ui::theme::TextWhite, animEased));
+    draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height), bg_col, radius);
+    draw_list->AddRect(p, ImVec2(p.x + width, p.y + height), outline_col, radius, 0, 1.5f);
 
-    ImDrawList* draw = window->DrawList;
-
-    // Draw Capsule Switch
-    ImVec2 switch_min = ImVec2(total_bb.Max.x - width - 8.0f, pos.y);
-    ImVec2 switch_max = ImVec2(total_bb.Max.x - 8.0f, pos.y + height);
-    draw->AddRectFilled(switch_min, switch_max, bg_col, radius);
-    draw->AddRect(switch_min, switch_max, outline_col, radius, 0, 1.0f);
-
-    float knob_x = switch_min.x + radius + (animEased * (width - height));
-    draw->AddCircleFilled(ImVec2(knob_x, pos.y + radius), radius - 3.0f, circle_col, 16);
-
-    // Label & Crown
-    float text_y = pos.y + (height - label_size.y) * 0.5f;
-    draw->AddText(ImVec2(pos.x + 4.0f, text_y), text_col, label);
+    draw_list->AddCircleFilled(ImVec2(p.x + 20.0f, p.y + height / 2.0f), 8.0f, circle_col);
+    draw_list->AddText(ImVec2(p.x + 40.0f, p.y + height / 2.0f - ImGui::GetTextLineHeight() / 2.0f), text_col, label);
 
     if (has_crown) {
-        draw->AddText(ImVec2(pos.x + label_size.x + 10.0f, text_y - 1.0f),
-                      ImColor(0.95f, 0.77f, 0.20f, 1.0f), ICON_FA_CROWN);
+        draw_list->AddText(ImVec2(p.x + width - 25.0f, p.y + height / 2.0f - ImGui::GetTextLineHeight() / 2.0f),
+                           ImColor(255, 180, 0), ICON_FA_CROWN);
     }
 
-    return pressed;
+    return clicked;
 }
 
 void Slider(const char* label, float* v, float v_min, float v_max, const char* fmt) {
-    ImGui::PushID(label);
+    if (!v) return;
+
     ImGui::TextColored(ui::theme::TextWhite, "%s", label);
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 45.0f);
+    ImGui::SameLine(ImGui::GetWindowWidth() - 75.0f);
     ImGui::TextColored(ui::theme::Primary, fmt, *v);
 
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 12.0f);
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ui::theme::FrameBg);
-    ImGui::PushStyleColor(ImGuiCol_SliderGrab, ui::theme::Primary);
-    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ui::theme::PrimaryLight);
-    ImGui::SliderFloat("##slider", v, v_min, v_max, "");
-    ImGui::PopStyleColor(3);
-    ImGui::PopID();
+    ImGui::SliderFloat((std::string("##") + label).c_str(), v, v_min, v_max, "");
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
+    ImGui::Spacing();
 }
 
 void Combo(const char* label, int* current_item, const char* const items[], int items_count) {

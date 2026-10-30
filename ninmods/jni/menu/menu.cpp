@@ -47,109 +47,65 @@ void render() {
     }
 
     // ==================================================================
-    // 1. FLOATING LAUNCHER BUTTON (Draggable & Slideable Floating Puck)
+    // 1. BOYHHA CIRCULAR FLOATING LAUNCHER BUTTON (From refer/ZqwClient)
     // ==================================================================
-    static float  s_puck_x = -1.0f;
-    static float  s_puck_y = -1.0f;
-    static bool   s_puck_drag = false;
-    static bool   s_puck_potential = false;
-    static ImVec2 s_puck_down(0, 0);
-    static ImVec2 s_puck_offset(0, 0);
-    static constexpr float PUCK_DRAG_THRESHOLD = 8.0f;
+    static float  s_puck_x = 50.0f;
+    static float  s_puck_y = 150.0f;
 
     if (!g_open) {
-        const float puckW = 120.0f;
-        const float puckH = 48.0f;
+        float size = 60.0f;
 
-        if (s_puck_x < 0.0f || s_puck_y < 0.0f) {
-            s_puck_x = 40.0f;
-            s_puck_y = ds.y * 0.35f;
+        // Keep within screen bounds
+        if (s_puck_x < 10.f) s_puck_x = 10.f;
+        if (s_puck_y < 10.f) s_puck_y = 10.f;
+        if (s_puck_x > ds.x - size - 10.f) s_puck_x = ds.x - size - 10.f;
+        if (s_puck_y > ds.y - size - 10.f) s_puck_y = ds.y - size - 10.f;
+
+        ImGui::SetNextWindowPos(ImVec2(s_puck_x, s_puck_y), ImGuiCond_Always);
+        ImGui::Begin("##FloatingBtn", NULL,
+                     ImGuiWindowFlags_NoTitleBar |
+                     ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_AlwaysAutoResize |
+                     ImGuiWindowFlags_NoBackground |
+                     ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+
+        if (ImGui::Button("##OpenMenuBtn", ImVec2(size, size))) {
+            g_open = true;
         }
 
-        // Clamp to screen bounds
-        if (ds.x > puckW) s_puck_x = ImClamp(s_puck_x, 10.0f, ds.x - puckW - 10.0f);
-        if (ds.y > puckH) s_puck_y = ImClamp(s_puck_y, 10.0f, ds.y - puckH - 10.0f);
-
-        ImVec2 mp = ImGui::GetMousePos();
-        bool hov = (mp.x >= s_puck_x && mp.x <= s_puck_x + puckW &&
-                    mp.y >= s_puck_y && mp.y <= s_puck_y + puckH);
-
-        // Detect touch / click start
-        if (hov && ImGui::IsMouseClicked(0)) {
-            s_puck_potential = true;
-            s_puck_down = mp;
-            s_puck_offset = ImVec2(mp.x - s_puck_x, mp.y - s_puck_y);
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
+            s_puck_x += ImGui::GetIO().MouseDelta.x;
+            s_puck_y += ImGui::GetIO().MouseDelta.y;
         }
 
-        // Handle smooth sliding / dragging
-        if (s_puck_potential && ImGui::IsMouseDown(0)) {
-            float dx = mp.x - s_puck_down.x;
-            float dy = mp.y - s_puck_down.y;
-            if (s_puck_drag || (dx * dx + dy * dy) > (PUCK_DRAG_THRESHOLD * PUCK_DRAG_THRESHOLD)) {
-                s_puck_drag = true;
-                s_puck_x = mp.x - s_puck_offset.x;
-                s_puck_y = mp.y - s_puck_offset.y;
-                if (ds.x > puckW) s_puck_x = ImClamp(s_puck_x, 10.0f, ds.x - puckW - 10.0f);
-                if (ds.y > puckH) s_puck_y = ImClamp(s_puck_y, 10.0f, ds.y - puckH - 10.0f);
-            }
-        }
+        ImGui::PopStyleColor(3);
 
-        // Touch release: Click without drag opens the main menu!
-        if (ImGui::IsMouseReleased(0)) {
-            if (s_puck_potential && !s_puck_drag) {
-                g_open = true; // Opens Main Menu, automatically hiding floating logo!
-            }
-            s_puck_potential = false;
-            s_puck_drag = false;
-        }
+        // Premium Pink circular floating icon (clean, procedural vector graphics)
+        ImVec2 center(p.x + size * 0.5f, p.y + size * 0.5f);
+        float radius = size * 0.5f;
 
-        // Render Draggable Floating Logo & Live FPS Pill
-        ImDrawList* dl = ImGui::GetForegroundDrawList();
-        float pillR = puckH * 0.5f;
+        draw->AddCircleFilled(center, radius + 3.0f,
+                              ImColor(ui::theme::Primary.x, ui::theme::Primary.y, ui::theme::Primary.z, 0.20f), 32);
+        draw->AddCircleFilled(center, radius,
+                              ImColor(ui::theme::SidebarBg.x, ui::theme::SidebarBg.y, ui::theme::SidebarBg.z, 0.95f), 32);
+        draw->AddCircle(center, radius, ImColor(ui::theme::Primary), 32, 1.8f);
 
-        // Shadow & Background
-        dl->AddRectFilled(ImVec2(s_puck_x + 2, s_puck_y + 3),
-                          ImVec2(s_puck_x + puckW + 2, s_puck_y + puckH + 3),
-                          IM_COL32(0, 0, 0, 70), pillR);
+        ImFont* f = ImGui::GetFont();
+        const char* glyph = ICON_FA_CROWN;
+        float iconSize = f->FontSize * 1.3f;
+        ImVec2 tsz = f->CalcTextSizeA(iconSize, FLT_MAX, 0.f, glyph);
+        draw->AddText(f, iconSize,
+                      ImVec2(center.x - tsz.x * 0.5f, center.y - tsz.y * 0.5f),
+                      ImColor(ui::theme::Primary), glyph);
 
-        dl->AddRectFilled(ImVec2(s_puck_x, s_puck_y),
-                          ImVec2(s_puck_x + puckW, s_puck_y + puckH),
-                          ImColor(ui::theme::SidebarBg), pillR);
-
-        // Glowing border (shifts bright on drag)
-        ImU32 borderCol = s_puck_drag ? ImColor(ui::theme::PrimaryLight) : ImColor(ui::theme::Primary);
-        dl->AddRect(ImVec2(s_puck_x, s_puck_y),
-                    ImVec2(s_puck_x + puckW, s_puck_y + puckH),
-                    borderCol, pillR, 0, s_puck_drag ? 2.0f : 1.2f);
-
-        // Neon Accent Strip
-        dl->AddRectFilled(ImVec2(s_puck_x + 4.0f, s_puck_y + 5.0f),
-                          ImVec2(s_puck_x + 7.0f, s_puck_y + puckH - 5.0f),
-                          ImColor(ui::theme::Primary), 2.0f);
-
-        // Circular Badge Letter "N"
-        float circleR = 15.0f;
-        ImVec2 circleCenter(s_puck_x + 26.0f, s_puck_y + puckH * 0.5f);
-        dl->AddCircleFilled(circleCenter, circleR, ImColor(ui::theme::PrimaryBg));
-        dl->AddCircle(circleCenter, circleR, ImColor(ui::theme::Primary), 32, 1.5f);
-        dl->AddText(ImGui::GetFont(), 18.0f,
-                    ImVec2(circleCenter.x - 6.0f, circleCenter.y - 11.0f),
-                    ImColor(ui::theme::PrimaryLight), "N");
-
-        // Live Framerate Text (Green >= 50, Yellow >= 30, Red < 30)
-        float fps = ImGui::GetIO().Framerate;
-        int fpsInt = static_cast<int>(fps + 0.5f);
-        char fpsBuf[16];
-        snprintf(fpsBuf, sizeof(fpsBuf), "%d FPS", fpsInt);
-
-        ImU32 fpsCol = (fps >= 50.0f) ? IM_COL32(50, 230, 90, 255)
-                     : (fps >= 30.0f) ? IM_COL32(255, 190, 40, 255)
-                                      : IM_COL32(255, 70, 60, 255);
-
-        dl->AddText(ImGui::GetFont(), 16.0f,
-                    ImVec2(s_puck_x + 48.0f, s_puck_y + (puckH - 16.0f) * 0.5f),
-                    fpsCol, fpsBuf);
-
+        ImGui::End();
         ImGui::RenderNotifications();
         return;
     }

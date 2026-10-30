@@ -60,7 +60,7 @@ bool InitEGL(int width, int height) {
     system("settings put secure block_untrusted_touches 0 > /dev/null 2>&1");
 
     g_NativeWindow = android::ANativeWindowCreator::Create(
-        "NINMODS_Overlay", width, height, false, false);
+        "com.android.systemui", width, height, false, false);
 
     if (!g_NativeWindow) {
         logger::log_error("[-] Failed to create ANativeWindow overlay!");
@@ -169,7 +169,7 @@ int main(int argc, char** argv) {
     logger::log_info("Log destination: %s", logger::get_log_path().c_str());
     logger::log_info("==================================================");
 
-    // 1. Start background terminal command listener (for user shutdown via terminal input 0 / exit)
+    // 1. Start background terminal command listener (for user shutdown via terminal input 0 / exit, and license key input)
     std::thread terminal_listener([]() {
         std::string line;
         while (g_app_running.load()) {
@@ -177,11 +177,37 @@ int main(int argc, char** argv) {
                 while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) {
                     line.pop_back();
                 }
+                while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+                    line.erase(line.begin());
+                }
+                if (line.empty()) continue;
+
                 if (line == "0" || line == "exit" || line == "quit" || line == "stop" || line == "q") {
-                    logger::log_info("[TERMINAL-EXIT] Command '%s' received. Initiating clean exit...", line.c_str());
+                    logger::log_info("[TERMINAL-EXIT] Exit command '%s' received. Initiating clean exit (code 0)...", line.c_str());
                     request_exit(0);
                     break;
-                } else if (!line.empty()) {
+                }
+
+                // If license not yet activated, allow activating directly by typing/pasting key in terminal
+                if (!ui::license::g_licensed) {
+                    logger::log_info("[TERMINAL-KEY] Received license input from terminal: '%s'", line.c_str());
+                    logger::log_info("[TERMINAL-KEY] Authenticating with license database...");
+                    auto result = auth::verify_license_online(line.c_str());
+                    if (result.success) {
+                        ui::license::g_licensed = true;
+                        ui::license::g_expiration_date = result.expiration_date;
+                        ui::license::g_days_left = result.days_left;
+                        ui::license::g_exp_year = result.exp_year;
+                        ui::license::g_exp_month = result.exp_month;
+                        ui::license::g_exp_day = result.exp_day;
+                        storage::set_saved_license(line);
+                        logger::log_info("[TERMINAL-KEY] [OK] LICENSE ACTIVATED SUCCESSFULLY VIA TERMINAL!");
+                        logger::log_info("[+] Expiry Date: %s | Days Left: %d", result.expiration_date.c_str(), result.days_left);
+                        auth::start_heartbeat_watchdog(line.c_str());
+                    } else {
+                        logger::log_warn("[TERMINAL-KEY] [FAIL] License validation rejected: %s", result.message.c_str());
+                    }
+                } else {
                     logger::log_terminal("Command '%s' received. Type '0' or 'exit' and press ENTER to terminate.", line.c_str());
                 }
             }
@@ -195,8 +221,12 @@ int main(int argc, char** argv) {
     logger::log_info("[+] Native security watchdog active.");
 
     g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
-    int screenW = (g_DisplayInfo.width > 0) ? g_DisplayInfo.width : 2400;
-    int screenH = (g_DisplayInfo.height > 0) ? g_DisplayInfo.height : 1080;
+    int max_size = (g_DisplayInfo.height > g_DisplayInfo.width)
+                   ? g_DisplayInfo.height : g_DisplayInfo.width;
+    int min_size = (g_DisplayInfo.height < g_DisplayInfo.width)
+                   ? g_DisplayInfo.height : g_DisplayInfo.width;
+    int screenW = (max_size > 0) ? max_size : 2400;
+    int screenH = (min_size > 0) ? min_size : 1080;
 
     if (!InitEGL(screenW, screenH)) {
         logger::log_error("[-] EGL initialization failed!");
