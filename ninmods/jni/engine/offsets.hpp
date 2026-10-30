@@ -9,9 +9,7 @@
 
 namespace offsets {
 
-    // ========================================================================
-    // BASE CHAIN (GameFacade -> BaseGame)
-    // ========================================================================
+    /** @brief BASE CHAIN (GameFacade -> BaseGame) */
     constexpr uintptr_t GameFacade           = 0xA72E4E0;
     constexpr uintptr_t GameFacade_P2        = 0xB8;
     constexpr uintptr_t BaseGame_Match       = 0x90;
@@ -21,18 +19,14 @@ namespace offsets {
     constexpr uintptr_t Match_PlayerDict     = 0xC0;
     constexpr uintptr_t Match_LocalPlayer    = 0xD8;
 
-    // ========================================================================
-    // IL2CPP MANAGED DICTIONARY
-    // ========================================================================
+    /** @brief IL2CPP MANAGED DICTIONARY */
     constexpr uintptr_t Dict_Entries         = 0x18;
     constexpr uintptr_t Dict_Count           = 0x20;
     constexpr uintptr_t Dict_ArrayHeader     = 0x20;
     constexpr uintptr_t Dict_EntryStride     = 0x18;
     constexpr uintptr_t Dict_EntryValue      = 0x10;
 
-    // ========================================================================
-    // PLAYER FIELDS
-    // ========================================================================
+    /** @brief PLAYER FIELDS */
     constexpr uintptr_t Player_Rotation      = 0x614;
     constexpr uintptr_t Player_HeadTF        = 0x6A0;
     constexpr uintptr_t Player_FootTF        = 0x6E8;
@@ -52,44 +46,32 @@ namespace offsets {
     constexpr uintptr_t Player_IsGrounded    = 0x11C;
     constexpr uintptr_t Player_FOVOffset     = 0x84;
 
-    // ========================================================================
-    // AVATAR / VISIBILITY
-    // ========================================================================
+    /** @brief AVATAR / VISIBILITY */
     constexpr uintptr_t Avatar_Uma           = 0x138;
     constexpr uintptr_t Uma_Visible          = 0x101;
     constexpr uintptr_t Uma_Data             = 0x28;
     constexpr uintptr_t UmaData_Skip         = 0x91;
 
-    // ========================================================================
-    // CAMERA MATRIX CHAIN
-    // ========================================================================
+    /** @brief CAMERA MATRIX CHAIN */
     constexpr uintptr_t Camera_Follow        = 0x28;
     constexpr uintptr_t Camera_IntPtr        = 0x10;
     constexpr uintptr_t Camera_Matrix        = 0x100;
 
-    // ========================================================================
-    // HEALTH POOL
-    // ========================================================================
+    /** @brief HEALTH POOL */
     constexpr uintptr_t HP_List              = 0x10;
     constexpr uintptr_t HP_Entry             = 0x20;
     constexpr uintptr_t HP_Value             = 0x18;
 
-    // ========================================================================
-    // WEAPON
-    // ========================================================================
+    /** @brief WEAPON */
     constexpr uintptr_t Player_Weapon        = 0x600;
     constexpr uintptr_t Weapon_Data          = 0x80;
     constexpr uintptr_t Weapon_Recoil        = 0x18;
 
-    // ========================================================================
-    // AIM INFO
-    // ========================================================================
+    /** @brief AIM INFO */
     constexpr uintptr_t AimInfo_Direction    = 0x40;
     constexpr uintptr_t AimInfo_StartPosition= 0x4C;
 
-    // ========================================================================
-    // BONES (ITransformNode)
-    // ========================================================================
+    /** @brief BONES (ITransformNode) */
     constexpr uintptr_t Bone_Head            = 0x6A0;
     constexpr uintptr_t Bone_Hip             = 0x6A8;
     constexpr uintptr_t Bone_Breast          = 0x6B0;
@@ -105,9 +87,7 @@ namespace offsets {
     constexpr uintptr_t Bone_RightHand       = 0x718;
     constexpr uintptr_t Bone_LeftHand        = 0x720;
 
-    // ========================================================================
-    // LOOT / DROP OBJECTS
-    // ========================================================================
+    /** @brief LOOT / DROP OBJECTS */
     constexpr uintptr_t Match_MetaManager        = 0xB8;
     constexpr uintptr_t MetaManager_DropObjects  = 0x18;
     constexpr uintptr_t MetaManager_MetaObjects  = 0x10;
@@ -122,9 +102,7 @@ namespace offsets {
     constexpr uintptr_t DropObject_Scale         = 0x84;
     constexpr uintptr_t DropObject_Landed        = 0x9C;
 
-    // ========================================================================
-    // AIM SILENT / RVA TARGETS
-    // ========================================================================
+    /** @brief AIM SILENT / RVA TARGETS */
     constexpr uintptr_t Player_TakeDamage_9      = 0x6F91500;
     constexpr uintptr_t Player_TakeDamage_4      = 0x6F913B4;
     constexpr uintptr_t Player_get_HeadCollider  = 0x6F2ACB0;

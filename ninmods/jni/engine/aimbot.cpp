@@ -6,7 +6,6 @@
 #include "menu/config.hpp"
 #include "display_metrics.h"
 #include "imgui.h"
-#include "dobby.h"
 #include "glm.hpp"
 #include <cmath>
 #include <android/log.h>
@@ -19,9 +18,11 @@ namespace engine::aim {
     static uint64_t g_current_target = 0;
     static bool g_hook_installed = false;
 
-    // ─────────────────────────────────────────────────────────────
-    // TakeDamage Hook (9-param) - Silent Aim & Nobita Headshot Redirect
-    // ─────────────────────────────────────────────────────────────
+    /**
+     * @brief 9-parameter damage intercept hook for silent aim headshot redirection.
+     *        Rewrites hit group, hit location, hit normal, and ray direction to the
+     *        nearest locked enemy head world position.
+     */
     static int (*orig_OnCalcDamage_9)(void* player, int damage, unsigned int damagerID,
                                       void* damageInfo, int hitGroup,
                                       Vector3 hitPos, Vector3 hitNormal,
@@ -54,7 +55,7 @@ namespace engine::aim {
                         }
                     }
 
-                    *(short*)((uintptr_t)damageInfo + offsets::DmgInfo_HitGroup) = 1; // Headshot
+                    *(short*)((uintptr_t)damageInfo + offsets::DmgInfo_HitGroup) = 1;
                     *(Vector3*)((uintptr_t)damageInfo + offsets::DmgInfo_HitLocation) = enemy_head_world;
                     *(Vector3*)((uintptr_t)damageInfo + offsets::DmgInfo_HitNormal) = direction;
                     *(Vector3*)((uintptr_t)damageInfo + offsets::DmgInfo_RayDir) = direction;
@@ -74,9 +75,10 @@ namespace engine::aim {
         return 0;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // TakeDamage Hook (4-param) - Silent Aim Secondary Redirect
-    // ─────────────────────────────────────────────────────────────
+    /**
+     * @brief 4-parameter damage intercept hook — secondary headshot redirect path.
+     *        Used when the game calls a simplified damage variant.
+     */
     static void (*orig_OnCalcDamage_4)(void* player, void* damageInfo,
                                        void* weaponInfo, void* checkParams,
                                        unsigned int vehicleID) = nullptr;
@@ -89,7 +91,7 @@ namespace engine::aim {
             if (head_node) {
                 Vector3 head_world = data::get_node_position(head_node);
                 if (head_world != Vector3::Zero()) {
-                    *(short*)((uintptr_t)damageInfo + offsets::DmgInfo_HitGroup) = 1; // Headshot
+                    *(short*)((uintptr_t)damageInfo + offsets::DmgInfo_HitGroup) = 1;
                     *(Vector3*)((uintptr_t)damageInfo + offsets::DmgInfo_HitLocation) = head_world;
                 }
             }
@@ -104,43 +106,47 @@ namespace engine::aim {
         g_current_target = 0;
 
         if (!g_hook_installed && mem::g_lib_base != 0) {
-            void* target_fn9 = reinterpret_cast<void*>(mem::g_lib_base + offsets::Player_TakeDamage_9);
-            DobbyHook(target_fn9, reinterpret_cast<void*>(hook_OnCalcDamage_9), reinterpret_cast<void**>(&orig_OnCalcDamage_9));
-
-            void* target_fn4 = reinterpret_cast<void*>(mem::g_lib_base + offsets::Player_TakeDamage_4);
-            DobbyHook(target_fn4, reinterpret_cast<void*>(hook_OnCalcDamage_4), reinterpret_cast<void**>(&orig_OnCalcDamage_4));
-
             g_hook_installed = true;
-            LOGI("[+] TakeDamage SilentAim Hooks (9-param & 4-param) installed via Dobby");
+            LOGI("[+] Aimbot hooks disabled (cross-process, using memory read/write approach)");
         }
     }
 
+    /**
+     * @brief Renders the 2D FOV circle overlay centered on the screen.
+     *        Color shifts to green when a target is locked; otherwise neon purple.
+     *        Only active when cfg::aim::draw_fov is true.
+     */
     void render_fov() {
-        if (!cfg::aim::enabled && !cfg::aim::draw_fov) return;
+        if (!cfg::aim::draw_fov) return;
 
         ImDrawList* dl = ImGui::GetForegroundDrawList();
         if (!dl) return;
 
         float cx = static_cast<float>(display::width > 0 ? display::width : 2400) * 0.5f;
         float cy = static_cast<float>(display::height > 0 ? display::height : 1080) * 0.5f;
-        float radius = cfg::aim::fov; // Dynamic FOV size controlled by slider
+        float radius = cfg::aim::fov;
 
         if (radius <= 5.0f) return;
 
-        // Clean Thread-Thin Aim Circle (Adjustable radius)
-        // If a target is currently locked inside the circle, color shifts to green; otherwise neon purple
         ImU32 circle_col = (g_current_target != 0)
-                           ? IM_COL32(50, 230, 90, 210)
+                           ? IM_COL32(50, 230, 90, 220)
                            : IM_COL32(174, 89, 250, 190);
 
-        dl->AddCircle(ImVec2(cx, cy), radius, circle_col, 128, 1.2f);
+        dl->AddCircle(ImVec2(cx, cy), radius, circle_col, 128, 1.5f);
+        dl->AddCircleFilled(ImVec2(cx, cy), 2.0f, circle_col);
     }
 
+    /**
+     * @brief Finds the closest enemy whose head screen position falls within the FOV circle radius.
+     * @param screen_cx Screen horizontal center.
+     * @param screen_cy Screen vertical center.
+     * @return Pointer to the nearest qualifying PlayerData, or nullptr if none found.
+     */
     static const data::PlayerData* find_best_target(float screen_cx, float screen_cy) {
         std::lock_guard<std::mutex> lk(data::g_players_mutex);
 
         const data::PlayerData* best = nullptr;
-        float min_dist_crosshair = cfg::aim::fov; // Must be strictly within the Circle Aim radius
+        float min_dist_crosshair = cfg::aim::fov;
 
         for (const auto& p : data::g_players) {
             if (p.curHP <= 0 || p.distance > cfg::aim::distance) continue;
@@ -155,7 +161,6 @@ namespace engine::aim {
             float dy = target_pos.y - screen_cy;
             float dist_to_center = sqrtf(dx * dx + dy * dy);
 
-            // True real-time targeting: only targets within the circle
             if (dist_to_center <= cfg::aim::fov && dist_to_center < min_dist_crosshair) {
                 min_dist_crosshair = dist_to_center;
                 best = &p;
@@ -164,6 +169,11 @@ namespace engine::aim {
         return best;
     }
 
+    /**
+     * @brief Per-frame aim assist update. Selects the best target within the FOV circle and
+     *        writes the normalized 3D direction vector to the AimInfo memory offset via
+     *        process_vm_writev. No-ops when cfg::aim::enabled is false or not in match.
+     */
     void update() {
         if (!cfg::aim::enabled || !data::g_in_match.load()) {
             g_current_target = 0;
@@ -177,19 +187,25 @@ namespace engine::aim {
         if (target) {
             g_current_target = target->addr;
 
-            // Combat calculation: Aim Assist direction
-            uint64_t local = data::g_local_player.load();
-            if (local && (cfg::aim::silent || cfg::aim::nobita)) {
+            uint64_t local = data::g_local_player.load(std::memory_order_relaxed);
+            if (mem::is_valid_addr(local) && (cfg::aim::silent || cfg::aim::nobita || cfg::aim::draw_fov)) {
                 uint64_t aim_info = mem::read<uint64_t>(local + offsets::Player_AimInfo);
-                if (aim_info) {
-                    Vector3 my_head = mem::read<Vector3>(local + offsets::Player_HeadTF);
-                    glm::vec3 p1(my_head.x, my_head.y, my_head.z);
-                    glm::vec3 p2(target->Head.x, target->Head.y, target->Head.z);
-                    glm::vec3 dir = p2 - p1;
-                    if (glm::length(dir) > 0.001f) {
-                        dir = glm::normalize(dir);
-                        Vector3 dir_out(dir.x, dir.y, dir.z);
-                        mem::write<Vector3>(aim_info + offsets::AimInfo_Direction, dir_out);
+                if (mem::is_valid_addr(aim_info)) {
+                    uint64_t my_head_node = mem::read<uint64_t>(local + offsets::Bone_Head);
+                    Vector3 my_pos = (my_head_node) ? data::get_node_position(my_head_node) : Vector3::Zero();
+                    Vector3 enemy_head = target->HeadWorld;
+                    if (my_pos != Vector3::Zero() && enemy_head != Vector3::Zero()) {
+                        glm::vec3 p1(my_pos.x, my_pos.y, my_pos.z);
+                        glm::vec3 p2(enemy_head.x, enemy_head.y, enemy_head.z);
+                        glm::vec3 dir = p2 - p1;
+                        float len = glm::length(dir);
+                        if (std::isfinite(len) && len > 0.001f) {
+                            dir = glm::normalize(dir);
+                            Vector3 dir_out(dir.x, dir.y, dir.z);
+                            if (std::isfinite(dir_out.x) && std::isfinite(dir_out.y) && std::isfinite(dir_out.z)) {
+                                mem::write<Vector3>(aim_info + offsets::AimInfo_Direction, dir_out);
+                            }
+                        }
                     }
                 }
             }
@@ -198,6 +214,7 @@ namespace engine::aim {
         }
     }
 
+    /** @return Memory address of the currently tracked target entity, or 0 if none. */
     uint64_t get_current_target() {
         return g_current_target;
     }

@@ -66,7 +66,7 @@ bool InitEGL(int width, int height) {
     system("settings put secure block_untrusted_touches 0 > /dev/null 2>&1");
 
     g_NativeWindow = android::ANativeWindowCreator::Create(
-        "com.android.systemui", width, height, true, false);
+        "com.android.systemui", width, height, false, false);
 
     if (!g_NativeWindow) {
         logger::log_error("[-] Failed to create ANativeWindow overlay!");
@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
 |  \| | | | |  \| | |\/| | | | | | | \___ \ 
 | |\  | | | | |\  | |  | | |_| | |_| |___) |
 |_| \_||___||_| \_|_|  |_|\___/ \___/|____/ 
-)" << std::endl;
+)" << '\n';
 
     // 0. Initialize persistent logging system (terminal + /data/local/tmp/ninmods.log)
     logger::init("/data/local/tmp/ninmods.log");
@@ -244,23 +244,19 @@ int main(int argc, char** argv) {
     InitImGui();
     display::init(screenW, screenH);
     touch::init(screenW, screenH, init_ori);
+    signal(SIGPIPE, SIG_IGN);
 
-    // Check target game process status at startup (Strictly com.dts.freefireth)
     int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
     if (initial_pid > 0) {
         logger::log_info("[+] Target Game Process Detected: %s (PID: %d)", engine::TARGET_PACKAGE, initial_pid);
     } else {
-        logger::log_info("[*] Target Game Process: Monitoring for %s (Background Running)...", engine::TARGET_PACKAGE);
+        logger::log_info("[*] Target Game Process: Monitoring for %s...", engine::TARGET_PACKAGE);
     }
 
-    logger::log_info("[+] Target Package: %s (%s)", engine::TARGET_PACKAGE, engine::TARGET_REGION);
+    logger::log_info("[+] Target Region: %s", engine::TARGET_REGION);
     logger::log_info("[+] Multi-ABI Engine: arm64-v8a & armeabi-v7a");
     logger::log_info("[+] NativeShield Engine: ACTIVE (AntiDebug, AntiDump, CRC32 Checksum)");
-#if defined(__aarch64__)
-    logger::log_info("[+] Protection Framework: DobbyHook (ARM64) & ByteDance ShadowHook ACTIVE");
-#else
-    logger::log_info("[+] Protection Framework: DobbyHook (ARM32) ACTIVE");
-#endif
+    logger::log_info("[+] Memory Driver: process_vm_readv / process_vm_writev (Crash-Free Direct Bus)");
     logger::log_info("[+] Display Resolution: %d x %d (Orientation: %d)", screenW, screenH, (g_DisplayInfo.orientation != 0) ? g_DisplayInfo.orientation : 1);
     logger::log_info("[+] Terminal & Menu Control: Type '0' or 'exit' in terminal, or click EXIT in menu to close.");
 
@@ -284,13 +280,14 @@ int main(int argc, char** argv) {
         ImGui_ImplAndroid_NewFrame(screenW, screenH);
         ImGui::NewFrame();
 
-        // Engine attaches immediately on start
+        // Engine attaches immediately or retries when game becomes active
         if (!s_engine_hooked) {
-            logger::log_info("[+] Attaching Engine to Game Process (%s)...", engine::TARGET_PACKAGE);
-            engine::init();
-            proc::lib = (uintptr_t)engine::mem::g_lib_base;
-            proc::pid = engine::mem::g_pid;
-            s_engine_hooked = true;
+            if (engine::init()) {
+                proc::lib = (uintptr_t)engine::mem::g_lib_base;
+                proc::pid = engine::mem::g_pid;
+                s_engine_hooked = true;
+                logger::log_info("[+] Attached to Game Process: %s (PID: %d)", engine::get_target_package(), proc::pid);
+            }
         }
 
         // Engine Update & Memory Operations
@@ -298,7 +295,7 @@ int main(int argc, char** argv) {
         proc::lib = (uintptr_t)engine::mem::g_lib_base;
         proc::pid = engine::mem::g_pid;
 
-        // ─── DEBUG LOG TIAP 5 DETIK (Exact ZqwClient format) ───
+        // Debug log every 5 seconds
         static int dbgCounter = 0;
         if (++dbgCounter >= 300) {  // ~5 detik
             dbgCounter = 0;

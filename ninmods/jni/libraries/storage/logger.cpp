@@ -18,25 +18,37 @@ namespace {
     static void write_entry(const char* level, const char* fmt, va_list args) {
         std::lock_guard<std::mutex> lock(s_mutex);
 
-        // Current timestamp
         time_t now = time(nullptr);
         struct tm tm_buf{};
         localtime_r(&now, &tm_buf);
         char time_str[32];
         strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_buf);
 
-        // Format message
         char msg_buf[1024];
         va_list args_copy;
         va_copy(args_copy, args);
         vsnprintf(msg_buf, sizeof(msg_buf), fmt, args_copy);
         va_end(args_copy);
 
-        // 1. Output to Terminal (stdout)
-        printf("[%s] [%s] %s\n", time_str, level, msg_buf);
+        // 1. Output to Terminal with ANSI colors (Red for error, Green for success)
+        const char* color_prefix = "";
+        const char* color_suffix = "\033[0m";
+
+        if (strcmp(level, "ERROR") == 0 || (msg_buf[0] == '[' && msg_buf[1] == '-')) {
+            color_prefix = "\033[91m"; // Red
+        } else if (strcmp(level, "SUCCESS") == 0 || (msg_buf[0] == '[' && msg_buf[1] == '+')) {
+            color_prefix = "\033[92m"; // Bright Green
+        } else if (strcmp(level, "WARN") == 0 || (msg_buf[0] == '[' && msg_buf[1] == '*')) {
+            color_prefix = "\033[93m"; // Bright Yellow
+        } else {
+            color_prefix = "\033[0m";
+            color_suffix = "";
+        }
+
+        printf("%s[%s] [%s] %s%s\n", color_prefix, time_str, level, msg_buf, color_suffix);
         fflush(stdout);
 
-        // 2. Output to Disk file (/data/local/tmp/ninmods.log)
+        // 2. Output to Disk file without ANSI colors
         if (s_file) {
             fprintf(s_file, "[%s] [%s] %s\n", time_str, level, msg_buf);
             fflush(s_file);
@@ -57,7 +69,6 @@ void init(const char* custom_log_path) {
     }
     s_file = fopen(s_path.c_str(), "a");
     if (!s_file) {
-        // Fallback to /sdcard/ninmods.log
         s_path = "/sdcard/ninmods.log";
         s_file = fopen(s_path.c_str(), "a");
     }
@@ -71,6 +82,13 @@ void log_info(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     write_entry("INFO", fmt, args);
+    va_end(args);
+}
+
+void log_success(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    write_entry("SUCCESS", fmt, args);
     va_end(args);
 }
 
@@ -95,17 +113,16 @@ void log_terminal(const char* fmt, ...) {
     va_end(args);
 }
 
-const std::string& get_log_path() {
-    return s_path;
-}
-
 void close() {
     std::lock_guard<std::mutex> lock(s_mutex);
     if (s_file) {
-        fprintf(s_file, "--- NINMODS SESSION END ---\n");
         fclose(s_file);
         s_file = nullptr;
     }
+}
+
+const std::string& get_log_path() {
+    return s_path;
 }
 
 } // namespace logger

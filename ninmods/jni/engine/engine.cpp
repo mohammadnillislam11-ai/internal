@@ -6,6 +6,7 @@
 #include "game_security.hpp"
 #include "offsets.hpp"
 #include "menu/config.hpp"
+#include "menu/menu.hpp"
 #include "oxorany.h"
 #include <cstdio>
 #include <unistd.h>
@@ -15,55 +16,69 @@ namespace engine {
 
     static bool g_attached = false;
 
+    /** @return Name of the target game package. */
     const char* get_target_package() {
         return TARGET_PACKAGE;
     }
 
+    /** @return Region string identifier. */
     const char* get_target_region() {
         return TARGET_REGION;
     }
 
+    /** @return Currently targeted game process ID, or -1 if unattached. */
     int get_target_pid() {
         return mem::g_pid;
     }
 
-    // Zero-Automation Helper: Check if any feature is toggled ON
-    static inline bool is_any_feature_enabled() {
-        return cfg::esp::enabled ||
-               cfg::aim::enabled ||
-               cfg::aim::draw_fov ||
-               cfg::misc::speed_hack ||
-               cfg::misc::fast_switch ||
-               cfg::misc::grenade_esp ||
-               cfg::misc::alert_360;
-    }
-
+    /**
+     * @brief Detects and attaches strictly to the running Free Fire process (com.dts.freefireth).
+     *        Safely verifies libil2cpp.so module base before starting worker threads.
+     * @return true if successfully attached, false if game is not running or still launching.
+     */
     bool init() {
-        // Strictly target com.dts.freefireth
-        mem::g_pid = mem::find_pid_by_name(TARGET_PACKAGE);
-        if (mem::g_pid <= 0) {
+        if (g_attached && mem::g_pid > 0 && kill(mem::g_pid, 0) == 0 && mem::g_lib_base > 0) {
+            return true;
+        }
+
+        if (mem::g_mem_fd >= 0) {
+            close(mem::g_mem_fd);
+            mem::g_mem_fd = -1;
+        }
+
+        int found_pid = mem::find_pid_by_name(TARGET_PACKAGE);
+        if (found_pid <= 0) {
             return false;
         }
 
-        // 1. Initialize libanogs.so security module immediately upon process detection
-        // Ensures anti-cheat cannot scan memory or detect client environment
+        mem::g_pid = found_pid;
+
+        // Locate libil2cpp.so module base
+        mem::g_lib_base = mem::find_module_base(mem::g_pid, oxorany("libil2cpp.so"));
+        if (mem::g_lib_base == 0) {
+            // Process exists but libil2cpp.so is still initializing (splash screen)
+            return false;
+        }
+
+        // Initialize passive security verification
         security::init(mem::g_pid);
 
-        // 2. Locate libil2cpp.so module base
-        mem::g_lib_base = mem::find_module_base(mem::g_pid, oxorany("libil2cpp.so"));
-        if (mem::g_lib_base > 0) {
-            g_attached = true;
-            data::start_worker(); // Worker runs in smart sleep mode until features are toggled
-            aim::init();          // One-time Dobby hooks installed with dynamic logic gating
-            printf("[+] Attached to %s (PID: %d, libil2cpp: 0x%lx)\n",
-                   TARGET_PACKAGE, mem::g_pid, (unsigned long)mem::g_lib_base);
-            return true;
-        }
-        return false;
+        g_attached = true;
+        proc::pid = mem::g_pid;
+        proc::lib = (uintptr_t)mem::g_lib_base;
+        data::start_worker();
+        aim::init();
+
+        printf("[+] Attached to %s (PID: %d, libil2cpp: 0x%lx)\n",
+               TARGET_PACKAGE, mem::g_pid, (unsigned long)mem::g_lib_base);
+        return true;
     }
 
+    /**
+     * @brief Periodic engine heartbeat. Runs re-attach watchdog if game restarts,
+     *        and updates aimbot calculations when enabled by user.
+     */
     void update() {
-        // Dynamic re-attach watchdog (Passive monitoring - strictly NO auto-launch)
         if (!g_attached || mem::g_pid <= 0) {
             static int check_counter = 0;
             if (++check_counter % 60 == 0) {
@@ -74,44 +89,41 @@ namespace engine {
 
         // Verify game PID is still alive
         if (kill(mem::g_pid, 0) != 0) {
-            g_attached = false;
-            mem::g_pid = -1;
-            mem::g_lib_base = 0;
-            data::stop_worker();
+            shutdown();
             return;
         }
 
-        // Ensure security protection stays active while game is running
         if (!security::is_active()) {
             security::init(mem::g_pid);
         }
 
-        // Combat Aimbot Update (Dynamically gated by user toggle)
         if (cfg::aim::enabled) {
             aim::update();
         }
 
-        // Miscellaneous Features (Dynamically gated by user toggles)
-        uint64_t local = data::g_local_player.load();
-        if (local && data::g_in_match.load()) {
-            if (cfg::misc::speed_hack) {
-                Vector3 vel = mem::read<Vector3>(local + offsets::Player_Velocity);
-                if (vel.x != 0.0f || vel.z != 0.0f) {
-                    vel.x *= 1.35f;
-                    vel.z *= 1.35f;
-                    mem::write<Vector3>(local + offsets::Player_Velocity, vel);
+        uint64_t local = data::g_local_player.load(std::memory_order_relaxed);
+        if (mem::is_valid_addr(local) && data::g_in_match.load(std::memory_order_relaxed)) {
+            if (!mem::read<bool>(local + offsets::Player_IsDead)) {
+                if (cfg::misc::speed_hack) {
+                    Vector3 vel = mem::read<Vector3>(local + offsets::Player_Velocity);
+                    if (std::isfinite(vel.x) && std::isfinite(vel.z) && (vel.x != 0.0f || vel.z != 0.0f)) {
+                        vel.x *= 1.35f;
+                        vel.z *= 1.35f;
+                        mem::write<Vector3>(local + offsets::Player_Velocity, vel);
+                    }
                 }
-            }
 
-            if (cfg::misc::fast_switch) {
-                uint64_t weapon = mem::read<uint64_t>(local + offsets::Player_Weapon);
-                if (weapon) {
-                    mem::write<float>(weapon + offsets::Weapon_Recoil, 0.0f);
+                if (cfg::misc::fast_switch) {
+                    uint64_t weapon = mem::read<uint64_t>(local + offsets::Player_Weapon);
+                    if (mem::is_valid_addr(weapon)) {
+                        mem::write<float>(weapon + offsets::Weapon_Recoil, 0.0f);
+                    }
                 }
             }
         }
     }
 
+    /** @brief Dispatches ESP and FOV rendering to active drawlists when enabled. */
     void render_esp() {
         if (cfg::esp::enabled) {
             esp::render_all();
@@ -121,11 +133,18 @@ namespace engine {
         }
     }
 
+    /** @brief Safely shuts down worker thread and resets all memory handles. */
     void shutdown() {
         data::stop_worker();
         g_attached = false;
         mem::g_pid = -1;
         mem::g_lib_base = 0;
+        if (mem::g_mem_fd >= 0) {
+            close(mem::g_mem_fd);
+            mem::g_mem_fd = -1;
+        }
+        proc::pid = -1;
+        proc::lib = 0;
     }
 
 } // namespace engine

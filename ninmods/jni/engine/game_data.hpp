@@ -32,6 +32,7 @@ namespace engine::data {
         // Screen Positions
         Vector3  Head;
         Vector3  Toe;
+        Vector3  HeadWorld;
 
         // Bone Hierarchy
         Vector3  Hip;
@@ -63,7 +64,7 @@ namespace engine::data {
 
         PlayerData()
             : addr(0),
-              Head(Vector3::Zero()), Toe(Vector3::Zero()),
+              Head(Vector3::Zero()), Toe(Vector3::Zero()), HeadWorld(Vector3::Zero()),
               Hip(Vector3::Zero()), Breast(Vector3::Zero()), Root(Vector3::Zero()),
               LShoulder(Vector3::Zero()), RShoulder(Vector3::Zero()),
               LAnkle(Vector3::Zero()), RAnkle(Vector3::Zero()),

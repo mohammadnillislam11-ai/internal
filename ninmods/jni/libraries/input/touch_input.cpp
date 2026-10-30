@@ -69,8 +69,8 @@ namespace touch {
                 continue;
             event_readed_count /= (ssize_t) sizeof(input_event);
 
-            static bool isDown = false;
-            static float x = 0.0f, y = 0.0f;
+            bool isDown = false;
+            float x = 0.0f, y = 0.0f;
             for (long j = 0; j < event_readed_count; j++) {
                 auto &event = events[j];
                 if (event.type == EV_KEY && (event.code == BTN_TOUCH || event.code == BTN_LEFT)) {
@@ -174,8 +174,24 @@ namespace touch {
         }
     }
 
-    void updateOrientation(uint8_t _orientation) {
+    void update_orientation(uint8_t _orientation) {
         orientation = _orientation;
+    }
+
+    void updateOrientation(uint8_t _orientation) {
+        update_orientation(_orientation);
+    }
+
+    uint8_t get_orientation() {
+        return orientation;
+    }
+
+    void toggle_orientation() {
+        orientation = (orientation == 1) ? 3 : 1;
+    }
+
+    void poll() {
+        // Events are read asynchronously in worker thread
     }
 
     void shutdown() {

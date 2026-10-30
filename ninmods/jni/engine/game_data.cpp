@@ -28,9 +28,12 @@ namespace engine::data {
     static std::unordered_map<uint64_t, int>  g_vis_counter;
     static std::unordered_map<uint64_t, bool> g_vis_stable;
 
-    // ========================================================================
-    // MATH HELPERS (Connected to GLM Mathematics Suite)
-    // ========================================================================
+    /**
+     * @brief Computes Euclidean distance in metres between two 3D world positions using GLM.
+     * @param a Origin world position.
+     * @param b Target world position.
+     * @return Distance in metres as a float.
+     */
     float get_distance_meters(const Vector3& a, const Vector3& b) {
         glm::vec3 v1(a.x, a.y, a.z);
         glm::vec3 v2(b.x, b.y, b.z);
@@ -38,21 +41,32 @@ namespace engine::data {
     }
 
     Vector3 world_to_screen(const Matrix4x4& vm, const Vector3& pos, float screen_w, float screen_h) {
-        float w = (pos.x * vm.m14) + (pos.y * vm.m24) + (pos.z * vm.m34) + vm.m44;
-        if (w >= 0.001f) {
-            float inv_w = 1.0f / w;
-            float cx = screen_w * 0.5f;
-            float cy = screen_h * 0.5f;
-            float x = (pos.x * vm.m11) + (pos.y * vm.m21) + (pos.z * vm.m31) + vm.m41;
-            float y = (pos.x * vm.m12) + (pos.y * vm.m22) + (pos.z * vm.m32) + vm.m42;
-            return Vector3(cx + cx * x * inv_w, cy - cy * y * inv_w, 0.0f);
+        if (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z)) {
+            return Vector3(-1.0f, -1.0f, -1.0f);
         }
-        return Vector3(-1.0f, -1.0f, -1.0f);
+        float w = (pos.x * vm.m14) + (pos.y * vm.m24) + (pos.z * vm.m34) + vm.m44;
+        if (!std::isfinite(w) || w < 0.001f) {
+            return Vector3(-1.0f, -1.0f, -1.0f);
+        }
+        float inv_w = 1.0f / w;
+        float cx = screen_w * 0.5f;
+        float cy = screen_h * 0.5f;
+        float x = (pos.x * vm.m11) + (pos.y * vm.m21) + (pos.z * vm.m31) + vm.m41;
+        float y = (pos.x * vm.m12) + (pos.y * vm.m22) + (pos.z * vm.m32) + vm.m42;
+        float sx = cx + cx * x * inv_w;
+        float sy = cy - cy * y * inv_w;
+        if (!std::isfinite(sx) || !std::isfinite(sy)) {
+            return Vector3(-1.0f, -1.0f, -1.0f);
+        }
+        return Vector3(sx, sy, 0.0f);
     }
 
-    // ========================================================================
-    // UNITY TRANSFORM POSITION HIERARCHY
-    // ========================================================================
+    /**
+     * @brief Reconstructs a Unity Transform's world position by walking the parent hierarchy.
+     *        Uses the cached TRS matrix chain stored in the IL2Cpp TransformInternal.
+     * @param transform Pointer to a Unity Transform IL2Cpp object.
+     * @return World-space Vector3 position, or Vector3::Zero() if unresolvable.
+     */
     static Vector3 get_transform_position(uint64_t transform) {
         auto transform_obj = mem::read<uint64_t>(transform + 0x10);
         if (transform_obj == 0) return Vector3::Zero();
@@ -69,7 +83,7 @@ namespace engine::data {
         auto result = mem::read<Vector3>(matrices + (index_val * 0x30));
         auto transform_index = mem::read<int>(indices + (index_val * 4));
 
-        for (int tries = 0; transform_index >= 0 && tries < 50; tries++) {
+        for (int tries = 0; transform_index >= 0 && transform_index < 5000 && tries < 50; tries++) {
             uint64_t mat_addr = matrices + (transform_index * 0x30);
             auto t = mem::read<TransformMatrix>(mat_addr);
 
@@ -111,9 +125,11 @@ namespace engine::data {
         return world_to_screen(g_view_matrix, world, sw, sh);
     }
 
-    // ========================================================================
-    // READ ENTITY PROPERTIES
-    // ========================================================================
+    /**
+     * @brief Reads the HP value through the game's chained HP pool pointer structure.
+     * @param player Remote player entity address.
+     * @return Current HP as int, or 0 if any pointer in the chain is null.
+     */
     static int read_hp(uint64_t player) {
         auto pool = mem::read<uint64_t>(player + offsets::Player_HP);
         if (!pool) return 0;
@@ -154,9 +170,14 @@ namespace engine::data {
         return mem::read<int>(wd + 0x64);
     }
 
-    // ========================================================================
-    // SCAN DROPPED LOOT
-    // ========================================================================
+    /**
+     * @brief Scans the game's dropped-loot dictionary and populates g_loots with visible items.
+     *        Only runs when cfg::esp::loot is enabled. Skips items beyond loot_range metres.
+     * @param base_game Remote BaseGame IL2Cpp object address.
+     * @param local_pos Local player world position for distance calculation.
+     * @param sw Screen width for world-to-screen projection.
+     * @param sh Screen height for world-to-screen projection.
+     */
     static void scan_loot(uint64_t base_game, const Vector3& local_pos, float sw, float sh) {
         std::vector<LootItem> list;
 
@@ -205,21 +226,13 @@ namespace engine::data {
         g_loots = std::move(list);
     }
 
-    // ========================================================================
-    // UPDATE CYCLE
-    // ========================================================================
+    /**
+     * @brief One full entity scan cycle. Called continuously by the background worker thread.
+     *        Reads GameFacade -> BaseGame -> Match -> PlayerDictionary, projects all enemy bones
+     *        to screen space, and atomically swaps the g_players snapshot. Safe to call at 8ms
+     *        intervals in-match and 50ms out-of-match.
+     */
     void update_cycle() {
-        // Zero-Automation & Strict Security:
-        // Do not touch process memory if neither ESP nor Aimbot is enabled.
-        if (!cfg::esp::enabled && !cfg::aim::enabled) {
-            {
-                std::lock_guard<std::mutex> lk(g_players_mutex);
-                if (!g_players.empty()) g_players.clear();
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            return;
-        }
-
         if (mem::g_pid <= 0 || mem::g_lib_base == 0) return;
 
         float screen_w = static_cast<float>(display::width > 0 ? display::width : 2400);
@@ -367,6 +380,7 @@ namespace engine::data {
             pd.addr       = enemy;
             pd.Head       = head_screen;
             pd.Toe        = toe_screen;
+            pd.HeadWorld  = head_world;
             pd.isVisible  = visible;
             pd.isBot      = is_bot;
             pd.distance   = dist;
@@ -408,13 +422,18 @@ namespace engine::data {
         }
     }
 
-    // ========================================================================
-    // WORKER THREAD LIFECYCLE
-    // ========================================================================
+    /**
+     * @brief Background worker thread loop. Runs update_cycle() continuously with adaptive sleep:
+     *        8ms when in-match for real-time accuracy, 50ms when in lobby to save CPU.
+     */
     static void worker_loop() {
         while (g_worker_running.load(std::memory_order_relaxed)) {
             update_cycle();
-            std::this_thread::sleep_for(std::chrono::milliseconds(8));
+            if (g_in_match.load(std::memory_order_relaxed)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(8));
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
         }
     }
 

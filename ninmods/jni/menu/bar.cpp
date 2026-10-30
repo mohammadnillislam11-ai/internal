@@ -16,9 +16,6 @@ namespace ui::bar {
     void set_game_alpha(float a) { g_game_alpha = a; }
     float game_alpha() { return g_game_alpha; }
 
-    // ============================================
-    // LOGO TEXTURE
-    // ============================================
     static GLuint g_logo_tex = 0;
     static bool   g_logo_loaded = false;
 
@@ -40,9 +37,6 @@ namespace ui::bar {
         g_logo_loaded = true;
     }
 
-    // ============================================
-    // ICON FPS
-    // ============================================
     static float  g_fps_x = -1.f;
     static float  g_fps_y = -1.f;
     static bool   g_fps_drag = false;
@@ -119,9 +113,6 @@ namespace ui::bar {
                           {g_fps_x + 7.f, g_fps_y + h - 4.f},
                           col(UITheme::accent, alpha), 2.f);
 
-        // ============================================
-        // LOGO (texture, bukan font)
-        // ============================================
         float cx = g_fps_x + 34.f, cy = g_fps_y + h * 0.5f, radius = 18.f;
 
         if (g_logo_loaded && g_logo_tex != 0) {
@@ -139,9 +130,6 @@ namespace ui::bar {
             dl->AddCircleFilled({cx, cy}, radius, col(UITheme::accent, alpha));
         }
 
-        // ============================================
-        // FPS TEXT (fallback tanpa font, pakai angka bulat)
-        // ============================================
         // Karena font tidak ada, kita gambar 2 kotak sederhana sebagai placeholder
         // KAMU bisa tambah font default dari ImGui::GetIO().Fonts->AddFontDefault()
         // di draw.cpp kalau mau ada text.
@@ -161,9 +149,6 @@ namespace ui::bar {
         }
     }
 
-    // ============================================
-    // RENDER — icon FPS hanya saat menu tertutup
-    // ============================================
     void render() {
         static float prog = 0.f;
         float dt = ImGui::GetIO().DeltaTime;
