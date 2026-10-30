@@ -23,6 +23,8 @@
 #define ICON_FA_CROWN "\xef\x94\xa1"
 #endif
 
+extern void request_exit(int code);
+
 namespace ui::menu {
 
 namespace {
@@ -464,8 +466,7 @@ void render() {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.20f, 0.20f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.90f, 0.25f, 0.25f, 1.0f));
             if (ImGui::Button("EXIT CLIENT (CODE 0)", ImVec2(220, 38))) {
-                extern void request_exit(int code);
-                request_exit(0);
+                ::request_exit(0);
             }
             ImGui::PopStyleColor(3);
         }

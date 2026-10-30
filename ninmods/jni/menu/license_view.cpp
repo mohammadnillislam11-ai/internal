@@ -8,6 +8,8 @@
 #include <cstring>
 #include <cstdio>
 
+extern void request_exit(int code);
+
 namespace ui::license {
 
 namespace {
@@ -147,8 +149,7 @@ bool render() {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.85f, 0.85f, 1.0f));
 
         if (ImGui::Button("EXIT CLIENT (CODE 0)", ImVec2(winW - 40.0f, 30.0f))) {
-            extern void request_exit(int code);
-            request_exit(0);
+            ::request_exit(0);
         }
         ImGui::PopStyleColor(4);
     }
