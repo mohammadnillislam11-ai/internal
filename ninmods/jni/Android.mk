@@ -122,6 +122,15 @@ LOCAL_C_INCLUDES := \
 LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby shadowhook
 LOCAL_LDLIBS := -llog -landroid -lEGL -lGLESv3 -lz -ldl
 
+LOCAL_LDFLAGS := \
+    -Wl,--gc-sections \
+    -Wl,--strip-all \
+    -Wl,--build-id=none \
+    -pie \
+    -Wl,-z,relro \
+    -Wl,-z,now \
+    -Wl,-z,noexecstack
+
 LOCAL_CPPFLAGS := -std=c++17 -fexceptions -frtti -Wno-unused-parameter
 LOCAL_CFLAGS := -O3 -fvisibility=hidden -fdata-sections -ffunction-sections
 

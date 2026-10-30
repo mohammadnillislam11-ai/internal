@@ -24,7 +24,7 @@ jobs:
         run: |
           cd ninmods
           chmod +x compile.sh run.sh 2>/dev/null || true
-          ndk-build -B V=1 2>&1 | tee build.log
+          ndk-build -B V=1
           echo "=== PWD AND LS AFTER BUILD ==="
           pwd
           ls -la
