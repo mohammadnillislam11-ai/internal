@@ -209,6 +209,7 @@ int main(int argc, char** argv) {
                     auto result = auth::verify_license_online(line.c_str());
                     if (result.success) {
                         ui::license::g_licensed = true;
+                        ui::menu::g_open = false; // Floating logo opens FIRST
                         ui::license::g_expiration_date = result.expiration_date;
                         ui::license::g_days_left = result.days_left;
                         ui::license::g_exp_year = result.exp_year;
@@ -234,26 +235,26 @@ int main(int argc, char** argv) {
     shield::start_watchdog();
     logger::log_info("[+] Native security watchdog active.");
 
-    // 3. Early VIP License Auto-Verification from config / default VIP key
+    // 3. Early VIP License Auto-Verification from saved config
     storage::load_config();
     std::string active_key = storage::get_saved_license();
-    if (active_key.empty()) {
-        active_key = "VIP-3DAYS-10DEV";
-    }
-
-    logger::log_info("[LICENSE] Checking license: %s ...", active_key.c_str());
-    auto auth_res = auth::verify_license_online(active_key);
-    if (auth_res.success) {
-        ui::license::g_licensed = true;
-        ui::license::g_expiration_date = auth_res.expiration_date;
-        ui::license::g_days_left = auth_res.days_left;
-        ui::license::g_exp_year = auth_res.exp_year;
-        ui::license::g_exp_month = auth_res.exp_month;
-        ui::license::g_exp_day = auth_res.exp_day;
-        storage::set_saved_license(active_key);
-        logger::log_info("[LICENSE] [OK] Key VALID! Expiry: %s (%d days left)",
-                         auth_res.expiration_date.c_str(), auth_res.days_left);
-        auth::start_heartbeat_watchdog(active_key);
+    if (!active_key.empty()) {
+        logger::log_info("[LICENSE] Checking saved license: %s ...", active_key.c_str());
+        auto auth_res = auth::verify_license_online(active_key);
+        if (auth_res.success) {
+            ui::license::g_licensed = true;
+            ui::menu::g_open = false; // Floating logo opens FIRST
+            ui::license::g_expiration_date = auth_res.expiration_date;
+            ui::license::g_days_left = auth_res.days_left;
+            ui::license::g_exp_year = auth_res.exp_year;
+            ui::license::g_exp_month = auth_res.exp_month;
+            ui::license::g_exp_day = auth_res.exp_day;
+            logger::log_info("[LICENSE] [OK] Saved key VALID! Expiry: %s (%d days left)",
+                             auth_res.expiration_date.c_str(), auth_res.days_left);
+            auth::start_heartbeat_watchdog(active_key);
+        } else {
+            logger::log_warn("[LICENSE] Saved key is invalid or expired: %s", auth_res.message.c_str());
+        }
     }
 
     g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
@@ -288,8 +289,8 @@ int main(int argc, char** argv) {
     logger::log_info("[+] Protection Framework: DobbyHook (ARM32) ACTIVE");
 #endif
     logger::log_info("[+] Display Resolution: %d x %d (Orientation: %d)", screenW, screenH, (g_DisplayInfo.orientation != 0) ? g_DisplayInfo.orientation : 1);
-    logger::log_info("[+] Terminal Control: Type '0' or 'exit' and press ENTER to terminate overlay at any time.");
-    logger::log_info("[OK] Awaiting VIP License Activation before game engine attach...");
+    logger::log_info("[+] Terminal & Menu Control: Type '0' or 'exit' in terminal, or click EXIT in menu to close.");
+    logger::log_info("[*] Awaiting VIP License: Enter key in terminal or on-screen prompt...");
 
     static bool s_engine_hooked = false;
 

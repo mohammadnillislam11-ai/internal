@@ -113,14 +113,6 @@ LicenseResult verify_license_online(const std::string& license_key) {
         res = node::verify_license(license_key, hwid);
     }
 
-    // Offline developer VIP master key for setup testing
-    if (!res.success && (license_key == "NINMODS-VIP" || license_key == "ADMIN-2026")) {
-        res.success = true;
-        res.message = "License Verified Successfully! (VIP Token)";
-        res.expiration_date = "Lifetime Access";
-        res.token = "VIP_LOCAL_TOKEN";
-    }
-
     return res;
 }
 

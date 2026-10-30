@@ -125,6 +125,8 @@ void render() {
                                 ImGuiWindowFlags_NoScrollbar;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
 
     if (ImGui::Begin("NinModsPanel", &g_open, winFlags)) {
         ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -132,7 +134,7 @@ void render() {
         // ─────────────────────────────────────────────────────────────
         // LEFT SIDEBAR (180px Wide)
         // ─────────────────────────────────────────────────────────────
-        ImGui::BeginChild("Sidebar", ImVec2(180, 0), true, ImGuiWindowFlags_NoScrollbar);
+        ImGui::BeginChild("Sidebar", ImVec2(180, 0), false, ImGuiWindowFlags_NoScrollbar);
         ImGui::Spacing(); ImGui::Spacing();
 
         ImGui::SetCursorPosX(15);
@@ -450,7 +452,8 @@ void render() {
         ImGui::EndChild();
         ImGui::End();
     }
-    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
 
     // Render active toasts from imgui-notify library
     ImGui::RenderNotifications();
