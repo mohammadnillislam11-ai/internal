@@ -8,19 +8,19 @@
 
 namespace ui::theme {
 
-// Core Color Palette (Theme Accent: Royal Neon Purple)
-inline ImVec4 WindowBg         = ImVec4(0.06f, 0.05f, 0.08f, 0.98f);
-inline ImVec4 SidebarBg        = ImVec4(0.04f, 0.03f, 0.06f, 1.00f);
-inline ImVec4 Primary          = ImVec4(0.68f, 0.35f, 0.98f, 1.00f); // Royal Neon Purple Accent
-inline ImVec4 PrimaryBg        = ImVec4(0.24f, 0.10f, 0.38f, 0.65f); // Deep Purple Card Accent
-inline ImVec4 PrimaryLight     = ImVec4(0.80f, 0.50f, 1.00f, 1.00f); // Light Purple Hover
-inline ImVec4 PrimaryDim       = ImVec4(0.40f, 0.18f, 0.60f, 0.35f);
-inline ImVec4 TextWhite        = ImVec4(0.96f, 0.96f, 0.98f, 1.00f);
-inline ImVec4 TextGray         = ImVec4(0.50f, 0.46f, 0.58f, 1.00f);
-inline ImVec4 BorderColor      = ImVec4(0.20f, 0.15f, 0.28f, 1.00f);
-inline ImVec4 FrameBg          = ImVec4(0.10f, 0.08f, 0.14f, 1.00f);
-inline ImVec4 FrameHover       = ImVec4(0.15f, 0.11f, 0.20f, 1.00f);
-inline ImVec4 FrameActive      = ImVec4(0.20f, 0.14f, 0.28f, 1.00f);
+// Core Color Palette (BOYHHA Premium Pink Theme Accent from refer/ZqwClient)
+inline ImVec4 WindowBg         = ImVec4(0.07f, 0.05f, 0.08f, 0.98f);
+inline ImVec4 SidebarBg        = ImVec4(0.04f, 0.03f, 0.05f, 1.00f);
+inline ImVec4 Primary          = ImVec4(1.00f, 0.28f, 0.60f, 1.00f); // #FF4799 Vibrant Premium Pink
+inline ImVec4 PrimaryBg        = ImVec4(0.35f, 0.08f, 0.20f, 0.85f); // Deep pink translucent pill bg
+inline ImVec4 PrimaryLight     = ImVec4(1.00f, 0.55f, 0.78f, 1.00f); // Highlight pink
+inline ImVec4 PrimaryDim       = ImVec4(0.45f, 0.12f, 0.28f, 0.35f);
+inline ImVec4 TextWhite        = ImVec4(0.96f, 0.96f, 0.97f, 1.00f);
+inline ImVec4 TextGray         = ImVec4(0.48f, 0.44f, 0.50f, 1.00f);
+inline ImVec4 BorderColor      = ImVec4(0.22f, 0.14f, 0.22f, 1.00f);
+inline ImVec4 FrameBg          = ImVec4(0.12f, 0.09f, 0.14f, 1.00f);
+inline ImVec4 FrameHover       = ImVec4(0.16f, 0.12f, 0.18f, 1.00f);
+inline ImVec4 FrameActive      = ImVec4(0.22f, 0.15f, 0.25f, 1.00f);
 
 inline void ApplyTheme() {
     ImGuiStyle& style = ImGui::GetStyle();

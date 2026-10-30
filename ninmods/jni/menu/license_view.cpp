@@ -31,13 +31,16 @@ bool render() {
         std::string saved = storage::get_saved_license();
         if (!saved.empty()) {
             snprintf(s_license_key, sizeof(s_license_key), "%s", saved.c_str());
+        } else {
+            // Default pre-fill with Firebase VIP Key so manual typing is not needed
+            snprintf(s_license_key, sizeof(s_license_key), "%s", "VIP-3DAYS-10DEV");
         }
         s_key_initialized = true;
     }
 
     const ImVec2 ds = ImGui::GetIO().DisplaySize;
     float winW = 440.0f;
-    float winH = 300.0f;
+    float winH = 350.0f;
 
     ImGui::SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2((ds.x - winW) * 0.5f, (ds.y - winH) * 0.5f), ImGuiCond_Always);
@@ -64,33 +67,48 @@ bool render() {
         ImGui::TextColored(ui::theme::TextWhite, "Enter License Key:");
         ImGui::Spacing();
 
-        // Key Input with Paste Button
-        ImGui::PushItemWidth(winW - 130.0f);
+        // Key Input (Full width)
+        ImGui::PushItemWidth(winW - 40.0f);
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ui::theme::FrameBg);
         ImGui::PushStyleColor(ImGuiCol_Border, ui::theme::BorderColor);
         ImGui::InputTextWithHint("##KeyInput", "Paste or enter key...", s_license_key, sizeof(s_license_key));
         ImGui::PopStyleColor(2);
         ImGui::PopItemWidth();
+        ImGui::Spacing();
 
-        ImGui::SameLine();
-        if (ImGui::Button("PASTE", ImVec2(75, 26))) {
+        // Quick 1-Click Action Buttons
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.12f, 0.22f, 0.9f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.18f, 0.35f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ui::theme::PrimaryBg);
+        ImGui::PushStyleColor(ImGuiCol_Text, ui::theme::PrimaryLight);
+
+        if (ImGui::Button("PASTE FROM CLIPBOARD", ImVec2((winW - 50.0f) * 0.5f, 30.0f))) {
             const char* clip = ImGui::GetClipboardText();
             if (clip && strlen(clip) > 0) {
                 snprintf(s_license_key, sizeof(s_license_key), "%s", clip);
+                snprintf(s_status_msg, sizeof(s_status_msg), "Key pasted from clipboard!");
+                s_status_color = ImVec4(0.4f, 0.9f, 0.5f, 1.0f);
             }
         }
+        ImGui::SameLine();
+        if (ImGui::Button("USE DEFAULT VIP KEY", ImVec2((winW - 50.0f) * 0.5f, 30.0f))) {
+            snprintf(s_license_key, sizeof(s_license_key), "VIP-3DAYS-10DEV");
+            snprintf(s_status_msg, sizeof(s_status_msg), "Loaded VIP-3DAYS-10DEV key!");
+            s_status_color = ImVec4(0.4f, 0.9f, 0.5f, 1.0f);
+        }
+        ImGui::PopStyleColor(4);
 
         ImGui::Spacing();
         ImGui::TextColored(s_status_color, "%s", s_status_msg);
         ImGui::Spacing();
 
         // Activation Button
-        ImGui::PushStyleColor(ImGuiCol_Button, ui::theme::PrimaryBg);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ui::theme::Primary);
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ui::theme::PrimaryLight);
-        ImGui::PushStyleColor(ImGuiCol_Text, ui::theme::TextWhite);
+        ImGui::PushStyleColor(ImGuiCol_Button, ui::theme::Primary);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ui::theme::PrimaryLight);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.45f, 0.75f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
 
-        if (ImGui::Button("ACTIVATE NOW", ImVec2(winW - 40.0f, 38.0f))) {
+        if (ImGui::Button("1-CLICK ACTIVATE VIP ACCESS", ImVec2(winW - 40.0f, 40.0f))) {
             if (strlen(s_license_key) >= 4) {
                 snprintf(s_status_msg, sizeof(s_status_msg), "Connecting to authentication server...");
                 s_status_color = ImVec4(0.9f, 0.9f, 0.2f, 1.0f);
