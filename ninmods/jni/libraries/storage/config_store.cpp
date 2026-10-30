@@ -1,6 +1,5 @@
 #include "config_store.h"
 #include "../../menu/config.hpp"
-#include "../../menu/license_view.h"
 #include "../network/license_client.h"
 #include "../network/firebase_client.hpp"
 #include "../network/node_client.hpp"
