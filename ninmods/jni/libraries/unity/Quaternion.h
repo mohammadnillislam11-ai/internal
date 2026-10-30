@@ -623,29 +623,29 @@ struct Quaternion& Quaternion::operator*=(const Quaternion rhs)
     return *this;
 }
 
-Quaternion operator-(Quaternion rhs) { return rhs * -1; }
-Quaternion operator+(Quaternion lhs, const float rhs) { return lhs += rhs; }
-Quaternion operator-(Quaternion lhs, const float rhs) { return lhs -= rhs; }
-Quaternion operator*(Quaternion lhs, const float rhs) { return lhs *= rhs; }
-Quaternion operator/(Quaternion lhs, const float rhs) { return lhs /= rhs; }
-Quaternion operator+(const float lhs, Quaternion rhs) { return rhs += lhs; }
-Quaternion operator-(const float lhs, Quaternion rhs) { return rhs -= lhs; }
-Quaternion operator*(const float lhs, Quaternion rhs) { return rhs *= lhs; }
-Quaternion operator/(const float lhs, Quaternion rhs) { return rhs /= lhs; }
-Quaternion operator+(Quaternion lhs, const Quaternion rhs)
+inline Quaternion operator-(Quaternion rhs) { return rhs * -1; }
+inline Quaternion operator+(Quaternion lhs, const float rhs) { return lhs += rhs; }
+inline Quaternion operator-(Quaternion lhs, const float rhs) { return lhs -= rhs; }
+inline Quaternion operator*(Quaternion lhs, const float rhs) { return lhs *= rhs; }
+inline Quaternion operator/(Quaternion lhs, const float rhs) { return lhs /= rhs; }
+inline Quaternion operator+(const float lhs, Quaternion rhs) { return rhs += lhs; }
+inline Quaternion operator-(const float lhs, Quaternion rhs) { return rhs -= lhs; }
+inline Quaternion operator*(const float lhs, Quaternion rhs) { return rhs *= lhs; }
+inline Quaternion operator/(const float lhs, Quaternion rhs) { return rhs /= lhs; }
+inline Quaternion operator+(Quaternion lhs, const Quaternion rhs)
 {
     return lhs += rhs;
 }
-Quaternion operator-(Quaternion lhs, const Quaternion rhs)
+inline Quaternion operator-(Quaternion lhs, const Quaternion rhs)
 {
     return lhs -= rhs;
 }
-Quaternion operator*(Quaternion lhs, const Quaternion rhs)
+inline Quaternion operator*(Quaternion lhs, const Quaternion rhs)
 {
     return lhs *= rhs;
 }
 
-Vector3 operator*(Quaternion lhs, const Vector3 rhs)
+inline Vector3 operator*(Quaternion lhs, const Vector3 rhs)
 {
     Vector3 u = Vector3(lhs.x, lhs.y, lhs.z);
     float s = lhs.w;
@@ -654,17 +654,17 @@ Vector3 operator*(Quaternion lhs, const Vector3 rhs)
            + Vector3::Cross(u, rhs) * (2.0f * s);
 }
 
-bool operator==(const Quaternion lhs, const Quaternion rhs)
+inline bool operator==(const Quaternion lhs, const Quaternion rhs)
 {
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z && lhs.w == rhs.w;
 }
 
-bool operator!=(const Quaternion lhs, const Quaternion rhs)
+inline bool operator!=(const Quaternion lhs, const Quaternion rhs)
 {
     return !(lhs == rhs);
 }
 
-std::string to_string(Quaternion a) {
+inline std::string to_string(Quaternion a) {
     return to_string(a.x) + std::string(", ") + to_string(a.y) + std::string(", ") + to_string(a.z) + std::string(", ") + to_string(a.w);
 }
 
