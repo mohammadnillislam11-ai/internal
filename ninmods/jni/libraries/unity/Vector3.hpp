@@ -24,6 +24,7 @@ struct Vector3 {
     inline Vector3(float x, float y, float z);
 	
 	static inline Vector3 zero();
+	static inline Vector3 Zero() { return zero(); }
 	
     static inline Vector3 One();
 	

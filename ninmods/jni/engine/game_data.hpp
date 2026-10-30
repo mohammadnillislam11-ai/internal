@@ -9,6 +9,10 @@
 
 namespace engine::data {
 
+    struct Vector4 {
+        float x{0.0f}, y{0.0f}, z{0.0f}, w{0.0f};
+    };
+
     struct Matrix4x4 {
         float m11, m12, m13, m14;
         float m21, m22, m23, m24;
