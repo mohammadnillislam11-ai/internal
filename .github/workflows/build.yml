@@ -24,27 +24,26 @@ jobs:
         run: |
           cd ninmods
           chmod +x compile.sh run.sh 2>/dev/null || true
-          ndk-build -B V=1 2>&1 | tee /tmp/ndk_build.log || {
-            BUILD_CODE=$?
-            echo "====================== NDK BUILD FAILED WITH EXIT CODE $BUILD_CODE ======================"
-            tail -n 120 /tmp/ndk_build.log
-            exit $BUILD_CODE
-          }
+          ndk-build -B V=1
+          echo "=== Check ninmods directory ==="
+          ls -R libs/ || true
 
       - name: Verify Output Binary
         run: |
-          echo "=== Current working directory and find client.sh ==="
-          pwd
-          find . -name "client.sh" -ls
-
-          TARGET_FILE=$(find . -name "client.sh" | head -n 1)
-          if [ -n "$TARGET_FILE" ]; then
-            echo "Found compiled client.sh at: $TARGET_FILE"
+          echo "=== Search entire repository ==="
+          find ninmods/libs -type f || true
+          if [ -f ninmods/libs/arm64-v8a/client.sh ]; then
+            echo "SUCCESS: ninmods/libs/arm64-v8a/client.sh exists!"
             mkdir -p output_binaries
-            cp "$TARGET_FILE" output_binaries/client.sh
-            ls -lh output_binaries/client.sh
+            cp ninmods/libs/arm64-v8a/client.sh output_binaries/client.sh
+          elif [ -f ninmods/libs/arm64-v8a/client.sh.so ]; then
+            echo "Found with .so extension!"
+            mkdir -p output_binaries
+            cp ninmods/libs/arm64-v8a/client.sh.so output_binaries/client.sh
           else
-            echo "ERROR: client.sh not generated anywhere!"
+            echo "=== Listing all files inside ninmods ==="
+            find ninmods -type f -name "*client*" || true
+            find ninmods/libs -type f || true
             exit 1
           fi
 
