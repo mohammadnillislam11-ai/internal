@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build Android arm64-v8a & armeabi-v7a
+    name: Build Android arm64-v8a
     runs-on: ubuntu-latest
 
     steps:
@@ -20,35 +20,32 @@ jobs:
           ndk-version: r25c
           add-to-path: true
 
-      - name: Build ninmods (client.sh)
+      - name: Build client.sh
         run: |
           cd ninmods
           chmod +x compile.sh run.sh 2>/dev/null || true
-          ndk-build -B V=1 2>&1 | tee build_error.log
+          ndk-build -B V=1 2>&1 | tee build.log
 
       - name: Upload Build Log on Failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ndk-build-log
-          path: ninmods/build_error.log
+          name: build-failure-log
+          path: ninmods/build.log
 
       - name: Verify Output Binary
         run: |
-          echo "=== Search entire repository ==="
-          find ninmods/libs -type f || true
           if [ -f ninmods/libs/arm64-v8a/client.sh ]; then
-            echo "SUCCESS: ninmods/libs/arm64-v8a/client.sh exists!"
-            mkdir -p output_binaries
-            cp ninmods/libs/arm64-v8a/client.sh output_binaries/client.sh
+            echo "Build SUCCESS!"
+            ls -lh ninmods/libs/arm64-v8a/client.sh
+            file ninmods/libs/arm64-v8a/client.sh
           elif [ -f ninmods/libs/arm64-v8a/client.sh.so ]; then
-            echo "Found with .so extension!"
-            mkdir -p output_binaries
-            cp ninmods/libs/arm64-v8a/client.sh.so output_binaries/client.sh
+            echo "Build SUCCESS (with .so)!"
+            cp ninmods/libs/arm64-v8a/client.sh.so ninmods/libs/arm64-v8a/client.sh
+            ls -lh ninmods/libs/arm64-v8a/client.sh
           else
-            echo "=== Listing all files inside ninmods ==="
-            find ninmods -type f -name "*client*" || true
-            find ninmods/libs -type f || true
+            echo "Search all generated files:"
+            find . -type f
             exit 1
           fi
 
@@ -56,5 +53,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: client.sh-arm64
-          path: output_binaries/client.sh
+          path: ninmods/libs/arm64-v8a/client.sh
           if-no-files-found: error
