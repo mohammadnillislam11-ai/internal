@@ -5,10 +5,12 @@
 #include "logger.h"
 #include "Icon.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "imgui_notify.h"
 #include <cstring>
 #include <cstdio>
 #include <string>
+#include <algorithm>
 
 #ifndef ICON_FA_CROWN
 #define ICON_FA_CROWN "\xef\x94\xa1"
@@ -125,8 +127,8 @@ bool render() {
     }
 
     const ImVec2 ds = ImGui::GetIO().DisplaySize;
-    float winW = ImMin(540.0f, ds.x - 20.0f);
-    float winH = ImMin(460.0f, ds.y - 20.0f);
+    float winW = std::min(540.0f, ds.x - 20.0f);
+    float winH = std::min(460.0f, ds.y - 20.0f);
 
     ImGui::SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2((ds.x - winW) * 0.5f, (ds.y - winH) * 0.5f), ImGuiCond_Always);
