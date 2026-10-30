@@ -73,15 +73,7 @@ namespace sys {
         __asm__ volatile("svc #0" : "+r"(x0) : "r"(x8), "r"(x1), "r"(x2), "r"(x3), "r"(x4), "r"(x5) : "memory", "cc");
         r = x0;
         #elif defined(__arm__)
-        register long r7 __asm__("r7") = n;
-        register long r0 __asm__("r0") = a1;
-        register long r1 __asm__("r1") = a2;
-        register long r2 __asm__("r2") = a3;
-        register long r3 __asm__("r3") = a4;
-        register long r4 __asm__("r4") = a5;
-        register long r5 __asm__("r5") = a6;
-        __asm__ volatile("svc #0" : "+r"(r0) : "r"(r7), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5) : "memory", "cc");
-        r = r0;
+        r = syscall(n, a1, a2, a3, a4, a5, a6);
         #elif defined(__x86_64__)
         register long rax asm("rax") = n;
         register long rdi asm("rdi") = a1;
@@ -117,12 +109,12 @@ namespace sys {
     }
 }
 
-struct linux_dirent64 {
+struct sys_dirent64 {
     uint64_t d_ino;
     int64_t  d_off;
     unsigned short d_reclen;
     unsigned char  d_type;
-    char d_name[];
+    char d_name[256];
 };
 
 namespace engine::mem {
@@ -162,7 +154,7 @@ namespace engine::mem {
 
             char* p = buf;
             while (p < buf + nr) {
-                auto* e = reinterpret_cast<linux_dirent64*>(p);
+                auto* e = reinterpret_cast<sys_dirent64*>(p);
 
                 if (e->d_type == 4) {
                     char* n = e->d_name;
