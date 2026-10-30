@@ -307,16 +307,8 @@ namespace touch {
         return orientation;
     }
 
-    uint8_t getOrientation() {
-        return orientation;
-    }
-
     void toggle_orientation() {
-        orientation = (orientation == 1) ? 2 : 1;
-    }
-
-    void toggleOrientation() {
-        toggle_orientation();
+        toggleOrientation();
     }
 
     void shutdown() {
