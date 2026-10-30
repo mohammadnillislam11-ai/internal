@@ -48,8 +48,7 @@ namespace SandHook {
             }
         }
 
-        template<typename T>
-        requires(std::is_pointer_v<T>)
+        template<typename T, typename std::enable_if_t<std::is_pointer_v<T>, int> = 0>
         constexpr T getSymbAddress(std::string_view name) const {
             return reinterpret_cast<T>(getSymbAddress(name));
         }
