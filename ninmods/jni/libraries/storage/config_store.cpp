@@ -130,11 +130,15 @@ bool load_config() {
 
         if (j.contains("aim")) {
             auto& aim = j["aim"];
-            cfg::aim::enabled    = aim.value("enabled", false);
-            cfg::aim::silent     = aim.value("silent", false);
-            cfg::aim::target_head= aim.value("target_head", true);
-            cfg::aim::fov        = aim.value("fov", 60.0f);
-            cfg::aim::distance   = aim.value("distance", 250.0f);
+            cfg::aim::enabled      = aim.value("enabled", false);
+            cfg::aim::silent       = aim.value("silent", false);
+            cfg::aim::nobita       = aim.value("nobita", false);
+            cfg::aim::target_bone  = aim.value("target_bone", 0);
+            cfg::aim::trigger_type = aim.value("trigger_type", 0);
+            cfg::aim::draw_fov     = aim.value("draw_fov", false);
+            cfg::aim::fov          = aim.value("fov", 120.0f);
+            cfg::aim::distance     = aim.value("distance", 250.0f);
+            cfg::aim::smooth       = aim.value("smooth", 8.0f);
         }
         return true;
     } catch (...) {
@@ -163,11 +167,15 @@ bool save_config() {
         j["esp"] = esp;
 
         nlohmann::json aim;
-        aim["enabled"]    = cfg::aim::enabled;
-        aim["silent"]     = cfg::aim::silent;
-        aim["target_head"]= cfg::aim::target_head;
-        aim["fov"]        = cfg::aim::fov;
-        aim["distance"]   = cfg::aim::distance;
+        aim["enabled"]      = cfg::aim::enabled;
+        aim["silent"]       = cfg::aim::silent;
+        aim["nobita"]       = cfg::aim::nobita;
+        aim["target_bone"]  = cfg::aim::target_bone;
+        aim["trigger_type"] = cfg::aim::trigger_type;
+        aim["draw_fov"]     = cfg::aim::draw_fov;
+        aim["fov"]          = cfg::aim::fov;
+        aim["distance"]     = cfg::aim::distance;
+        aim["smooth"]       = cfg::aim::smooth;
         j["aim"] = aim;
 
         std::ofstream file(CONFIG_FILE_PATH);
