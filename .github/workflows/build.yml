@@ -24,9 +24,9 @@ jobs:
         run: |
           cd ninmods
           chmod +x compile.sh run.sh 2>/dev/null || true
-          ndk-build -B V=1
-          echo "=== Check ninmods directory ==="
-          ls -R libs/ || true
+          ndk-build -B V=1 > /tmp/ndk.log 2>&1 || (echo "=== NDK BUILD FAILED ===" && cat /tmp/ndk.log && exit 1)
+          echo "=== NDK BUILD FINISHED SUCCESSFULLY ==="
+          ls -la libs/arm64-v8a/ || true
 
       - name: Verify Output Binary
         run: |
