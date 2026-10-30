@@ -68,7 +68,9 @@ FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/clipboard/*.cpp)
 
 # 5. Animation (Official AHEasing), Memory (KittyMemory), xDL & Security Obfuscation
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/animation/*.c)
-FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/kittymemory/*.cpp)
+FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyMemory.cpp
+FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyUtils.cpp
+FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/MemoryPatch.cpp
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/xdl/src/main/cpp/*.c)
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/oxorany/*.cpp)
 

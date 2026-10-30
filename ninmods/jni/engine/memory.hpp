@@ -8,7 +8,6 @@
 #include <cstdio>
 #include "oxorany.h"
 #include "KittyMemory.hpp"
-#include "KittyScanner.hpp"
 
 /**
  * @file memory.hpp
