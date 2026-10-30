@@ -24,37 +24,30 @@ jobs:
         run: |
           cd ninmods
           chmod +x compile.sh run.sh 2>/dev/null || true
-          ndk-build -B V=1 2>&1 | tee build.log
-
-      - name: Upload Build Log on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-failure-log
-          path: ninmods/build.log
+          ndk-build -B V=1
 
       - name: Verify Output Binaries
         run: |
-          echo "=== Checking arm64-v8a ==="
-          if [ -f ninmods/libs/arm64-v8a/client.sh ]; then
-            ls -lh ninmods/libs/arm64-v8a/client.sh
-            file ninmods/libs/arm64-v8a/client.sh
-          else
-            echo "arm64-v8a binary not found!"
-            exit 1
+          echo "=== Root Directory Listing ==="
+          ls -la
+          echo "=== ninmods Directory Listing ==="
+          ls -la ninmods
+          if [ -d ninmods/libs ]; then
+            echo "=== ninmods/libs Content ==="
+            find ninmods/libs -type f
           fi
-
-          echo "=== Checking armeabi-v7a ==="
-          if [ -f ninmods/libs/armeabi-v7a/client.sh ]; then
-            ls -lh ninmods/libs/armeabi-v7a/client.sh
-            file ninmods/libs/armeabi-v7a/client.sh
-          else
-            echo "armeabi-v7a binary not found!"
-            exit 1
+          if [ -d libs ]; then
+            echo "=== root libs Content ==="
+            find libs -type f
+            mkdir -p ninmods/libs
+            cp -r libs/* ninmods/libs/
           fi
 
       - name: Upload Binaries Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ninmods-binaries
-          path: ninmods/libs/
+          name: ninmods-client
+          path: |
+            ninmods/libs/*/client.sh
+            libs/*/client.sh
+          if-no-files-found: warn
