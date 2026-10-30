@@ -14,39 +14,13 @@
 namespace engine {
 
     static bool g_attached = false;
-    static std::string s_active_package = "com.dts.freefiremax";
-    static std::string s_active_region  = "MAX (India / Global)";
-
-    static const char* const SUPPORTED_PACKAGES[] = {
-        "com.dts.freefiremax",  // Free Fire MAX (India & Global)
-        "com.dts.freefireth",   // Free Fire Global
-        "com.dts.freefirein"    // Free Fire India
-    };
-
-    int find_active_game_pid() {
-        for (const auto* pkg : SUPPORTED_PACKAGES) {
-            int pid = mem::find_pid_by_name(pkg);
-            if (pid > 0) {
-                s_active_package = pkg;
-                if (std::string(pkg) == "com.dts.freefiremax") {
-                    s_active_region = "MAX (India / Global)";
-                } else if (std::string(pkg) == "com.dts.freefirein") {
-                    s_active_region = "India";
-                } else {
-                    s_active_region = "Global";
-                }
-                return pid;
-            }
-        }
-        return -1;
-    }
 
     const char* get_target_package() {
-        return s_active_package.c_str();
+        return TARGET_PACKAGE;
     }
 
     const char* get_target_region() {
-        return s_active_region.c_str();
+        return TARGET_REGION;
     }
 
     int get_target_pid() {
@@ -65,8 +39,8 @@ namespace engine {
     }
 
     bool init() {
-        // Silent passive check for game process - auto-detects India (MAX / in) and Global (th)
-        mem::g_pid = find_active_game_pid();
+        // Strictly target com.dts.freefireth
+        mem::g_pid = mem::find_pid_by_name(TARGET_PACKAGE);
         if (mem::g_pid <= 0) {
             return false;
         }
@@ -81,8 +55,8 @@ namespace engine {
             g_attached = true;
             data::start_worker(); // Worker runs in smart sleep mode until features are toggled
             aim::init();          // One-time Dobby hooks installed with dynamic logic gating
-            printf("[+] Attached to %s (PID: %d, Region: %s, libil2cpp: 0x%lx)\n",
-                   s_active_package.c_str(), mem::g_pid, s_active_region.c_str(), (unsigned long)mem::g_lib_base);
+            printf("[+] Attached to %s (PID: %d, libil2cpp: 0x%lx)\n",
+                   TARGET_PACKAGE, mem::g_pid, (unsigned long)mem::g_lib_base);
             return true;
         }
         return false;

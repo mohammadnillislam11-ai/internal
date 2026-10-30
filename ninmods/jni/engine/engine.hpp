@@ -9,7 +9,9 @@
 
 namespace engine {
 
-    int find_active_game_pid();
+    constexpr const char* TARGET_PACKAGE = "com.dts.freefireth";
+    constexpr const char* TARGET_REGION  = "Global";
+
     const char* get_target_package();
     const char* get_target_region();
     int get_target_pid();
