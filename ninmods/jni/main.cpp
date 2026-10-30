@@ -59,7 +59,7 @@ bool InitEGL(int width, int height) {
     system("settings put secure block_untrusted_touches 0 > /dev/null 2>&1");
 
     g_NativeWindow = android::ANativeWindowCreator::Create(
-        "com.android.systemui", width, height, false, false);
+        "com.android.systemui", width, height, true, false);
 
     if (!g_NativeWindow) {
         logger::log_error("[-] Failed to create ANativeWindow overlay!");
@@ -302,12 +302,12 @@ int main(int argc, char** argv) {
     display::init(screenW, screenH);
     touch::init(screenW, screenH, init_ori);
 
-    // Check target game process status at startup
-    int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
+    // Check target game process status at startup (Auto-detects Free Fire MAX / Global / India)
+    int initial_pid = engine::find_active_game_pid();
     if (initial_pid > 0) {
-        logger::log_info("[+] Target Game Process Detected: %s (PID: %d)", engine::TARGET_PACKAGE, initial_pid);
+        logger::log_info("[+] Target Game Process Detected: %s (PID: %d)", engine::get_target_package(), initial_pid);
     } else {
-        logger::log_info("[*] Target Game Process: Monitoring for %s (Background Running)...", engine::TARGET_PACKAGE);
+        logger::log_info("[*] Target Game Process: Monitoring for Free Fire MAX / Global / India (Background Running)...");
     }
 
     logger::log_info("[+] Target Package: %s (%s)", engine::get_target_package(), engine::get_target_region());

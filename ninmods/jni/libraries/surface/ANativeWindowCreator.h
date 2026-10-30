@@ -506,8 +506,8 @@ struct SurfaceComposerClient {
           layerMetadata, nullptr);
     }
 
-    // ⚠️ FIX: SetTrustedOverlay HANYA kalau `hide = true`
-    if (12 <= Functionals::GetInstance().systemVersion && hide) {
+    // Apply SetTrustedOverlay on Android 12+ to prevent touch freeze across the device
+    if (12 <= Functionals::GetInstance().systemVersion) {
       static SurfaceComposerClientTransaction transaction;
       transaction.SetTrustedOverlay(result, true);
       transaction.Apply(false, true);
