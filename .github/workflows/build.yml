@@ -25,6 +25,11 @@ jobs:
           cd ninmods
           chmod +x compile.sh run.sh 2>/dev/null || true
           ndk-build -B V=1 2>&1 | tee build.log
+          echo "=== PWD AND LS AFTER BUILD ==="
+          pwd
+          ls -la
+          ls -la libs/ || true
+          ls -la libs/arm64-v8a/ || true
 
       - name: Upload Build Log on Failure
         if: failure()
@@ -35,16 +40,21 @@ jobs:
 
       - name: Verify Output Binary
         run: |
+          echo "=== SEARCHING FOR COMPILED BINARIES ==="
+          find ninmods -type f -name "client*" || true
+          find . -type f -name "client*" || true
+
           if [ -f ninmods/libs/arm64-v8a/client.sh ]; then
             echo "Build SUCCESS!"
             ls -lh ninmods/libs/arm64-v8a/client.sh
             file ninmods/libs/arm64-v8a/client.sh
-          elif [ -f ninmods/libs/arm64-v8a/client.sh.so ]; then
-            echo "Build SUCCESS (with .so)!"
-            cp ninmods/libs/arm64-v8a/client.sh.so ninmods/libs/arm64-v8a/client.sh
+          elif [ -f libs/arm64-v8a/client.sh ]; then
+            echo "Found in root libs/arm64-v8a/client.sh, moving to ninmods/libs/arm64-v8a/..."
+            mkdir -p ninmods/libs/arm64-v8a
+            cp libs/arm64-v8a/client.sh ninmods/libs/arm64-v8a/client.sh
             ls -lh ninmods/libs/arm64-v8a/client.sh
           else
-            echo "Search all generated files:"
+            echo "Binary not found!"
             find . -type f
             exit 1
           fi
