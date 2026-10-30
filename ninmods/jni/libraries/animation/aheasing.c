@@ -27,7 +27,7 @@
 //
 
 #include <math.h>
-#include "easing.h"
+#include "aheasing.h"
 
 // Modeled after the line y = x
 AHFloat LinearInterpolation(AHFloat p)

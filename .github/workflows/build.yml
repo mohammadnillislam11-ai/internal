@@ -22,6 +22,7 @@ jobs:
 
       - name: Build client.sh (arm64-v8a & armeabi-v7a)
         run: |
+          set -o pipefail
           cd ninmods
           chmod +x compile.sh 2>/dev/null || true
           ndk-build -B V=1 2>&1 | tee build.log
