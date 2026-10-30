@@ -237,9 +237,6 @@ namespace touch {
     bool init(int32_t _screen_w, int32_t _screen_h, uint8_t _orientation) {
         g_touch_running.store(true);
         orientation = _orientation;
-        if (orientation == 0) {
-            orientation = 1; // Landscape for Free Fire
-        }
 
         system("chmod 666 /dev/input/event* >/dev/null 2>&1");
 
@@ -283,9 +280,7 @@ namespace touch {
     }
 
     void update(int32_t _screen_w, int32_t _screen_h, uint8_t _orientation) {
-        if (_orientation != 0) {
-            orientation = _orientation;
-        }
+        orientation = _orientation;
         if (_screen_w > 0 && _screen_h > 0) {
             for (auto &_input: inputs) {
                 _input.calculateMultipliers(_screen_w, _screen_h);
@@ -294,9 +289,7 @@ namespace touch {
     }
 
     void updateOrientation(uint8_t _orientation) {
-        if (_orientation != 0) {
-            orientation = _orientation;
-        }
+        orientation = _orientation;
     }
 
     void update_orientation(uint8_t _orientation) {

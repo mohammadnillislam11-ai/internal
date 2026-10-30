@@ -234,24 +234,42 @@ int main(int argc, char** argv) {
     shield::start_watchdog();
     logger::log_info("[+] Native security watchdog active.");
 
+    // 3. Early VIP License Auto-Verification from config / default VIP key
+    storage::load_config();
+    std::string active_key = storage::get_saved_license();
+    if (active_key.empty()) {
+        active_key = "VIP-3DAYS-10DEV";
+    }
+
+    logger::log_info("[LICENSE] Checking license: %s ...", active_key.c_str());
+    auto auth_res = auth::verify_license_online(active_key);
+    if (auth_res.success) {
+        ui::license::g_licensed = true;
+        ui::license::g_expiration_date = auth_res.expiration_date;
+        ui::license::g_days_left = auth_res.days_left;
+        ui::license::g_exp_year = auth_res.exp_year;
+        ui::license::g_exp_month = auth_res.exp_month;
+        ui::license::g_exp_day = auth_res.exp_day;
+        storage::set_saved_license(active_key);
+        logger::log_info("[LICENSE] [OK] Key VALID! Expiry: %s (%d days left)",
+                         auth_res.expiration_date.c_str(), auth_res.days_left);
+        auth::start_heartbeat_watchdog(active_key);
+    }
+
     g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
-    int max_size = (g_DisplayInfo.height > g_DisplayInfo.width)
-                   ? g_DisplayInfo.height : g_DisplayInfo.width;
-    int min_size = (g_DisplayInfo.height < g_DisplayInfo.width)
-                   ? g_DisplayInfo.height : g_DisplayInfo.width;
-    int screenW = (max_size > 0) ? max_size : 2400;
-    int screenH = (min_size > 0) ? min_size : 1080;
+    int screenW = (g_DisplayInfo.width > 0) ? g_DisplayInfo.width : 2400;
+    int screenH = (g_DisplayInfo.height > 0) ? g_DisplayInfo.height : 1080;
+    uint8_t init_ori = (uint8_t)g_DisplayInfo.orientation;
 
     if (!InitEGL(screenW, screenH)) {
         logger::log_error("[-] EGL initialization failed!");
         return 1;
     }
-    logger::log_info("[+] EGL Surface initialized: %d x %d", screenW, screenH);
+    logger::log_info("[+] EGL Surface initialized: %d x %d (Orientation: %d)", screenW, screenH, (int)init_ori);
 
     InitImGui();
     display::init(screenW, screenH);
-    storage::load_config();
-    touch::init(screenW, screenH, (g_DisplayInfo.orientation != 0) ? g_DisplayInfo.orientation : 1);
+    touch::init(screenW, screenH, init_ori);
 
     // Check target game process status at startup
     int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
@@ -279,10 +297,22 @@ int main(int argc, char** argv) {
     while (g_app_running.load()) {
         auto frame_start = std::chrono::steady_clock::now();
 
+        // Dynamically track display orientation and dimensions every frame
+        g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
+        int cur_w = (g_DisplayInfo.width > 0) ? g_DisplayInfo.width : screenW;
+        int cur_h = (g_DisplayInfo.height > 0) ? g_DisplayInfo.height : screenH;
+        uint8_t cur_ori = (uint8_t)g_DisplayInfo.orientation;
+
+        static uint8_t s_last_ori = 255;
+        if (s_last_ori != cur_ori) {
+            s_last_ori = cur_ori;
+            touch::update(cur_w, cur_h, cur_ori);
+        }
+
         touch::poll();
 
         ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplAndroid_NewFrame(screenW, screenH);
+        ImGui_ImplAndroid_NewFrame(cur_w, cur_h);
         ImGui::NewFrame();
 
         // Stepwise License Verification Gate
@@ -335,7 +365,7 @@ int main(int argc, char** argv) {
         ui::menu::render();
 
         ImGui::Render();
-        glViewport(0, 0, screenW, screenH);
+        glViewport(0, 0, cur_w, cur_h);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
