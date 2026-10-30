@@ -54,5 +54,13 @@ namespace auth {
 
     bool is_heartbeat_active();
 
+    // Global license activation state
+    inline bool g_licensed = false;
+    inline std::string g_expiration_date = "";
+    inline int g_days_left = 0;
+    inline int g_exp_year = 0;
+    inline int g_exp_month = 0;
+    inline int g_exp_day = 0;
+
 } // namespace auth
 

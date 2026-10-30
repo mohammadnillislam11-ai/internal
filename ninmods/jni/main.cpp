@@ -3,7 +3,6 @@
 #include <chrono>
 #include <unistd.h>
 #include <fcntl.h>
-#include <termios.h>
 #include <cstdio>
 #include <cstring>
 #include <atomic>
@@ -31,7 +30,6 @@
 #include "font_data.hpp"
 
 #include "menu/menu.hpp"
-#include "menu/license_view.h"
 #include "menu/style.hpp"
 #include "menu/config.hpp"
 #include "engine/engine.hpp"
@@ -184,104 +182,11 @@ int main(int argc, char** argv) {
     logger::log_info("Log destination: %s", logger::get_log_path().c_str());
     logger::log_info("==================================================");
 
-    // 1. Start background terminal command listener (Real-time live typing from Gboard/terminal into overlay)
-    std::thread terminal_listener([]() {
-        struct termios orig_termios, raw_termios;
-        bool is_tty = (isatty(STDIN_FILENO) != 0);
-        if (is_tty) {
-            tcgetattr(STDIN_FILENO, &orig_termios);
-            raw_termios = orig_termios;
-            raw_termios.c_lflag &= ~(ICANON | ECHO);
-            raw_termios.c_cc[VMIN] = 0;
-            raw_termios.c_cc[VTIME] = 1; // 100ms timeout
-            tcsetattr(STDIN_FILENO, TCSANOW, &raw_termios);
-        }
-
-        std::string live_buffer = "";
-        char ch = 0;
-
-        while (g_app_running.load()) {
-            if (!ui::license::g_licensed) {
-                // Real-time character-by-character live typing mode
-                ssize_t n = read(STDIN_FILENO, &ch, 1);
-                if (n > 0) {
-                    if (ch == '\r' || ch == '\n') {
-                        // Enter pressed on keyboard
-                        std::string key = live_buffer.empty() ? ui::license::get_key() : live_buffer;
-                        while (!key.empty() && (key.front() == ' ' || key.front() == '\t')) key.erase(key.begin());
-                        while (!key.empty() && (key.back() == ' ' || key.back() == '\r' || key.back() == '\n')) key.pop_back();
-
-                        if (key == "0" || key == "exit" || key == "quit" || key == "q") {
-                            request_exit(0);
-                            break;
-                        }
-
-                        if (!key.empty()) {
-                            ui::license::set_key(key);
-                            logger::log_info("[TERMINAL-KEY] Submitting: '%s'", key.c_str());
-                            auto result = auth::verify_license_online(key);
-                            if (result.success) {
-                                ui::license::g_licensed = true;
-                                ui::menu::g_open = false; // Floating logo opens FIRST
-                                ui::license::g_expiration_date = result.expiration_date;
-                                ui::license::g_days_left = result.days_left;
-                                ui::license::g_exp_year = result.exp_year;
-                                ui::license::g_exp_month = result.exp_month;
-                                ui::license::g_exp_day = result.exp_day;
-                                storage::set_saved_license(key);
-                                logger::log_info("[TERMINAL-KEY] [OK] LICENSE ACTIVATED SUCCESSFULLY!");
-                                auth::start_heartbeat_watchdog(key);
-                                live_buffer.clear();
-                            } else {
-                                logger::log_warn("[TERMINAL-KEY] [FAIL] Rejected: %s", result.message.c_str());
-                            }
-                        }
-                    } else if (ch == 127 || ch == 8) {
-                        // Backspace pressed on keyboard
-                        if (!live_buffer.empty()) {
-                            live_buffer.pop_back();
-                            ui::license::set_key(live_buffer);
-                        }
-                    } else if (ch >= 32 && ch <= 126) {
-                        // Printable ASCII character typed on keyboard
-                        if (live_buffer.length() < 120) {
-                            live_buffer.push_back(ch);
-                            ui::license::set_key(live_buffer); // INSTANT ON-SCREEN VISUAL UPDATE!
-                        }
-                    }
-                } else {
-                    usleep(15000);
-                }
-            } else {
-                // Once licensed, restore canonical terminal or read normal commands (0 / exit)
-                if (is_tty) {
-                    tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
-                    is_tty = false;
-                }
-                std::string line;
-                if (std::getline(std::cin, line)) {
-                    while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
-                    while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
-                    if (line == "0" || line == "exit" || line == "quit" || line == "q") {
-                        request_exit(0);
-                        break;
-                    }
-                }
-                usleep(50000);
-            }
-        }
-
-        if (is_tty) {
-            tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
-        }
-    });
-    terminal_listener.detach();
-
-    // 2. Initialize native security shield (AntiDebug, AntiDump, AntiLibPatch, FridaDetect)
+    // 1. Initialize native security shield (AntiDebug, AntiDump, AntiLibPatch, FridaDetect)
     shield::start_watchdog();
     logger::log_info("[+] Native security watchdog active.");
 
-    // 3. Early VIP License Auto-Verification from saved config or CLI arguments
+    // 2. VIP License Verification - Terminal Driven (Fast, Direct, Zero On-Screen UI Friction)
     storage::load_config();
     std::string active_key = storage::get_saved_license();
 
@@ -289,39 +194,98 @@ int main(int argc, char** argv) {
     if (active_key.empty() && argc > 1 && argv[1] != nullptr && strlen(argv[1]) >= 2) {
         std::string cli_arg = argv[1];
         while (!cli_arg.empty() && (cli_arg.back() == '\r' || cli_arg.back() == '\n' || cli_arg.back() == ' ')) cli_arg.pop_back();
-        while (!cli_arg.empty() && cli_arg.front() == ' ') cli_arg.erase(cli_arg.begin());
+        while (!cli_arg.empty() && (cli_arg.front() == ' ' || cli_arg.front() == '\t')) cli_arg.erase(cli_arg.begin());
         if (cli_arg != "0" && cli_arg != "exit") {
             active_key = cli_arg;
-            logger::log_info("[LICENSE] Detected key from CLI argument: %s", active_key.c_str());
+            std::cout << "[+] Found key from CLI argument: " << active_key << std::endl;
         }
     }
 
     if (!active_key.empty()) {
-        logger::log_info("[LICENSE] Checking license: %s ...", active_key.c_str());
+        std::cout << "[*] Verifying saved license online..." << std::flush;
         auto auth_res = auth::verify_license_online(active_key);
         if (auth_res.success) {
-            ui::license::g_licensed = true;
-            ui::menu::g_open = false; // Floating logo opens FIRST
-            ui::license::g_expiration_date = auth_res.expiration_date;
-            ui::license::g_days_left = auth_res.days_left;
-            ui::license::g_exp_year = auth_res.exp_year;
-            ui::license::g_exp_month = auth_res.exp_month;
-            ui::license::g_exp_day = auth_res.exp_day;
+            auth::g_licensed = true;
+            auth::g_expiration_date = auth_res.expiration_date;
+            auth::g_days_left = auth_res.days_left;
+            auth::g_exp_year = auth_res.exp_year;
+            auth::g_exp_month = auth_res.exp_month;
+            auth::g_exp_day = auth_res.exp_day;
             storage::set_saved_license(active_key);
-            logger::log_info("[LICENSE] [OK] License VALID! Expiry: %s (%d days left)",
-                             auth_res.expiration_date.c_str(), auth_res.days_left);
+            std::cout << " [OK]\n[+] Expiry: " << auth_res.expiration_date;
+            if (auth_res.days_left > 0) std::cout << " (" << auth_res.days_left << " days left)";
+            std::cout << std::endl;
             auth::start_heartbeat_watchdog(active_key);
         } else {
-            logger::log_warn("[LICENSE] Key is invalid or expired: %s", auth_res.message.c_str());
-        }
-    } else {
-        // Pre-fill key from /sdcard/key.txt or clipboard if available
-        std::string auto_clip = clipboard::get_text();
-        if (!auto_clip.empty() && auto_clip.length() >= 2 && auto_clip.length() <= 64) {
-            ui::license::set_key(auto_clip);
-            logger::log_info("[LICENSE] Pre-filled license from clipboard/file: %s", auto_clip.c_str());
+            std::cout << " [FAIL]\n[-] Saved key invalid: " << auth_res.message << std::endl;
+            active_key.clear();
         }
     }
+
+    // If not licensed yet, ask directly in terminal (standard terminal input)
+    while (!auth::g_licensed && g_app_running.load()) {
+        std::cout << "\n[?] Enter VIP License Key (or '0' to exit): " << std::flush;
+        std::string input_line;
+        if (!std::getline(std::cin, input_line)) {
+            usleep(100000);
+            continue;
+        }
+
+        while (!input_line.empty() && (input_line.back() == '\r' || input_line.back() == '\n' || input_line.back() == ' ')) input_line.pop_back();
+        while (!input_line.empty() && (input_line.front() == ' ' || input_line.front() == '\t')) input_line.erase(input_line.begin());
+
+        if (input_line == "0" || input_line == "exit" || input_line == "quit" || input_line == "q") {
+            std::cout << "[*] Exiting client.\n" << std::flush;
+            return 0;
+        }
+
+        if (input_line.length() < 2) {
+            std::cout << "[-] License key is too short. Please try again." << std::endl;
+            continue;
+        }
+
+        std::cout << "[*] Verifying license with server..." << std::flush;
+        auto res = auth::verify_license_online(input_line);
+        if (res.success) {
+            auth::g_licensed = true;
+            auth::g_expiration_date = res.expiration_date;
+            auth::g_days_left = res.days_left;
+            auth::g_exp_year = res.exp_year;
+            auth::g_exp_month = res.exp_month;
+            auth::g_exp_day = res.exp_day;
+            storage::set_saved_license(input_line);
+            std::cout << " [OK]\n==================================================" << std::endl;
+            std::cout << "[OK] VIP LICENSE ACTIVATED SUCCESSFULLY!" << std::endl;
+            std::cout << "[+] Expiry Date: " << res.expiration_date;
+            if (res.days_left > 0) std::cout << " (" << res.days_left << " days left)";
+            std::cout << "\n==================================================\n" << std::endl;
+            auth::start_heartbeat_watchdog(input_line);
+            break;
+        } else {
+            std::cout << " [FAIL]\n[-] Rejected: " << res.message << ". Please try again." << std::endl;
+        }
+    }
+
+    if (!auth::g_licensed) {
+        return 0;
+    }
+
+    // 3. Start background terminal command listener for exit commands ('0' or 'exit')
+    std::thread terminal_listener([]() {
+        while (g_app_running.load()) {
+            std::string line;
+            if (std::getline(std::cin, line)) {
+                while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
+                while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
+                if (line == "0" || line == "exit" || line == "quit" || line == "q") {
+                    request_exit(0);
+                    break;
+                }
+            }
+            usleep(100000);
+        }
+    });
+    terminal_listener.detach();
 
     g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
     int screenW = (g_DisplayInfo.width > 0) ? g_DisplayInfo.width : 2400;
@@ -356,7 +320,6 @@ int main(int argc, char** argv) {
 #endif
     logger::log_info("[+] Display Resolution: %d x %d (Orientation: %d)", screenW, screenH, (g_DisplayInfo.orientation != 0) ? g_DisplayInfo.orientation : 1);
     logger::log_info("[+] Terminal & Menu Control: Type '0' or 'exit' in terminal, or click EXIT in menu to close.");
-    logger::log_info("[*] Awaiting VIP License: Enter key in terminal or on-screen prompt...");
 
     static bool s_engine_hooked = false;
 
@@ -384,18 +347,18 @@ int main(int argc, char** argv) {
 
         // Stepwise License Verification Gate
         // Engine only attaches and runs after license key is verified
-        if (ui::license::g_licensed) {
+        if (auth::g_licensed) {
             if (!s_engine_hooked) {
                 logger::log_info("[OK] VIP License Validated! Attaching Engine to Game Process...");
-                if (!ui::license::g_expiration_date.empty()) {
-                    if (ui::license::g_exp_year > 0) {
+                if (!auth::g_expiration_date.empty()) {
+                    if (auth::g_exp_year > 0) {
                         logger::log_info("[+] License Expiry: %s (Month: %02d | Year: %04d | Days Left: %d)",
-                                         ui::license::g_expiration_date.c_str(),
-                                         ui::license::g_exp_month,
-                                         ui::license::g_exp_year,
-                                         ui::license::g_days_left);
+                                         auth::g_expiration_date.c_str(),
+                                         auth::g_exp_month,
+                                         auth::g_exp_year,
+                                         auth::g_days_left);
                     } else {
-                        logger::log_info("[+] License Expiry: %s", ui::license::g_expiration_date.c_str());
+                        logger::log_info("[+] License Expiry: %s", auth::g_expiration_date.c_str());
                     }
                 }
                 engine::init();
@@ -427,8 +390,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        // ImGui Menu & UI Rendering
-        // Displays License Modal when unlicensed; Draggable Floating Puck & Main Menu when licensed
+        // ImGui Menu & UI Rendering (Floating Puck & Main Menu)
         ui::menu::render();
 
         ImGui::Render();

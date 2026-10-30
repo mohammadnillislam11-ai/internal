@@ -1,6 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "menu.hpp"
-#include "license_view.h"
 #include "config.hpp"
 #include "style.hpp"
 #include "widgets.hpp"
@@ -37,15 +36,6 @@ void render() {
 
     const ImVec2 ds = ImGui::GetIO().DisplaySize;
     if (ds.x < 100.f || ds.y < 100.f) return;
-
-    // ==================================================================
-    // 0. FIRST-RUN LICENSE / KEY VERIFICATION MODAL
-    // ==================================================================
-    if (!ui::license::g_licensed) {
-        ui::license::render();
-        ImGui::RenderNotifications();
-        return;
-    }
 
     // ==================================================================
     // 1. BOYHHA CIRCULAR FLOATING LAUNCHER BUTTON (From refer/ZqwClient)
@@ -402,11 +392,11 @@ void render() {
             ImGui::TextColored(ui::theme::TextWhite, "Expiration:");
             ImGui::SameLine(180);
             char expDisplay[128];
-            if (ui::license::g_days_left > 0) {
+            if (auth::g_days_left > 0) {
                 snprintf(expDisplay, sizeof(expDisplay), "%s (%d days left)",
-                         ui::license::g_expiration_date.c_str(), ui::license::g_days_left);
-            } else if (!ui::license::g_expiration_date.empty()) {
-                snprintf(expDisplay, sizeof(expDisplay), "%s", ui::license::g_expiration_date.c_str());
+                         auth::g_expiration_date.c_str(), auth::g_days_left);
+            } else if (!auth::g_expiration_date.empty()) {
+                snprintf(expDisplay, sizeof(expDisplay), "%s", auth::g_expiration_date.c_str());
             } else {
                 snprintf(expDisplay, sizeof(expDisplay), "ACTIVE");
             }
