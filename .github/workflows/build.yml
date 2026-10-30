@@ -24,12 +24,12 @@ jobs:
         run: |
           cd ninmods
           chmod +x compile.sh run.sh 2>/dev/null || true
-          ndk-build -B V=1
-          echo "=== Contents of ninmods after build ==="
-          ls -la
-          echo "=== Contents of libs if exists ==="
-          ls -la libs/ || true
-          ls -la libs/arm64-v8a/ || true
+          ndk-build -B V=1 2>&1 | tee /tmp/ndk_build.log || {
+            BUILD_CODE=$?
+            echo "====================== NDK BUILD FAILED WITH EXIT CODE $BUILD_CODE ======================"
+            tail -n 120 /tmp/ndk_build.log
+            exit $BUILD_CODE
+          }
 
       - name: Verify Output Binary
         run: |
