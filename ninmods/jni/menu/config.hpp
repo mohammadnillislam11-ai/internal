@@ -33,6 +33,7 @@ namespace cfg {
         inline float box_rounding   = 2.0f;
         inline float box_thickness  = 1.0f; // Thread-thin line
         inline float fix_esp        = 0.0f;
+        inline float bracket_frac   = 0.28f;
 
         // Color Themes
         inline ImVec4 box_col       = ImVec4(0.68f, 0.35f, 0.98f, 1.0f); // Royal Neon Purple
