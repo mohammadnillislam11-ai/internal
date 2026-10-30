@@ -12,11 +12,12 @@ Thumbs.db
 *.swp
 *.bak
 
+# Local data & docs
+data.json
+docs/
+
 # Reference portfolio folder
 Imgui Portifolio #16/
 
 # Reference Projects
-refer/BOYHHA/
-refer/refer/
-refer/ZqwClient_old/
-refer/*.zip
+refer/

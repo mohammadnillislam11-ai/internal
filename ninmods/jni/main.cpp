@@ -176,7 +176,11 @@ int main(int argc, char** argv) {
     printf("[+] Target Package: %s (%s)\n", engine::get_target_package(), engine::get_target_region());
     printf("[+] Multi-ABI Engine: arm64-v8a & armeabi-v7a\n");
     printf("[+] NativeShield Engine: ACTIVE (AntiDebug, AntiDump, CRC32 Checksum)\n");
-    printf("[+] Protection Framework: DobbyHook & ByteDance ShadowHook ACTIVE\n");
+#if defined(__aarch64__)
+    printf("[+] Protection Framework: DobbyHook (ARM64) & ByteDance ShadowHook ACTIVE\n");
+#else
+    printf("[+] Protection Framework: DobbyHook (ARM32) ACTIVE\n");
+#endif
     printf("[+] Resolution: %d x %d (Orientation: %d)\n", screenW, screenH, (g_DisplayInfo.orientation != 0) ? g_DisplayInfo.orientation : 1);
     printf("[OK] Awaiting VIP License Activation before game engine attach...\n");
 

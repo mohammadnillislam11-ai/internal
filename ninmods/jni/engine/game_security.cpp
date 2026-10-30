@@ -1,6 +1,8 @@
 #include "game_security.hpp"
 #include "dobby.h"
+#if defined(__aarch64__)
 #include "shadowhook.h"
+#endif
 #include "oxorany.h"
 #include <cstdio>
 #include <cstring>
@@ -121,8 +123,10 @@ namespace engine::security {
             return false;
         }
 
-        // Initialize ShadowHook & Dobby Hook Frameworks
+        // Initialize ShadowHook (ARM64) & Dobby Hook Frameworks
+#if defined(__aarch64__)
         shadowhook_init(SHADOWHOOK_MODE_UNIQUE, false);
+#endif
 
         // Install hooks across all 12 protection offsets via official Dobby hook framework
         DobbyHook((void*)(g_anogs_base + OFF_ANTI_FRIDA),

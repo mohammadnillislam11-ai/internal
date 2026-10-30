@@ -37,16 +37,18 @@ LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/libraries/hook/dobby/include
 include $(PREBUILT_STATIC_LIBRARY)
 
 # ============================================================
-# Prebuilt: ByteDance ShadowHook (Multi-ABI arm64-v8a)
+# Prebuilt: ByteDance ShadowHook (arm64-v8a)
 # ============================================================
+ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
 include $(CLEAR_VARS)
 LOCAL_MODULE := shadowhook
 LOCAL_SRC_FILES := libraries/hook/shadowhook/lib/$(TARGET_ARCH_ABI)/libshadowhook.a
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/libraries/hook/shadowhook/include
 include $(PREBUILT_STATIC_LIBRARY)
+endif
 
 # ============================================================
-# MAIN EXECUTABLE — client.sh
+# MAIN EXECUTABLE - client.sh
 # ============================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := client.sh
@@ -119,7 +121,11 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/menu \
     $(LOCAL_PATH)/engine
 
-LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby shadowhook
+LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby
+ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+LOCAL_STATIC_LIBRARIES += shadowhook
+endif
+
 LOCAL_LDLIBS := -llog -landroid -lEGL -lGLESv3 -lz -ldl
 
 LOCAL_LDFLAGS := \
