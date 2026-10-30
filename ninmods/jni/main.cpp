@@ -173,51 +173,82 @@ void InitImGui() {
     ImGui::GetStyle().ScaleAllSizes(1.35f);
 }
 
+/**
+ * @brief Checks and enforces a fixed global calendar expiration deadline.
+ *        The expiration is locked to an exact absolute Date, Time, and Year
+ *        (2026-11-01 23:59:59) rather than counting down from the runtime of client.sh.
+ * @param out_exp_str Buffer to receive the formatted expiration date string.
+ * @param out_len Capacity of out_exp_str buffer.
+ * @param out_rem_hours Pointer to receive remaining hours.
+ * @param out_rem_mins Pointer to receive remaining minutes.
+ * @return True if current system time is strictly before the fixed deadline; false if expired.
+ */
+static bool check_trial_license(char* out_exp_str, size_t out_len, int* out_rem_hours, int* out_rem_mins) {
+    // Fixed absolute global expiration date: 2026-11-01 23:59:59
+    constexpr int EXP_YEAR  = 2026;
+    constexpr int EXP_MONTH = 11;
+    constexpr int EXP_DAY   = 1;
+    constexpr int EXP_HOUR  = 23;
+    constexpr int EXP_MIN   = 59;
+    constexpr int EXP_SEC   = 59;
+
+    struct tm exp_tm{};
+    exp_tm.tm_year = EXP_YEAR - 1900;
+    exp_tm.tm_mon  = EXP_MONTH - 1;
+    exp_tm.tm_mday = EXP_DAY;
+    exp_tm.tm_hour = EXP_HOUR;
+    exp_tm.tm_min  = EXP_MIN;
+    exp_tm.tm_sec  = EXP_SEC;
+    exp_tm.tm_isdst = -1;
+
+    time_t expiry = mktime(&exp_tm);
+    if (expiry <= 0) {
+        expiry = 1793555999;
+    }
+
+    strftime(out_exp_str, out_len, "%Y-%m-%d %H:%M:%S", &exp_tm);
+
+    time_t now = time(nullptr);
+    if (now >= expiry) {
+        if (out_rem_hours) *out_rem_hours = 0;
+        if (out_rem_mins) *out_rem_mins = 0;
+        return false;
+    }
+
+    long remaining_sec = expiry - now;
+    if (out_rem_hours) *out_rem_hours = static_cast<int>(remaining_sec / 3600);
+    if (out_rem_mins) *out_rem_mins = static_cast<int>((remaining_sec % 3600) / 60);
+    return true;
+}
+
 int main(int argc, char** argv) {
-    std::cout << R"(
+    char exp_buf[64] = {0};
+    int rem_h = 0, rem_m = 0;
+    bool lic_valid = check_trial_license(exp_buf, sizeof(exp_buf), &rem_h, &rem_m);
+
+    // If expired, reject execution immediately
+    if (!lic_valid) {
+        std::cout << "\033[38;2;180;105;255m" << R"(
  _   _  ___  _   _ __  __  ___   ___  ____  
 | \ | ||_ _|| \ | |  \/  |/ _ \ / _ \/ ___| 
 |  \| | | | |  \| | |\/| | | | | | | \___ \ 
 | |\  | | | | |\  | |  | | |_| | |_| |___) |
 |_| \_||___||_| \_|_|  |_|\___/ \___/|____/ 
-)" << '\n';
+)" << "\033[0m\n";
+        std::cout << "\033[91m====================================================\033[0m\n";
+        std::cout << "\033[91m [!] TRIAL LICENSE EXPIRED\033[0m\n";
+        std::cout << "\033[91m [-] Expiry Date was: " << exp_buf << "\033[0m\n";
+        std::cout << "\033[91m [-] Your 2-Day NINMODS trial has ended.\033[0m\n";
+        std::cout << "\033[91m [-] Please contact admin for license renewal.\033[0m\n";
+        std::cout << "\033[91m====================================================\033[0m\n";
+        return 1;
+    }
 
-    // 0. Initialize persistent logging system (terminal + /data/local/tmp/ninmods.log)
+    // Initialize persistent logging
     logger::init("/data/local/tmp/ninmods.log");
-    logger::log_info("==================================================");
-    logger::log_info("NINMODS Client 2.0 (Multi-ABI ARM64 / ARM32)");
-    logger::log_info("Log destination: %s", logger::get_log_path().c_str());
-    logger::log_info("Mode: OPEN CLIENT (Zero License Restriction)");
-    logger::log_info("==================================================");
 
-    // 1. Initialize native security shield (AntiDebug, AntiDump, AntiLibPatch, FridaDetect)
     shield::start_watchdog();
-    logger::log_info("[+] Native security watchdog active.");
-
-    // 2. Load stored user settings (ESP, Aim settings)
     storage::load_config();
-
-    // 3. Start background terminal command listener for exit commands ('0' or 'exit')
-    std::thread terminal_listener([]() {
-        while (g_app_running.load()) {
-            if (!std::cin.good() || std::cin.eof()) {
-                break;
-            }
-            std::string line;
-            if (std::getline(std::cin, line)) {
-                while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
-                while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
-                if (line == "0" || line == "exit" || line == "quit" || line == "q") {
-                    request_exit(0);
-                    break;
-                }
-            } else {
-                break;
-            }
-            usleep(100000);
-        }
-    });
-    terminal_listener.detach();
 
     g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
     int max_size = (g_DisplayInfo.height > g_DisplayInfo.width)
@@ -239,7 +270,6 @@ int main(int argc, char** argv) {
         logger::log_error("[-] EGL initialization failed!");
         return 1;
     }
-    logger::log_info("[+] EGL Surface initialized: %d x %d (Orientation: %d)", screenW, screenH, (int)init_ori);
 
     InitImGui();
     display::init(screenW, screenH);
@@ -248,17 +278,77 @@ int main(int argc, char** argv) {
 
     int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
     if (initial_pid > 0) {
-        logger::log_info("[+] Target Game Process Detected: %s (PID: %d)", engine::TARGET_PACKAGE, initial_pid);
+        logger::log_success("[+] Game Detected: %s (PID: %d)", engine::TARGET_PACKAGE, initial_pid);
     } else {
-        logger::log_info("[*] Target Game Process: Monitoring for %s...", engine::TARGET_PACKAGE);
+        logger::log_info("[*] Monitoring for Target Game: %s...", engine::TARGET_PACKAGE);
     }
 
-    logger::log_info("[+] Target Region: %s", engine::TARGET_REGION);
-    logger::log_info("[+] Multi-ABI Engine: arm64-v8a & armeabi-v7a");
-    logger::log_info("[+] NativeShield Engine: ACTIVE (AntiDebug, AntiDump, CRC32 Checksum)");
-    logger::log_info("[+] Memory Driver: process_vm_readv / process_vm_writev (Crash-Free Direct Bus)");
-    logger::log_info("[+] Display Resolution: %d x %d (Orientation: %d)", screenW, screenH, (g_DisplayInfo.orientation != 0) ? g_DisplayInfo.orientation : 1);
-    logger::log_info("[+] Terminal & Menu Control: Type '0' or 'exit' in terminal, or click EXIT in menu to close.");
+    // Clear screen and display interactive professional console menu
+    std::cout << "\033[H\033[2J";
+    std::cout << "\033[38;2;180;105;255m" << R"(
+ _   _  ___  _   _ __  __  ___   ___  ____  
+| \ | ||_ _|| \ | |  \/  |/ _ \ / _ \/ ___| 
+|  \| | | | |  \| | |\/| | | | | | | \___ \ 
+| |\  | | | | |\  | |  | | |_| | |_| |___) |
+|_| \_||___||_| \_|_|  |_|\___/ \___/|____/ 
+)" << "\033[0m\n";
+
+    std::cout << "\033[38;2;180;105;255m====================================================\033[0m\n";
+    std::cout << "\033[97m   NINMODS STANDALONE 2.0 (ARM64 / ARM32)\033[0m\n";
+    std::cout << "\033[38;2;180;105;255m====================================================\033[0m\n";
+    std::cout << "\033[92m [1] Start Client (Open Floating Logo)\033[0m\n";
+    std::cout << "\033[91m [2] Exit & Terminate All Processes\033[0m\n";
+    std::cout << "\033[93m [3] License Status: ACTIVE (Expires: " << exp_buf << " | " << rem_h << "h " << rem_m << "m left)\033[0m\n";
+    std::cout << "\033[38;2;180;105;255m====================================================\033[0m\n";
+    std::cout << "\033[96mEnter your choice [1-2] and press Enter: \033[0m" << std::flush;
+
+    if (isatty(fileno(stdin))) {
+        std::string choice;
+        while (std::getline(std::cin, choice)) {
+            while (!choice.empty() && (choice.back() == '\r' || choice.back() == '\n' || choice.back() == ' ')) choice.pop_back();
+            while (!choice.empty() && (choice.front() == ' ' || choice.front() == '\t')) choice.erase(choice.begin());
+
+            if (choice == "2" || choice == "exit" || choice == "quit" || choice == "q") {
+                std::cout << "\033[91m[-] Exiting NINMODS Client...\033[0m\n";
+                logger::log_info("[EXIT] User selected Option 2. Shutting down.");
+                return 0;
+            } else if (choice == "3") {
+                std::cout << "\033[93m[+] Trial License active until: " << exp_buf << " (" << rem_h << "h " << rem_m << "m remaining).\033[0m\n";
+                std::cout << "\033[96mEnter your choice [1-2] and press Enter: \033[0m" << std::flush;
+            } else {
+                // Option 1 or Enter
+                break;
+            }
+        }
+    }
+
+    std::cout << "\033[92m[+] Starting NINMODS floating logo overlay...\033[0m\n";
+    logger::log_success("[+] Overlay initialized. Floating logo ready on screen.");
+
+    // Ensure menu starts closed with floating puck visible
+    ui::bar::g_open = false;
+
+    // Start background listener thread for continuous exit command monitoring ('2', '0', 'exit')
+    std::thread terminal_listener([]() {
+        while (g_app_running.load()) {
+            if (!std::cin.good() || std::cin.eof()) {
+                break;
+            }
+            std::string line;
+            if (std::getline(std::cin, line)) {
+                while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
+                while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
+                if (line == "2" || line == "0" || line == "exit" || line == "quit" || line == "q") {
+                    request_exit(0);
+                    break;
+                }
+            } else {
+                break;
+            }
+            usleep(100000);
+        }
+    });
+    terminal_listener.detach();
 
     static bool s_engine_hooked = false;
 
@@ -328,6 +418,9 @@ int main(int argc, char** argv) {
         // Frame rate limiter: cap at 60 FPS (~16666 us) to ensure smooth input responsiveness and 0% phone freeze
         auto frame_end = std::chrono::steady_clock::now();
         auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
+        if (elapsed_us > 150000) {
+            logger::log_warn("[FREEZE-GUARD] Frame stutter: %ld ms delay", static_cast<long>(elapsed_us / 1000));
+        }
         constexpr int64_t TARGET_FRAME_TIME_US = 16666;
         if (elapsed_us < TARGET_FRAME_TIME_US) {
             usleep(static_cast<useconds_t>(TARGET_FRAME_TIME_US - elapsed_us));

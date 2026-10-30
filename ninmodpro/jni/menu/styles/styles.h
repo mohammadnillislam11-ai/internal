@@ -9,38 +9,32 @@
 inline float g_sw, g_sh;
 
 namespace UITheme {
-    // BACKGROUND
-    inline ImVec4 bg           = ImVec4(8/255.f, 8/255.f, 10/255.f, 1.f);
-    inline ImVec4 bg_two       = ImVec4(12/255.f, 12/255.f, 15/255.f, 1.f);
-    inline ImVec4 sidebar      = ImVec4(12/255.f, 12/255.f, 15/255.f, 1.f);
-    inline ImVec4 panel        = ImVec4(18/255.f, 18/255.f, 22/255.f, 1.f);
-    inline ImVec4 widget       = ImVec4(26/255.f, 26/255.f, 32/255.f, 1.f);
+    inline ImVec4 bg           = ImVec4(22/255.f, 16/255.f, 36/255.f, 0.94f);
+    inline ImVec4 bg_two       = ImVec4(28/255.f, 20/255.f, 44/255.f, 0.98f);
+    inline ImVec4 sidebar      = ImVec4(26/255.f, 18/255.f, 42/255.f, 0.98f);
+    inline ImVec4 panel        = ImVec4(36/255.f, 26/255.f, 56/255.f, 0.90f);
+    inline ImVec4 widget       = ImVec4(46/255.f, 34/255.f, 72/255.f, 1.0f);
 
-    // ACCENT — MERAH
-    inline ImVec4 accent       = ImVec4(180/255.f, 30/255.f, 30/255.f, 1.f);
-    inline ImVec4 accent_light = ImVec4(220/255.f, 40/255.f, 40/255.f, 1.f);
-    inline ImVec4 accent_dark  = ImVec4(120/255.f, 20/255.f, 20/255.f, 1.f);
+    inline ImVec4 accent       = ImVec4(180/255.f, 105/255.f, 255/255.f, 1.0f);
+    inline ImVec4 accent_light = ImVec4(205/255.f, 145/255.f, 255/255.f, 1.0f);
+    inline ImVec4 accent_dark  = ImVec4(140/255.f, 60/255.f, 220/255.f, 1.0f);
 
-    // TEXT
-    inline ImVec4 text         = ImVec4(230/255.f, 230/255.f, 235/255.f, 1.f);
-    inline ImVec4 text_light   = ImVec4(230/255.f, 230/255.f, 235/255.f, 1.f);
-    inline ImVec4 text_dim     = ImVec4(140/255.f, 140/255.f, 150/255.f, 1.f);
+    inline ImVec4 text         = ImVec4(245/255.f, 245/255.f, 252/255.f, 1.0f);
+    inline ImVec4 text_light   = ImVec4(255/255.f, 255/255.f, 255/255.f, 1.0f);
+    inline ImVec4 text_dim     = ImVec4(175/255.f, 165/255.f, 195/255.f, 1.0f);
 
-    // STATUS
-    inline ImVec4 success      = ImVec4(52/255.f, 199/255.f, 89/255.f, 1.f);
-    inline ImVec4 warning      = ImVec4(255/255.f, 180/255.f, 40/255.f, 1.f);
-    inline ImVec4 danger       = ImVec4(255/255.f, 69/255.f, 58/255.f, 1.f);
+    inline ImVec4 success      = ImVec4(52/255.f, 211/255.f, 110/255.f, 1.0f);
+    inline ImVec4 warning      = ImVec4(255/255.f, 180/255.f, 40/255.f, 1.0f);
+    inline ImVec4 danger       = ImVec4(255/255.f, 69/255.f, 58/255.f, 1.0f);
 
-    // BORDER
-    inline ImVec4 border       = ImVec4(35/255.f, 35/255.f, 42/255.f, 1.f);
-    inline ImVec4 border_light = ImVec4(50/255.f, 50/255.f, 60/255.f, 1.f);
-    inline ImVec4 border_dark  = ImVec4(0/255.f, 0/255.f, 0/255.f, 1.f);
-    inline ImVec4 subtab_bg    = ImVec4(12/255.f, 12/255.f, 15/255.f, 1.f);
+    inline ImVec4 border       = ImVec4(115/255.f, 70/255.f, 175/255.f, 0.75f);
+    inline ImVec4 border_light = ImVec4(180/255.f, 105/255.f, 255/255.f, 0.95f);
+    inline ImVec4 border_dark  = ImVec4(16/255.f, 10/255.f, 26/255.f, 1.0f);
+    inline ImVec4 subtab_bg    = ImVec4(26/255.f, 18/255.f, 42/255.f, 1.0f);
 
-    // BUTTON
-    inline ImVec4 ButtonColor   = ImVec4(180/255.f, 30/255.f, 30/255.f, 1.f);
-    inline ImVec4 ButtonHovered = ImVec4(220/255.f, 40/255.f, 40/255.f, 1.f);
-    inline ImVec4 ButtonActive  = ImVec4(120/255.f, 20/255.f, 20/255.f, 1.f);
+    inline ImVec4 ButtonColor   = ImVec4(160/255.f, 85/255.f, 240/255.f, 1.0f);
+    inline ImVec4 ButtonHovered = ImVec4(185/255.f, 115/255.f, 255/255.f, 1.0f);
+    inline ImVec4 ButtonActive  = ImVec4(130/255.f, 55/255.f, 210/255.f, 1.0f);
 
     inline void ButtonStyle() {
         ImGui::PushStyleColor(ImGuiCol_Button, ButtonColor);
@@ -51,7 +45,6 @@ namespace UITheme {
         ImGui::PopStyleColor(3);
     }
 }
-
 
 namespace style {
     inline std::unordered_map<std::string, float> anims;

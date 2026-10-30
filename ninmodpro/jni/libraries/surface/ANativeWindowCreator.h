@@ -395,8 +395,7 @@ namespace android {
             }
 
             // ═══════════════════════════════════════════════════════
-            // FIX: `secure` flag & `SetTrustedOverlay` hanya kalau `hide = true`
-            //      Kalau `hide = false` → screenshot NORMAL
+                        //      Kalau `hide = false` → screenshot NORMAL
             // ═══════════════════════════════════════════════════════
             SurfaceControl CreateSurface(const char *name, int32_t width, int32_t height, bool hide, bool secure) {
                 void *parentHandle = nullptr;
@@ -429,7 +428,6 @@ namespace android {
                                                                                              value, -1);
                 } else {
                     // Android 10+
-                    // ⚠️ FIX: layerMetadata.setInt32 + flags 0x40 hanya kalau `hide = true`
                     if (hide) {
                         if (Functionals::GetInstance().systemVersion > 9 &&
                             Functionals::GetInstance().systemVersion < 12) {
@@ -444,7 +442,6 @@ namespace android {
                                                                                              layerMetadata, nullptr);
                 }
 
-                // ⚠️ FIX: SetTrustedOverlay HANYA kalau `hide = true`
                 if (12 <= Functionals::GetInstance().systemVersion && hide) {
                     static SurfaceComposerClientTransaction transaction;
                     transaction.SetTrustedOverlay(result, true);
@@ -571,11 +568,11 @@ namespace android {
 
         static void Destroy(ANativeWindow *nativeWindow) {
             auto it = m_cachedSurfaceControl.find(nativeWindow);
-            if (it != m_cachedSurfaceControl.end())
+            if (it == m_cachedSurfaceControl.end())
                 return;
 
-            m_cachedSurfaceControl[nativeWindow].DestroySurface(reinterpret_cast<detail::Surface *>(nativeWindow));
-            m_cachedSurfaceControl.erase(nativeWindow);
+            it->second.DestroySurface(reinterpret_cast<detail::Surface *>(nativeWindow));
+            m_cachedSurfaceControl.erase(it);
         }
 
     private:

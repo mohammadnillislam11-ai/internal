@@ -1,5 +1,5 @@
 #pragma once
-// NEXORA MODS logo - 256x256 RGBA
+// NINMODS logo - 256x256 RGBA
 static const int logo_width  = 256;
 static const int logo_height = 256;
 static const unsigned int logo_data[65536] = {
