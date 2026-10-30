@@ -30,6 +30,10 @@ inline void ApplyTheme() {
     style.PopupRounding     = 8.0f;
     style.WindowBorderSize  = 1.0f;
     style.FrameBorderSize   = 0.0f;
+    style.AntiAliasedLines   = true;
+    style.AntiAliasedLinesUseTex = true;
+    style.AntiAliasedFill    = true;
+    style.CurveTessellationTol = 1.0f;
 
     style.Colors[ImGuiCol_WindowBg]         = WindowBg;
     style.Colors[ImGuiCol_ChildBg]          = SidebarBg;

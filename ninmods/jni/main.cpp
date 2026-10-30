@@ -145,6 +145,7 @@ void InitImGui() {
     cfg.PixelSnapH = true;
     cfg.OversampleH = 2;
     cfg.OversampleV = 2;
+    cfg.RasterizerDensity = 2.0f;
     float fontSize = 20.0f;
 
     ImFont* mainFont = io.Fonts->AddFontFromMemoryTTF(
@@ -156,6 +157,7 @@ void InitImGui() {
     icons_cfg.PixelSnapH = true;
     icons_cfg.OversampleH = 2;
     icons_cfg.OversampleV = 2;
+    icons_cfg.RasterizerDensity = 2.0f;
     io.Fonts->AddFontFromMemoryCompressedTTF(
         font_awesome_data, font_awesome_size, fontSize, &icons_cfg, icons_ranges);
 
