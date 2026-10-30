@@ -23,6 +23,7 @@ namespace cfg {
         inline bool  bot_tag        = false;
         inline bool  tracer         = false;
         inline bool  skeleton       = false;
+        inline bool  crosshair      = false;
         inline bool  firing_ind     = false;
         inline bool  loot           = false;
 
