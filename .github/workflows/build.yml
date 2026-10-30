@@ -20,17 +20,10 @@ jobs:
           ndk-version: r25c
           add-to-path: true
 
-      - name: Build ninmods (arm64-v8a & armeabi-v7a)
+      - name: Build client.sh (arm64-v8a & armeabi-v7a)
         run: |
           set -o pipefail
           cd ninmods
-          chmod +x compile.sh 2>/dev/null || true
-          ndk-build -B V=1 2>&1 | tee build.log || (echo "=== NDK BUILD ERROR LOG ===" && tail -n 100 build.log && exit 1)
-
-      - name: Build ninmodpro (arm64-v8a & armeabi-v7a)
-        run: |
-          set -o pipefail
-          cd ninmodpro
           chmod +x compile.sh 2>/dev/null || true
           ndk-build -B V=1 2>&1 | tee build.log || (echo "=== NDK BUILD ERROR LOG ===" && tail -n 100 build.log && exit 1)
 
@@ -39,70 +32,40 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-failure-log
-          path: |
-            ninmods/build.log
-            ninmodpro/build.log
+          path: ninmods/build.log
 
       - name: Verify Output Binaries
         run: |
-          echo "Verifying ninmods 64-bit arm64-v8a client.sh..."
+          echo "Verifying 64-bit arm64-v8a client.sh..."
           if [ -f ninmods/libs/arm64-v8a/client.sh ]; then
-            echo "[OK] ninmods 64-bit client.sh built successfully!"
+            echo "[OK] 64-bit client.sh built successfully!"
             ls -lh ninmods/libs/arm64-v8a/client.sh
             file ninmods/libs/arm64-v8a/client.sh
           else
-            echo "[ERROR] ninmods 64-bit arm64-v8a client.sh not found!"
+            echo "[ERROR] 64-bit arm64-v8a client.sh not found!"
             exit 1
           fi
 
-          echo "Verifying ninmods 32-bit armeabi-v7a client.sh..."
+          echo "Verifying 32-bit armeabi-v7a client.sh..."
           if [ -f ninmods/libs/armeabi-v7a/client.sh ]; then
-            echo "[OK] ninmods 32-bit client.sh built successfully!"
+            echo "[OK] 32-bit client.sh built successfully!"
             ls -lh ninmods/libs/armeabi-v7a/client.sh
             file ninmods/libs/armeabi-v7a/client.sh
           else
-            echo "[ERROR] ninmods 32-bit armeabi-v7a client.sh not found!"
+            echo "[ERROR] 32-bit armeabi-v7a client.sh not found!"
             exit 1
           fi
 
-          echo "Verifying ninmodpro 64-bit arm64-v8a client.sh..."
-          if [ -f ninmodpro/libs/arm64-v8a/client.sh ]; then
-            echo "[OK] ninmodpro 64-bit client.sh built successfully!"
-            ls -lh ninmodpro/libs/arm64-v8a/client.sh
-            file ninmodpro/libs/arm64-v8a/client.sh
-          fi
-
-          echo "Verifying ninmodpro 32-bit armeabi-v7a client.sh..."
-          if [ -f ninmodpro/libs/armeabi-v7a/client.sh ]; then
-            echo "[OK] ninmodpro 32-bit client.sh built successfully!"
-            ls -lh ninmodpro/libs/armeabi-v7a/client.sh
-            file ninmodpro/libs/armeabi-v7a/client.sh
-          fi
-
-      - name: Upload ninmods client.sh (64-bit arm64-v8a)
+      - name: Upload client.sh (64-bit arm64-v8a)
         uses: actions/upload-artifact@v4
         with:
           name: client.sh-arm64
           path: ninmods/libs/arm64-v8a/client.sh
           if-no-files-found: error
 
-      - name: Upload ninmods client.sh (32-bit armeabi-v7a)
+      - name: Upload client.sh (32-bit armeabi-v7a)
         uses: actions/upload-artifact@v4
         with:
           name: client.sh-arm32
           path: ninmods/libs/armeabi-v7a/client.sh
           if-no-files-found: error
-
-      - name: Upload ninmodpro client.sh (64-bit arm64-v8a)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ninmodpro-client.sh-arm64
-          path: ninmodpro/libs/arm64-v8a/client.sh
-          if-no-files-found: warn
-
-      - name: Upload ninmodpro client.sh (32-bit armeabi-v7a)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ninmodpro-client.sh-arm32
-          path: ninmodpro/libs/armeabi-v7a/client.sh
-          if-no-files-found: warn
