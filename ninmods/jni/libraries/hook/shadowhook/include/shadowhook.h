@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2026 ByteDance Inc.
+// Copyright (c) 2021-2025 ByteDance Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@
 // Pengying Xu (xupengying@bytedance.com)
 //
 
+// made by @RrQ_Owner
 #ifndef BYTEDANCE_SHADOWHOOK_H
 #define BYTEDANCE_SHADOWHOOK_H
 
@@ -35,7 +36,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define SHADOWHOOK_VERSION "2.0.1"
+#define SHADOWHOOK_VERSION "2.0.1-rc.10"
 
 #define SHADOWHOOK_ERRNO_OK                     0
 #define SHADOWHOOK_ERRNO_PENDING                1
@@ -143,7 +144,7 @@ void *shadowhook_hook_sym_name_2(const char *lib_name, const char *sym_name, voi
 void *shadowhook_hook_sym_name_callback_2(const char *lib_name, const char *sym_name, void *new_addr,
                                           void **orig_addr, uint32_t flags, shadowhook_hooked_t hooked,
                                           void *hooked_arg);
-
+//made by @RrQ_Owner
 // intercept and unintercept
 typedef union {
 #if defined(__aarch64__)
@@ -154,7 +155,7 @@ typedef union {
   uint16_t h[8];
   uint8_t b[16];
 } shadowhook_vreg_t;
-
+//made by @RrQ_Owner
 #if defined(__aarch64__)
 typedef struct {
   uint64_t regs[31];  // x0-x30
@@ -198,7 +199,7 @@ void *shadowhook_intercept_sym_name_callback(const char *lib_name, const char *s
 int shadowhook_unintercept(void *stub);
 
 // get operation records
-#define SHADOWHOOK_RECORD_ITEM_ALL             0xFFFFFFFF
+#define SHADOWHOOK_RECORD_ITEM_ALL             0x7FF  // 0b11111111111
 #define SHADOWHOOK_RECORD_ITEM_TIMESTAMP       (1 << 0)
 #define SHADOWHOOK_RECORD_ITEM_CALLER_LIB_NAME (1 << 1)
 #define SHADOWHOOK_RECORD_ITEM_OP              (1 << 2)
@@ -210,7 +211,6 @@ int shadowhook_unintercept(void *stub);
 #define SHADOWHOOK_RECORD_ITEM_ERRNO           (1 << 8)
 #define SHADOWHOOK_RECORD_ITEM_STUB            (1 << 9)
 #define SHADOWHOOK_RECORD_ITEM_FLAGS           (1 << 10)
-#define SHADOWHOOK_RECORD_ITEM_TRACE           (1 << 11)
 char *shadowhook_get_records(uint32_t item_flags);
 void shadowhook_dump_records(int fd, uint32_t item_flags);
 
@@ -220,7 +220,7 @@ void shadowhook_dlclose(void *handle);
 void *shadowhook_dlsym(void *handle, const char *sym_name);
 void *shadowhook_dlsym_dynsym(void *handle, const char *sym_name);
 void *shadowhook_dlsym_symtab(void *handle, const char *sym_name);
-
+//made by @RrQ_Owner
 // register and unregister callbacks for executing dynamic library's .init .init_array / .fini .fini_array
 typedef void (*shadowhook_dl_info_t)(struct dl_phdr_info *info, size_t size, void *data);
 int shadowhook_register_dl_init_callback(shadowhook_dl_info_t pre, shadowhook_dl_info_t post, void *data);
@@ -238,7 +238,7 @@ void *shadowhook_get_return_address(void);
 #ifdef __cplusplus
 }
 #endif
-
+//made by @RrQ_Owner
 // call previous function in proxy-function
 #ifdef __cplusplus
 #define SHADOWHOOK_CALL_PREV(func, ...) \
@@ -276,3 +276,4 @@ class ShadowhookStackScope {
 #define SHADOWHOOK_RETURN_ADDRESS() shadowhook_get_return_address()
 
 #endif
+//made by @RrQ_Owner
