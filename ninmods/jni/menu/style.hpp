@@ -8,19 +8,19 @@
 
 namespace ui::theme {
 
-// Core Color Palette (Light Pink Frosted Glass Theme - Borderless)
-inline ImVec4 WindowBg         = ImVec4(0.14f, 0.06f, 0.12f, 0.88f); // Soft translucent pink glass
-inline ImVec4 SidebarBg        = ImVec4(0.10f, 0.04f, 0.08f, 0.88f);
-inline ImVec4 Primary          = ImVec4(1.00f, 0.28f, 0.60f, 1.00f); // #FF4799 Vibrant Pink
-inline ImVec4 PrimaryBg        = ImVec4(0.85f, 0.20f, 0.50f, 0.80f); // Translucent pink button
-inline ImVec4 PrimaryLight     = ImVec4(1.00f, 0.55f, 0.78f, 1.00f);
-inline ImVec4 PrimaryDim       = ImVec4(0.45f, 0.12f, 0.28f, 0.35f);
-inline ImVec4 TextWhite        = ImVec4(0.96f, 0.96f, 0.97f, 1.00f);
-inline ImVec4 TextGray         = ImVec4(0.65f, 0.55f, 0.62f, 1.00f);
-inline ImVec4 BorderColor      = ImVec4(0.00f, 0.00f, 0.00f, 0.00f); // No border
-inline ImVec4 FrameBg          = ImVec4(0.20f, 0.08f, 0.16f, 0.80f); // Glass input frame
-inline ImVec4 FrameHover       = ImVec4(0.26f, 0.11f, 0.21f, 0.90f);
-inline ImVec4 FrameActive      = ImVec4(0.32f, 0.14f, 0.26f, 0.95f);
+// Core Color Palette (Crisp Light Pink Theme - Zero Blur Effect)
+inline ImVec4 WindowBg         = ImVec4(0.18f, 0.08f, 0.15f, 0.98f); // Crisp clean solid rose-pink (no background blur)
+inline ImVec4 SidebarBg        = ImVec4(0.14f, 0.06f, 0.12f, 0.98f);
+inline ImVec4 Primary          = ImVec4(1.00f, 0.42f, 0.70f, 1.00f); // Light Vibrant Pink (#FF6BB3)
+inline ImVec4 PrimaryBg        = ImVec4(0.92f, 0.32f, 0.62f, 0.95f); // Light pink solid button
+inline ImVec4 PrimaryLight     = ImVec4(1.00f, 0.65f, 0.82f, 1.00f); // Soft light pink highlight
+inline ImVec4 PrimaryDim       = ImVec4(0.55f, 0.18f, 0.36f, 0.50f);
+inline ImVec4 TextWhite        = ImVec4(0.98f, 0.98f, 0.98f, 1.00f);
+inline ImVec4 TextGray         = ImVec4(0.78f, 0.68f, 0.74f, 1.00f);
+inline ImVec4 BorderColor      = ImVec4(0.00f, 0.00f, 0.00f, 0.00f); // Completely borderless
+inline ImVec4 FrameBg          = ImVec4(0.28f, 0.12f, 0.24f, 0.95f); // Clean light pink frame
+inline ImVec4 FrameHover       = ImVec4(0.36f, 0.16f, 0.30f, 0.98f);
+inline ImVec4 FrameActive      = ImVec4(0.44f, 0.20f, 0.38f, 1.00f);
 
 inline void ApplyTheme() {
     ImGuiStyle& style = ImGui::GetStyle();

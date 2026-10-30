@@ -92,11 +92,11 @@ void render() {
         ImVec2 center(p.x + size * 0.5f, p.y + size * 0.5f);
         float radius = size * 0.5f;
 
-        draw->AddCircleFilled(center, radius + 3.0f,
-                              ImColor(ui::theme::Primary.x, ui::theme::Primary.y, ui::theme::Primary.z, 0.20f), 32);
+        draw->AddCircleFilled(center, radius + 2.0f,
+                              ImColor(ui::theme::Primary.x, ui::theme::Primary.y, ui::theme::Primary.z, 0.30f), 32);
         draw->AddCircleFilled(center, radius,
-                              ImColor(ui::theme::SidebarBg.x, ui::theme::SidebarBg.y, ui::theme::SidebarBg.z, 0.95f), 32);
-        draw->AddCircle(center, radius, ImColor(ui::theme::Primary), 32, 1.8f);
+                              ImColor(ui::theme::SidebarBg.x, ui::theme::SidebarBg.y, ui::theme::SidebarBg.z, 0.98f), 32);
+        draw->AddCircle(center, radius, ImColor(ui::theme::Primary), 32, 2.0f);
 
         ImFont* f = ImGui::GetFont();
         const char* glyph = ICON_FA_CROWN;
