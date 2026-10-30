@@ -1,7 +1,11 @@
 #pragma once
+#include <cstdint>
 
-namespace ui::menu {
-    inline bool g_open = false; // Floating logo opens FIRST upon license activation
-    void render();
+namespace proc {
+    inline uintptr_t lib = 0;
+    inline int pid = -1;
 }
 
+namespace ui::menu {
+    void render();
+}

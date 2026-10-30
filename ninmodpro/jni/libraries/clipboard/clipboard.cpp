@@ -96,37 +96,9 @@ namespace {
         return "";
     }
 
-    // Method 3: Android OS service call clipboard (universal Android root method)
+    // Method 3: Disabled due to Android 12+ IPC parcel limit error
     static std::string tryServiceCall() {
-        FILE* f = popen("service call clipboard 2 s16 com.android.shell i32 0 2>/dev/null", "r");
-        if (!f) return "";
-
-        char buf[4096];
-        std::string raw;
-        while (fgets(buf, sizeof(buf), f)) {
-            raw += buf;
-        }
-        pclose(f);
-
-        if (raw.empty()) return "";
-
-        std::string result;
-        size_t pos = 0;
-        while (true) {
-            size_t start = raw.find('\'', pos);
-            if (start == std::string::npos) break;
-            size_t end = raw.find('\'', start + 1);
-            if (end == std::string::npos) break;
-
-            std::string chunk = raw.substr(start + 1, end - start - 1);
-            for (char c : chunk) {
-                if (c != '.' && c >= 32 && c < 127) {
-                    result += c;
-                }
-            }
-            pos = end + 1;
-        }
-        return result;
+        return "";
     }
 
     // Method 4: Android cmd clipboard get (Android 10+)

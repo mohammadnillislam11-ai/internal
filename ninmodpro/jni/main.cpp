@@ -30,6 +30,9 @@
 #include "font_data.hpp"
 
 #include "menu/menu.hpp"
+#include "menu/bar.hpp"
+#include "menu/styles.h"
+#include "menu/cfg.hpp"
 #include "menu/style.hpp"
 #include "menu/config.hpp"
 #include "engine/engine.hpp"
@@ -135,7 +138,7 @@ void InitImGui() {
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;
 
-    ui::theme::ApplyTheme();
+    ImGui::StyleColorsDark();
 
     ImGui_ImplAndroid_Init(g_NativeWindow);
     ImGui_ImplOpenGL3_Init("#version 300 es");
@@ -303,6 +306,8 @@ int main(int argc, char** argv) {
 
     int screenW = max_size;
     int screenH = min_size;
+    g_sw = static_cast<float>(screenW);
+    g_sh = static_cast<float>(screenH);
     uint8_t init_ori = (uint8_t)g_DisplayInfo.orientation;
     if (init_ori == 0) init_ori = 1;
 
@@ -372,12 +377,15 @@ int main(int argc, char** argv) {
                     }
                 }
                 engine::init();
+                proc::lib = (uintptr_t)engine::mem::g_lib_base;
+                proc::pid = engine::mem::g_pid;
                 s_engine_hooked = true;
             }
 
             // Engine Update & Feature Slots
             engine::update();
-            engine::render_esp();
+            proc::lib = (uintptr_t)engine::mem::g_lib_base;
+            proc::pid = engine::mem::g_pid;
 
             // Periodic Live Terminal Game Status (Every ~3 seconds at 60 FPS = 180 frames)
             static int s_info_tick = 0;
