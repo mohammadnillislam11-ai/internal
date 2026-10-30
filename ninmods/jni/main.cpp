@@ -146,7 +146,7 @@ void InitImGui() {
     cfg.OversampleH = 2;
     cfg.OversampleV = 2;
     cfg.RasterizerDensity = 2.0f;
-    float fontSize = 20.0f;
+    float fontSize = 22.0f;
 
     ImFont* mainFont = io.Fonts->AddFontFromMemoryTTF(
         (void*)Custom, sizeof(Custom), fontSize, &cfg);
@@ -164,7 +164,7 @@ void InitImGui() {
     io.FontDefault = mainFont;
     io.Fonts->Build();
 
-    ImGui::GetStyle().ScaleAllSizes(1.25f);
+    ImGui::GetStyle().ScaleAllSizes(1.35f);
 }
 
 int main(int argc, char** argv) {
@@ -204,6 +204,7 @@ int main(int argc, char** argv) {
 
                 // If license not yet activated, allow activating directly by typing/pasting key in terminal
                 if (!ui::license::g_licensed) {
+                    ui::license::set_key(line); // Sync terminal typing into on-screen menu field
                     logger::log_info("[TERMINAL-KEY] Received license input from terminal: '%s'", line.c_str());
                     logger::log_info("[TERMINAL-KEY] Authenticating with license database...");
                     auto result = auth::verify_license_online(line.c_str());

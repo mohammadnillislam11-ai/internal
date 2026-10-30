@@ -114,10 +114,11 @@ void render() {
     // ==================================================================
     // 2. MAIN NINMODS CLIENT PANEL
     // ==================================================================
-    float panelW = ImMin(750.0f, ds.x - 40.0f);
-    float panelH = ImMin(440.0f, ds.y - 40.0f);
+    bool is_portrait = (ds.x < ds.y);
+    float panelW = is_portrait ? std::min(680.0f, ds.x - 24.0f) : std::min(780.0f, ds.x - 40.0f);
+    float panelH = is_portrait ? std::min(580.0f, ds.y - 120.0f) : std::min(460.0f, ds.y - 30.0f);
 
-    ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2((ds.x - panelW) * 0.5f, (ds.y - panelH) * 0.5f), ImGuiCond_FirstUseEver);
 
     ImGuiWindowFlags winFlags = ImGuiWindowFlags_NoTitleBar |

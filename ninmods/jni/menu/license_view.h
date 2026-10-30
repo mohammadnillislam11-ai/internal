@@ -9,6 +9,9 @@ namespace ui::license {
     inline int g_exp_month = 0;
     inline int g_exp_day = 0;
 
+    void set_key(const std::string& key);
+    std::string get_key();
+
     /**
      * @brief Render the License / Key Verification modal window.
      * @return True if license is valid and active, False if still awaiting activation.
