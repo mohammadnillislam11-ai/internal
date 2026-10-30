@@ -20,6 +20,8 @@ namespace touch {
 #if TOUCH_MODE == 2
         bool trackingIDPresent{false};
 #endif
+        bool isDown{false};
+        float x{0.0f}, y{0.0f};
 
         input(const char *_path, int32_t _screen_w, int32_t _screen_h) {
             fd = open(_path, O_RDWR);
@@ -58,7 +60,7 @@ namespace touch {
     ImGuiIO *imgui_io = nullptr;
     std::vector<input> inputs;
 
-    void input_thread(const input &_input) {
+    void input_thread(input _input) {
         sleep(1);
         if (!imgui_io)
             imgui_io = &ImGui::GetIO();
@@ -69,71 +71,71 @@ namespace touch {
                 continue;
             event_readed_count /= (ssize_t) sizeof(input_event);
 
-            bool isDown = false;
-            float x = 0.0f, y = 0.0f;
             for (long j = 0; j < event_readed_count; j++) {
                 auto &event = events[j];
                 if (event.type == EV_KEY && (event.code == BTN_TOUCH || event.code == BTN_LEFT)) {
-                    isDown = (event.value != 0);
+                    _input.isDown = (event.value != 0);
                 }
                 if (event.type == EV_ABS) {
 #if TOUCH_MODE == 2
                     if (_input.trackingIDPresent && event.code == ABS_MT_TRACKING_ID) {
-                        isDown = event.value != -1;
+                        _input.isDown = (event.value != -1);
                         continue;
                     }
 #elif TOUCH_MODE == 0
                     if (event.code == ABS_MT_TRACKING_ID) {
-                        isDown = event.value != -1;
+                        _input.isDown = (event.value != -1);
                         continue;
                     }
 #endif
                     if (event.code == ABS_MT_POSITION_X) {
-                        x = (float) event.value;
+                        _input.x = (float) event.value;
                         continue;
                     }
                     if (event.code == ABS_MT_POSITION_Y) {
-                        y = (float) event.value;
+                        _input.y = (float) event.value;
                         continue;
                     }
                 }
                 if (event.code == SYN_REPORT && imgui_io) {
 #if TOUCH_MODE == 2
-                    bool curDown = _input.trackingIDPresent ? isDown : event_readed_count > 2;
+                    bool curDown = _input.trackingIDPresent ? _input.isDown : (event_readed_count > 2);
 #elif TOUCH_MODE == 0
-                    bool curDown = isDown;
+                    bool curDown = _input.isDown;
 #else
                     bool curDown = event_readed_count > 2;
 #endif
-                    float calcX = 0.0f;
-                    float calcY = 0.0f;
-                    switch (orientation) {
-                        case 1:
-                            calcX = y;
-                            calcY = _input.absX.maximum - x;
-                            break;
-                        case 2:
-                            calcX = _input.absX.maximum - x;
-                            calcY = _input.absY.maximum - y;
-                            break;
-                        case 3:
-                            calcX = _input.absY.maximum - y;
-                            calcY = x;
-                            break;
-                        default:
-                            calcX = x;
-                            calcY = y;
-                            break;
-                    }
-                    calcX *= _input.absXMultiplier;
-                    calcY *= _input.absYMultiplier;
-
-                    imgui_io->MousePos.x = calcX;
-                    imgui_io->MousePos.y = calcY;
-                    imgui_io->AddMousePosEvent(calcX, calcY);
-
                     imgui_io->MouseDown[0] = curDown;
                     imgui_io->AddMouseButtonEvent(0, curDown);
+
+                    if (curDown) {
+                        float calcX = 0.0f;
+                        float calcY = 0.0f;
+                        switch (orientation) {
+                            case 1:
+                                calcX = _input.y;
+                                calcY = _input.absX.maximum - _input.x;
+                                break;
+                            case 2:
+                                calcX = _input.absX.maximum - _input.x;
+                                calcY = _input.absY.maximum - _input.y;
+                                break;
+                            case 3:
+                                calcX = _input.absY.maximum - _input.y;
+                                calcY = _input.x;
+                                break;
+                            default:
+                                calcX = _input.x;
+                                calcY = _input.y;
+                                break;
+                        }
+                        calcX *= _input.absXMultiplier;
+                        calcY *= _input.absYMultiplier;
+
+                        imgui_io->MousePos.x = calcX;
+                        imgui_io->MousePos.y = calcY;
+                        imgui_io->AddMousePosEvent(calcX, calcY);
+                    }
                 }
             }
         }

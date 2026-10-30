@@ -125,9 +125,7 @@ namespace engine {
 
     /** @brief Dispatches ESP and FOV rendering to active drawlists when enabled. */
     void render_esp() {
-        if (cfg::esp::enabled) {
-            esp::render_all();
-        }
+        esp::render_all();
         if (cfg::aim::draw_fov) {
             aim::render_fov();
         }

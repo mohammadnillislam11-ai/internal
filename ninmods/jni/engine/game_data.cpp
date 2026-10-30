@@ -4,11 +4,10 @@
 #include "menu/config.hpp"
 #include "display_metrics.h"
 #include "oxorany.h"
-#include "glm.hpp"
-#include "MonoString.h"
 #include <thread>
 #include <chrono>
 #include <unordered_map>
+#include <algorithm>
 
 namespace engine::data {
 
@@ -29,68 +28,58 @@ namespace engine::data {
     static std::unordered_map<uint64_t, bool> g_vis_stable;
 
     /**
-     * @brief Computes Euclidean distance in metres between two 3D world positions using GLM.
-     * @param a Origin world position.
-     * @param b Target world position.
-     * @return Distance in metres as a float.
+     * @brief Computes Euclidean distance between two Vector3 points.
      */
     float get_distance_meters(const Vector3& a, const Vector3& b) {
-        glm::vec3 v1(a.x, a.y, a.z);
-        glm::vec3 v2(b.x, b.y, b.z);
-        return glm::distance(v1, v2);
+        float dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+        return sqrtf(dx * dx + dy * dy + dz * dz);
     }
 
+    /**
+     * @brief Projects 3D world coordinates to 2D viewport coordinates using camera projection matrix.
+     */
     Vector3 world_to_screen(const Matrix4x4& vm, const Vector3& pos, float screen_w, float screen_h) {
-        if (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z)) {
-            return Vector3(-1.0f, -1.0f, -1.0f);
+        float v12 = (pos.x * vm.m14) + (pos.y * vm.m24) + (pos.z * vm.m34) + vm.m44;
+        if (v12 >= 0.001f) {
+            float inv = 1.0f / v12;
+            float cx = screen_w * 0.5f;
+            float cy = screen_h * 0.5f;
+            float v9  = (pos.x * vm.m11) + (pos.y * vm.m21) + (pos.z * vm.m31) + vm.m41;
+            float v10 = (pos.x * vm.m12) + (pos.y * vm.m22) + (pos.z * vm.m32) + vm.m42;
+            return Vector3(cx + cx * v9 * inv, cy - cy * v10 * inv, 0.0f);
         }
-        float w = (pos.x * vm.m14) + (pos.y * vm.m24) + (pos.z * vm.m34) + vm.m44;
-        if (!std::isfinite(w) || w < 0.001f) {
-            return Vector3(-1.0f, -1.0f, -1.0f);
-        }
-        float inv_w = 1.0f / w;
-        float cx = screen_w * 0.5f;
-        float cy = screen_h * 0.5f;
-        float x = (pos.x * vm.m11) + (pos.y * vm.m21) + (pos.z * vm.m31) + vm.m41;
-        float y = (pos.x * vm.m12) + (pos.y * vm.m22) + (pos.z * vm.m32) + vm.m42;
-        float sx = cx + cx * x * inv_w;
-        float sy = cy - cy * y * inv_w;
-        if (!std::isfinite(sx) || !std::isfinite(sy)) {
-            return Vector3(-1.0f, -1.0f, -1.0f);
-        }
-        return Vector3(sx, sy, 0.0f);
+        return Vector3(-1.0f, -1.0f, -1.0f);
     }
 
     /**
      * @brief Reconstructs a Unity Transform's world position by walking the parent hierarchy.
-     *        Uses the cached TRS matrix chain stored in the IL2Cpp TransformInternal.
-     * @param transform Pointer to a Unity Transform IL2Cpp object.
-     * @return World-space Vector3 position, or Vector3::Zero() if unresolvable.
+     *        Standardized from ZqwClient TRS matrix chain engine.
      */
     static Vector3 get_transform_position(uint64_t transform) {
-        auto transform_obj = mem::read<uint64_t>(transform + 0x10);
+        auto transform_obj = rpm<uint64_t>(transform + 0x10);
         if (transform_obj == 0) return Vector3::Zero();
 
-        auto matrix_ptr = mem::read<uint64_t>(transform_obj + 0x38);
+        struct { uint64_t matrices; uint64_t indices; } ptrs{};
+        auto matrix_ptr = rpm<uint64_t>(transform_obj + 0x38);
         if (!matrix_ptr) return Vector3::Zero();
 
-        uint64_t matrices = mem::read<uint64_t>(matrix_ptr + 0x18);
-        uint64_t indices  = mem::read<uint64_t>(matrix_ptr + 0x20);
-        if (!matrices || !indices) return Vector3::Zero();
+        ptrs.matrices = rpm<uint64_t>(matrix_ptr + 0x18);
+        ptrs.indices  = rpm<uint64_t>(matrix_ptr + 0x20);
+        if (!ptrs.matrices || !ptrs.indices) return Vector3::Zero();
 
-        auto index_val = mem::read<uint64_t>(transform_obj + 0x40);
+        auto index_val = rpm<uint64_t>(transform_obj + 0x40);
 
-        auto result = mem::read<Vector3>(matrices + (index_val * 0x30));
-        auto transform_index = mem::read<int>(indices + (index_val * 4));
+        auto result = rpm<Vector3>(ptrs.matrices + (index_val * 0x30));
+        auto transform_index = rpm<int>(ptrs.indices + (index_val * 4));
 
-        for (int tries = 0; transform_index >= 0 && transform_index < 5000 && tries < 50; tries++) {
-            uint64_t mat_addr = matrices + (transform_index * 0x30);
-            auto t = mem::read<TransformMatrix>(mat_addr);
+        for (int tries = 0; transform_index >= 0 && tries < 50; tries++) {
+            uint64_t mat_addr = ptrs.matrices + (transform_index * 0x30);
+            auto t = rpm<TransformMatrix>(mat_addr);
 
-            float rx = t.rotation.x, ry = t.rotation.y, rz = t.rotation.z, rw = t.rotation.w;
-            float sx = result.x * t.scale.x;
-            float sy = result.y * t.scale.y;
-            float sz = result.z * t.scale.z;
+            auto rx = t.rotation.x, ry = t.rotation.y, rz = t.rotation.z, rw = t.rotation.w;
+            auto sx = result.x * t.scale.x;
+            auto sy = result.y * t.scale.y;
+            auto sz = result.z * t.scale.z;
 
             result.x = t.position.x + sx +
                        (sx * ((ry * ry * -2.0f) - (rz * rz * 2.0f))) +
@@ -105,52 +94,56 @@ namespace engine::data {
                        (sy * ((ry * rz *  2.0f) - (rw * rx * -2.0f))) +
                        (sz * ((rx * rx * -2.0f) - (ry * ry *  2.0f)));
 
-            transform_index = mem::read<int>(indices + (transform_index * 4));
+            transform_index = rpm<int>(ptrs.indices + (transform_index * 4));
         }
 
         return result;
     }
 
     Vector3 get_node_position(uint64_t node) {
-        auto trans = mem::read<uint64_t>(node + 0x10);
-        if (!trans) return Vector3::Zero();
-        return get_transform_position(trans);
-    }
-
-    static Vector3 bone_screen(uint64_t player, uintptr_t offset, float sw, float sh) {
-        uint64_t node = mem::read<uint64_t>(player + offset);
-        if (!node) return Vector3::Zero();
-        Vector3 world = get_node_position(node);
-        if (world == Vector3::Zero()) return Vector3::Zero();
-        return world_to_screen(g_view_matrix, world, sw, sh);
+        auto transform_val = rpm<uint64_t>(node + 0x10);
+        if (transform_val == 0) return Vector3::Zero();
+        return get_transform_position(transform_val);
     }
 
     /**
-     * @brief Reads the HP value through the game's chained HP pool pointer structure.
-     * @param player Remote player entity address.
-     * @return Current HP as int, or 0 if any pointer in the chain is null.
+     * @brief Helper that extracts node world position and translates it directly to screen coordinates.
      */
-    static int read_hp(uint64_t player) {
-        auto pool = mem::read<uint64_t>(player + offsets::Player_HP);
-        if (!pool) return 0;
-        auto list = mem::read<uint64_t>(pool + offsets::HP_List);
-        if (!list) return 0;
-        auto elem = mem::read<uint64_t>(list + offsets::HP_Entry);
-        if (!elem) return 0;
-        return mem::read<int>(elem + offsets::HP_Value);
+    static Vector3 bone_screen(uint64_t player, uintptr_t offset, float sw, float sh) {
+        uint64_t node = rpm<uint64_t>(player + offset);
+        if (!node) return Vector3::Zero();
+        Vector3 w = get_node_position(node);
+        if (w == Vector3::Zero()) return Vector3::Zero();
+        return world_to_screen(g_view_matrix, w, sw, sh);
     }
 
-    static void read_name(uint64_t player, char* buf, size_t buflen) {
-        buf[0] = '\0';
-        auto str_ptr = mem::read<uint64_t>(player + offsets::Player_Name);
-        if (!str_ptr || str_ptr < 0x10000) return;
+    /**
+     * @brief Reads player health from the managed health pool chain.
+     */
+    static int read_hp(uint64_t player) {
+        auto pool = rpm<uint64_t>(player + offsets::Player_HP);
+        if (!pool) return 0;
+        auto datas = rpm<uint64_t>(pool + offsets::HP_List);
+        if (!datas) return 0;
+        auto elem = rpm<uint64_t>(datas + offsets::HP_Entry);
+        if (!elem) return 0;
+        return rpm<int>(elem + offsets::HP_Value);
+    }
 
-        int len = mem::read<int>(str_ptr + 0x10);
-        if (len <= 0 || len > 64) return;
+    /**
+     * @brief Reads and decodes player UTF-16 name into an ASCII buffer.
+     */
+    static int read_name(uint64_t player, char* buf, size_t buflen) {
+        buf[0] = '\0';
+        auto str_ptr = rpm<uint64_t>(player + offsets::Player_Name);
+        if (!str_ptr || str_ptr < 0x10000) return 0;
+
+        int len = rpm<int>(str_ptr + 0x10);
+        if (len <= 0 || len > 64) return 0;
 
         uint16_t utf16[65];
         if (len > 64) len = 64;
-        if (!mem::read_raw(str_ptr + 0x14, utf16, len * sizeof(uint16_t))) return;
+        if (!mem_read(str_ptr + 0x14, utf16, len * sizeof(uint16_t))) return 0;
 
         int n = 0;
         for (int i = 0; i < len && n < static_cast<int>(buflen) - 1; i++) {
@@ -160,50 +153,80 @@ namespace engine::data {
             }
         }
         buf[n] = '\0';
-    }
-
-    static int read_weapon(uint64_t player) {
-        auto w = mem::read<uint64_t>(player + offsets::Player_Weapon);
-        if (!w) return -1;
-        auto wd = mem::read<uint64_t>(w + offsets::Weapon_Data);
-        if (!wd) return -1;
-        return mem::read<int>(wd + 0x64);
+        return n;
     }
 
     /**
-     * @brief Scans the game's dropped-loot dictionary and populates g_loots with visible items.
-     *        Only runs when cfg::esp::loot is enabled. Skips items beyond loot_range metres.
-     * @param base_game Remote BaseGame IL2Cpp object address.
-     * @param local_pos Local player world position for distance calculation.
-     * @param sw Screen width for world-to-screen projection.
-     * @param sh Screen height for world-to-screen projection.
+     * @brief Reads weapon resource identification ID.
+     */
+    static int read_weapon(uint64_t player) {
+        auto w = rpm<uint64_t>(player + offsets::Player_Weapon);
+        if (!w) return -1;
+        auto wd = rpm<uint64_t>(w + offsets::Weapon_Data);
+        if (!wd) return -1;
+        return rpm<int>(wd + 0x64);
+    }
+
+    /**
+     * @brief Managed IL2CPP Dictionary wrapper matching ZqwClient stealth 1-syscall architecture.
+     */
+    class ManagedDictionary {
+    public:
+        uint64_t address{0};
+        uint64_t entries_head{0};
+        int      count{0};
+        bool     valid{false};
+
+        explicit ManagedDictionary(uint64_t addr) : address(addr) {
+            if (!engine::mem::addr_valid(addr)) return;
+
+            struct { uint64_t entries; uint64_t count_and_pad; } header{};
+            if (!mem_read(addr + offsets::Dict_Entries, &header, sizeof(header))) return;
+
+            if (!engine::mem::addr_valid(header.entries)) return;
+
+            entries_head = header.entries + offsets::Dict_ArrayHeader;
+            count        = static_cast<int>(header.count_and_pad & 0xFFFFFFFFu);
+            valid        = (count > 0 && count < 0x1000);
+        }
+
+        inline int get_count() const { return count; }
+
+        inline uint64_t entry(int i) const {
+            if (!valid || i < 0 || i >= count) return 0;
+            return rpm<uint64_t>(entries_head + (i * offsets::Dict_EntryStride) + offsets::Dict_EntryValue);
+        }
+    };
+
+    /**
+     * @brief Scans dropped loot items using the MetaManager DropObjects dictionary.
      */
     static void scan_loot(uint64_t base_game, const Vector3& local_pos, float sw, float sh) {
         std::vector<LootItem> list;
 
-        uint64_t match = mem::read<uint64_t>(base_game + offsets::BaseGame_Match);
+        uint64_t match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
         if (!match) return;
 
-        uint64_t meta_mgr = mem::read<uint64_t>(match + offsets::Match_MetaManager);
+        uint64_t meta_mgr = rpm<uint64_t>(match + offsets::Match_MetaManager);
         if (!meta_mgr) return;
 
-        uint64_t dict_ptr = mem::read<uint64_t>(meta_mgr + offsets::MetaManager_DropObjects);
+        uint64_t dict_ptr = rpm<uint64_t>(meta_mgr + offsets::MetaManager_DropObjects);
         if (!dict_ptr) return;
 
-        uint64_t entries = mem::read<uint64_t>(dict_ptr + offsets::Dict_Entries);
-        int count = mem::read<int>(dict_ptr + offsets::Dict_Count);
+        uint64_t entries = rpm<uint64_t>(dict_ptr + offsets::Dict_Entries);
+        int count = rpm<int>(dict_ptr + offsets::Dict_Count);
         if (!entries || count <= 0 || count > 500) return;
 
         uint64_t base = entries + offsets::Dict_ArrayHeader;
         for (int i = 0; i < count; i++) {
             uint64_t e = base + (i * offsets::Dict_EntryStride);
-            uint64_t drop_obj = mem::read<uint64_t>(e + offsets::Dict_EntryValue);
+            uint64_t drop_obj = rpm<uint64_t>(e + offsets::Dict_EntryValue);
             if (!drop_obj || drop_obj < 0x100000) continue;
 
-            bool landed = mem::read<bool>(drop_obj + offsets::DropObject_Landed);
+            bool landed = rpm<bool>(drop_obj + offsets::DropObject_Landed);
             if (!landed) continue;
 
-            Vector3 world = mem::read<Vector3>(drop_obj + offsets::DropObject_Position);
+            Vector3 world = rpm<Vector3>(drop_obj + offsets::DropObject_Position);
             if (world == Vector3::Zero()) continue;
 
             float dist = get_distance_meters(local_pos, world);
@@ -214,8 +237,8 @@ namespace engine::data {
 
             LootItem item;
             item.addr      = drop_obj;
-            item.guid      = mem::read<uint32_t>(drop_obj + offsets::DropObject_Guid);
-            item.resID     = mem::read<uint32_t>(drop_obj + offsets::DropObject_ResID);
+            item.guid      = rpm<uint32_t>(drop_obj + offsets::DropObject_Guid);
+            item.resID     = rpm<uint32_t>(drop_obj + offsets::DropObject_ResID);
             item.worldPos  = world;
             item.screenPos = screen;
             item.distance  = dist;
@@ -227,13 +250,12 @@ namespace engine::data {
     }
 
     /**
-     * @brief One full entity scan cycle. Called continuously by the background worker thread.
-     *        Reads GameFacade -> BaseGame -> Match -> PlayerDictionary, projects all enemy bones
-     *        to screen space, and atomically swaps the g_players snapshot. Safe to call at 8ms
-     *        intervals in-match and 50ms out-of-match.
+     * @brief One full entity scan cycle.
      */
     void update_cycle() {
-        if (mem::g_pid <= 0 || mem::g_lib_base == 0) return;
+        int pid = (engine::mem::g_pid > 0) ? engine::mem::g_pid : proc::pid;
+        uintptr_t lib = (engine::mem::g_lib_base > 0) ? engine::mem::g_lib_base : proc::lib;
+        if (pid <= 0 || lib == 0) return;
 
         float screen_w = static_cast<float>(display::width > 0 ? display::width : 2400);
         float screen_h = static_cast<float>(display::height > 0 ? display::height : 1080);
@@ -241,20 +263,20 @@ namespace engine::data {
         std::vector<PlayerData> tmp_players;
         tmp_players.reserve(64);
 
-        // GameFacade -> BaseGame
-        auto gf_cell = mem::read<uint64_t>(mem::g_lib_base + oxorany(offsets::GameFacade));
+        // Base Chain
+        auto gf_cell = rpm<uint64_t>(lib + oxorany(offsets::GameFacade));
         if (!gf_cell) return;
 
-        auto gf_class = mem::read<uint64_t>(gf_cell);
+        auto gf_class = rpm<uint64_t>(gf_cell);
         if (!gf_class) return;
 
-        auto static_fields = mem::read<uint64_t>(gf_class + offsets::GameFacade_P2);
+        auto static_fields = rpm<uint64_t>(gf_class + offsets::GameFacade_P2);
         if (!static_fields) return;
 
-        auto base_game = mem::read<uint64_t>(static_fields + 0x8);
+        auto base_game = rpm<uint64_t>(static_fields + 0x8);
         if (!base_game) return;
 
-        bool match_active = mem::read<bool>(base_game + offsets::MatchIsRunning);
+        bool match_active = rpm<bool>(base_game + offsets::MatchIsRunning);
         g_in_match.store(match_active);
 
         if (!match_active) {
@@ -270,33 +292,33 @@ namespace engine::data {
             return;
         }
 
-        auto match = mem::read<uint64_t>(base_game + offsets::BaseGame_Match);
+        auto match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
         if (!match) return;
 
-        auto local_player = mem::read<uint64_t>(match + offsets::Match_LocalPlayer);
+        auto local_player = rpm<uint64_t>(match + offsets::Match_LocalPlayer);
         g_local_player.store(local_player ? local_player : 0);
         if (!local_player) return;
 
         // Camera Matrix
-        uint64_t follow = mem::read<uint64_t>(local_player + offsets::Player_Camera);
-        uint64_t cam = follow ? mem::read<uint64_t>(follow + offsets::Camera_Follow) : 0;
-        uint64_t int_ptr = cam ? mem::read<uint64_t>(cam + offsets::Camera_IntPtr) : 0;
+        uint64_t follow = rpm<uint64_t>(local_player + offsets::Player_Camera);
+        uint64_t cam = follow ? rpm<uint64_t>(follow + offsets::Camera_Follow) : 0;
+        uint64_t int_ptr = cam ? rpm<uint64_t>(cam + offsets::Camera_IntPtr) : 0;
 
         if (!int_ptr) {
-            follow = mem::read<uint64_t>(local_player + 0x690);
-            cam = follow ? mem::read<uint64_t>(follow + 0x30) : 0;
-            int_ptr = cam ? mem::read<uint64_t>(cam + 0x10) : 0;
+            follow = rpm<uint64_t>(local_player + 0x690);
+            cam = follow ? rpm<uint64_t>(follow + 0x30) : 0;
+            int_ptr = cam ? rpm<uint64_t>(cam + 0x10) : 0;
         }
 
         if (!int_ptr) return;
 
-        g_view_matrix = mem::read<Matrix4x4>(int_ptr + offsets::Camera_Matrix);
+        g_view_matrix = rpm<Matrix4x4>(int_ptr + offsets::Camera_Matrix);
 
         Vector3 local_pos = Vector3::Zero();
-        uint64_t local_head_node = mem::read<uint64_t>(local_player + offsets::Bone_Head);
+        uint64_t local_head_node = rpm<uint64_t>(local_player + offsets::Bone_Head);
         if (local_head_node) local_pos = get_node_position(local_head_node);
 
-        // Loot scan
+        // Loot Scan
         if (cfg::esp::loot) {
             scan_loot(base_game, local_pos, screen_w, screen_h);
         } else {
@@ -304,39 +326,36 @@ namespace engine::data {
             g_loots.clear();
         }
 
-        // Player dictionary scan
-        uint64_t dict_addr = mem::read<uint64_t>(base_game + offsets::Match_PlayerDict);
+        // Player Dictionary Scan
+        uint64_t dict_addr = rpm<uint64_t>(base_game + offsets::Match_PlayerDict);
         if (!dict_addr) return;
 
-        uint64_t entries_ptr = mem::read<uint64_t>(dict_addr + offsets::Dict_Entries);
-        int dict_count = mem::read<int>(dict_addr + offsets::Dict_Count);
-        if (!entries_ptr || dict_count <= 0 || dict_count > 120) return;
+        ManagedDictionary dict(dict_addr);
+        if (!dict.valid) return;
 
-        uint64_t entries_head = entries_ptr + offsets::Dict_ArrayHeader;
-
-        for (int i = 0; i < dict_count; i++) {
-            uint64_t entry_addr = entries_head + (i * offsets::Dict_EntryStride);
-            uint64_t enemy = mem::read<uint64_t>(entry_addr + offsets::Dict_EntryValue);
-
+        int num_entries = dict.get_count();
+        for (int i = 0; i < num_entries; i++) {
+            uint64_t enemy = dict.entry(i);
             if (!enemy || enemy < 0x100000 || enemy == local_player) continue;
-            if (mem::read<bool>(enemy + offsets::Player_IsDead)) continue;
+
+            if (rpm<bool>(enemy + offsets::Player_IsDead)) continue;
 
             int hp = read_hp(enemy);
             if (hp <= 0) continue;
 
-            bool is_bot = mem::read<bool>(enemy + offsets::Player_IsBot);
+            bool is_bot = rpm<bool>(enemy + offsets::Player_IsBot);
 
-            auto avatar = mem::read<uint64_t>(enemy + offsets::Player_Avatar);
-            auto uma = avatar ? mem::read<uint64_t>(avatar + offsets::Avatar_Uma) : 0;
+            auto avatar = rpm<uint64_t>(enemy + offsets::Player_Avatar);
+            auto uma = avatar ? rpm<uint64_t>(avatar + offsets::Avatar_Uma) : 0;
             if (!uma) continue;
 
-            // Teammate Filter (UmaData_Skip from reference engine)
-            auto uma_data = mem::read<uint64_t>(uma + offsets::Uma_Data);
-            if (uma_data && mem::read<bool>(uma_data + offsets::UmaData_Skip)) continue;
+            // Teammate Filter
+            auto uma_data = rpm<uint64_t>(uma + offsets::Uma_Data);
+            if (uma_data && rpm<bool>(uma_data + offsets::UmaData_Skip)) continue;
 
-            bool raw_visible = mem::read<bool>(uma + offsets::Uma_Visible);
+            bool raw_visible = rpm<bool>(uma + offsets::Uma_Visible);
 
-            // Debounce visibility
+            // Visibility Debouncing
             bool visible = raw_visible;
             {
                 auto it = g_vis_stable.find(enemy);
@@ -358,13 +377,14 @@ namespace engine::data {
             }
 
             // Head world & distance
-            uint64_t head_node = mem::read<uint64_t>(enemy + offsets::Bone_Head);
+            uint64_t head_node = rpm<uint64_t>(enemy + offsets::Bone_Head);
             if (!head_node) continue;
             Vector3 head_world = get_node_position(head_node);
             if (head_world == Vector3::Zero()) continue;
 
             float dist = get_distance_meters(local_pos, head_world);
             if (dist > cfg::esp::max_range) continue;
+            if (!visible && dist < 200.0f) continue;
 
             Vector3 head_screen = world_to_screen(g_view_matrix, head_world, screen_w, screen_h);
             if (head_screen.x < 0) continue;
@@ -386,11 +406,11 @@ namespace engine::data {
             pd.distance   = dist;
             pd.curHP      = hp;
             pd.maxHP      = 200;
-            pd.curArmor   = mem::read<int>(enemy + offsets::Player_Armor);
-            pd.isFiring   = mem::read<bool>(enemy + offsets::Player_IsFiring);
-            pd.isGrounded = mem::read<bool>(enemy + offsets::Player_IsGrounded);
+            pd.curArmor   = rpm<int>(enemy + offsets::Player_Armor);
+            pd.isFiring   = rpm<bool>(enemy + offsets::Player_IsFiring);
+            pd.isGrounded = rpm<bool>(enemy + offsets::Player_IsGrounded);
 
-            Vector3 vel = mem::read<Vector3>(enemy + offsets::Player_Velocity);
+            Vector3 vel = rpm<Vector3>(enemy + offsets::Player_Velocity);
             pd.speed = sqrtf(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
 
             // Skeleton bones
@@ -423,17 +443,15 @@ namespace engine::data {
     }
 
     /**
-     * @brief Background worker thread loop. Runs update_cycle() continuously with adaptive sleep:
-     *        8ms when in-match for real-time accuracy, 50ms when in lobby to save CPU.
+     * @brief High-frequency worker thread with randomized jitter to match ZqwClient timing model.
      */
     static void worker_loop() {
+        uint32_t seed = 0x9E3779B1u;
         while (g_worker_running.load(std::memory_order_relaxed)) {
             update_cycle();
-            if (g_in_match.load(std::memory_order_relaxed)) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(8));
-            } else {
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            }
+            seed = seed * 1664525u + 1013904223u;
+            int jitter = (seed >> 24) & 7;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5 + jitter));
         }
     }
 
@@ -444,12 +462,38 @@ namespace engine::data {
 
     void stop_worker() {
         if (!g_worker_running.exchange(false)) return;
-        if (g_worker_thread.joinable()) g_worker_thread.join();
-
+        if (g_worker_thread.joinable()) {
+            g_worker_thread.join();
+        }
         std::lock_guard<std::mutex> lk(g_players_mutex);
         g_players.clear();
-        g_in_match.store(false);
-        g_local_player.store(0);
     }
 
 } // namespace engine::data
+
+/**
+ * @brief Global data namespace aliases aligned with ZqwClient usage.
+ */
+namespace data {
+    std::vector<engine::data::PlayerData>& players = engine::data::g_players;
+    std::mutex& players_mutex = engine::data::g_players_mutex;
+    std::vector<engine::data::LootItem>& loots = engine::data::g_loots;
+    std::mutex& loots_mutex = engine::data::g_loots_mutex;
+    std::atomic<uint64_t>& localPlayerAddr = engine::data::g_local_player;
+    std::atomic<bool>& inMatch = engine::data::g_in_match;
+    engine::data::Matrix4x4& viewMatrix = engine::data::g_view_matrix;
+
+    void update() {
+        engine::data::update_cycle();
+    }
+    void thread_start() {
+        engine::data::start_worker();
+    }
+    void thread_stop() {
+        engine::data::stop_worker();
+    }
+    size_t player_count() {
+        std::lock_guard<std::mutex> lk(engine::data::g_players_mutex);
+        return engine::data::g_players.size();
+    }
+}

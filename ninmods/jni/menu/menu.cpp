@@ -149,32 +149,45 @@ namespace ui::menu {
         ImVec2 pos = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         if (dl) {
-            char valStr[32]; snprintf(valStr, sizeof(valStr), "%.1f%s", *value, suffix);
-            float valW = NS_TextSize(valStr, 14.0f).x + 18.f;
-            dl->AddText(ImGui::GetFont(), 16.0f, {pos.x, pos.y+2.f}, C_TextSec(), label);
-            float vx = pos.x + avail - valW;
-            dl->AddRectFilled({vx, pos.y}, {vx+valW, pos.y+24.f}, C_BgDark(), 4.f);
-            dl->AddRect({vx, pos.y}, {vx+valW, pos.y+24.f}, C_Border(), 4.f, 0, 1.f);
-            dl->AddText(ImGui::GetFont(), 14.0f,
-                {vx + 8.f, pos.y + 4.f}, C_TextMain(), valStr);
+            char valStr[32];
+            if (suffix && suffix[0] != '\0') {
+                snprintf(valStr, sizeof(valStr), "%.0f%s", *value, suffix);
+            } else {
+                snprintf(valStr, sizeof(valStr), "%.0f", *value);
+            }
+            float valW = NS_TextSize(valStr, 15.0f).x;
+            dl->AddText(ImGui::GetFont(), 15.5f, {pos.x, pos.y}, C_TextSec(), label);
+            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x + avail - valW, pos.y}, C_TextDim(), valStr);
 
-            float ty = pos.y + 36.f, tw2 = avail;
-            float rawPct = (maxV > minV) ? ImClamp((*value-minV)/(maxV-minV),0.f,1.f) : 0.f;
+            float ty = pos.y + 24.f, tw2 = avail;
+            float rawPct = (maxV > minV) ? ImClamp((*value-minV)/(maxV-minV), 0.f, 1.f) : 0.f;
             float pct = NS_Anim(std::string(id)+"#pct", rawPct, 22.f);
+
+            // Track background
             dl->AddRectFilled({pos.x, ty}, {pos.x+tw2, ty+5.f},
-                IM_COL32(40,30,60,(int)(content_alpha*255)), 2.5f);
+                IM_COL32(40, 30, 60, (int)(content_alpha*255)), 2.5f);
+            // Track active fill
             dl->AddRectFilled({pos.x, ty}, {pos.x+tw2*pct, ty+5.f}, C_Accent(), 2.5f);
             if (pct > 0.01f) {
                 dl->AddRect({pos.x, ty}, {pos.x+tw2*pct, ty+5.f},
                     (C_Accent() & 0x00FFFFFF) | ((ImU32)90 << 24), 2.5f, 0, 1.f);
             }
-            dl->AddCircleFilled({pos.x+tw2*pct, ty+2.5f}, 8.5f, IM_COL32(255,255,255,255));
-            dl->AddCircle({pos.x+tw2*pct, ty+2.5f}, 8.5f, C_Accent(), 16, 1.8f);
-            ImGui::SetCursorScreenPos({pos.x, ty-8.f});
+            // Thumb knob
+            float thumbX = pos.x + tw2 * pct;
+            dl->AddCircleFilled({thumbX, ty + 2.5f}, 8.0f, IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
+            dl->AddCircle({thumbX, ty + 2.5f}, 8.0f, C_Accent(), 16, 1.8f);
+
+            ImGui::SetCursorScreenPos({pos.x, ty - 6.f});
             ImGui::SetNextItemWidth(tw2);
         }
+        ImGui::PushStyleColor(ImGuiCol_FrameBg,          IM_COL32(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,   IM_COL32(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive,    IM_COL32(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab,       IM_COL32(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, IM_COL32(0,0,0,0));
         bool changed = ImGui::SliderFloat("##s", value, minV, maxV, "");
-        ImGui::Dummy(ImVec2(0, 16.f));
+        ImGui::PopStyleColor(5);
+        ImGui::Dummy(ImVec2(0, 14.f));
         ImGui::PopID();
         return changed;
     }
@@ -293,14 +306,16 @@ namespace ui::menu {
     static void tab_aimbot(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
-        ImVec2 cp = ImGui::GetCursorScreenPos();
 
         float gap = 20.f;
-        bool twoCol = (cw > 500.f);
-        float colW = twoCol ? ((cw - gap) * 0.5f) : cw;
+        float col0W = (cw - gap) * 0.48f;
+        float col1W = (cw - gap) * 0.52f;
 
-        // Left Column: Core Toggles & FOV Slider (Mirrors Mockup Image 2)
-        ImGui::BeginGroup();
+        ImGui::Columns(2, "aim_cols", false);
+        ImGui::SetColumnWidth(0, col0W);
+        ImGui::SetColumnWidth(1, col1W + gap);
+
+        // Column 0 (Left): Core Toggles & FOV Radar Slider (Exact match to plan screenshot)
         NS_Toggle("esp_master", oxorany("ESP"),            &cfg::esp::enabled);
         NS_Toggle("esp_box",    oxorany("ESP (Box)"),      &cfg::esp::box);
         NS_Toggle("esp_skel",   oxorany("ESP (Skeleton)"), &cfg::esp::skeleton);
@@ -308,60 +323,27 @@ namespace ui::menu {
         NS_Toggle("aim_draw",   oxorany("Aim FOV"),        &cfg::aim::draw_fov);
         NS_Slider("fov_rad",    oxorany("FOV Radar"),      &cfg::aim::fov, 30.f, 300.f, "");
         NS_Toggle("aim_silent", oxorany("Target Status"),  &cfg::aim::silent);
-        ImGui::EndGroup();
 
-        if (twoCol) {
-            ImGui::SameLine(0, gap);
-            ImGui::BeginGroup();
+        ImGui::NextColumn();
 
-            // Right Column: Aim Distance / FOV Slider + Radar Display Widget + Nobita Mode
-            NS_Slider("aim_dist", oxorany("Aim FOV"), &cfg::aim::distance, 30.f, 400.f, "");
+        // Column 1 (Right): Aim FOV Slider + Concentric Radar Widget + Target Status
+        NS_Slider("aim_dist", oxorany("Aim FOV"), &cfg::aim::distance, 30.f, 400.f, "");
 
-            // Concentric Neon Purple Radar Widget (Exact match to Image 2)
-            float radarBoxH = 175.f;
-            ImVec2 rPos = ImGui::GetCursorScreenPos();
-            float rcx = rPos.x + colW * 0.5f;
-            float rcy = rPos.y + radarBoxH * 0.5f;
-            float rad = 65.f;
+        // Simple FOV Circle Widget (Clean, no 3D designs, no concentric clutter)
+        float circleBoxH = 175.f;
+        ImVec2 rPos = ImGui::GetCursorScreenPos();
+        float rcx = rPos.x + col1W * 0.5f;
+        float rcy = rPos.y + circleBoxH * 0.5f;
+        float rad = 65.f;
 
-            // Outer ring with subtle glow
-            dl->AddCircle(ImVec2(rcx, rcy), rad, C_Accent(), 48, 1.8f);
-            dl->AddCircle(ImVec2(rcx, rcy), rad + 1.5f, C_AccentDim(), 48, 1.0f);
+        // Clean simple circle outline
+        dl->AddCircle(ImVec2(rcx, rcy), rad, C_Accent(), 64, 1.8f);
 
-            // Middle ring
-            dl->AddCircle(ImVec2(rcx, rcy), rad * 0.66f, C_Border(), 36, 1.2f);
+        ImGui::Dummy(ImVec2(col1W, circleBoxH));
 
-            // Inner ring
-            dl->AddCircle(ImVec2(rcx, rcy), rad * 0.33f, C_Border(), 24, 1.0f);
+        NS_Toggle("aim_nobita", oxorany("Target Status"), &cfg::aim::nobita);
 
-            // Center glowing dot
-            dl->AddCircleFilled(ImVec2(rcx, rcy), 3.5f, C_AccentBright());
-            dl->AddCircle(ImVec2(rcx, rcy), 5.5f, C_Accent(), 16, 1.2f);
-
-            // Crosshair lines with end ticks
-            dl->AddLine({rcx - rad - 8.f, rcy}, {rcx + rad + 8.f, rcy}, C_AccentDim(), 1.2f);
-            dl->AddLine({rcx, rcy - rad - 8.f}, {rcx, rcy + rad + 8.f}, C_AccentDim(), 1.2f);
-
-            // 4 Accent ticks on the outer perimeter
-            dl->AddLine({rcx - rad - 3.f, rcy - 4.f}, {rcx - rad - 3.f, rcy + 4.f}, C_Accent(), 1.5f);
-            dl->AddLine({rcx + rad + 3.f, rcy - 4.f}, {rcx + rad + 3.f, rcy + 4.f}, C_Accent(), 1.5f);
-            dl->AddLine({rcx - 4.f, rcy - rad - 3.f}, {rcx + 4.f, rcy - rad - 3.f}, C_Accent(), 1.5f);
-            dl->AddLine({rcx - 4.f, rcy + rad + 3.f}, {rcx + 4.f, rcy + rad + 3.f}, C_Accent(), 1.5f);
-
-            // If enemies detected in match, plot subtle target blips on radar
-            size_t pCount = data::player_count();
-            if (pCount > 0) {
-                float blipAngle = (float)(ImGui::GetTime() * 1.5);
-                float bx1 = rcx + cosf(blipAngle) * (rad * 0.55f);
-                float by1 = rcy + sinf(blipAngle) * (rad * 0.55f);
-                dl->AddCircleFilled({bx1, by1}, 3.0f, C_Danger());
-            }
-
-            ImGui::Dummy(ImVec2(colW, radarBoxH));
-
-            NS_Toggle("aim_nobita", oxorany("Target Status"), &cfg::aim::nobita);
-            ImGui::EndGroup();
-        }
+        ImGui::Columns(1);
 
         cfg::aim::enabled = cfg::aim::silent || cfg::aim::nobita || cfg::aim::draw_fov;
         ImGui::Dummy(ImVec2(0, 15.f));
@@ -819,7 +801,7 @@ namespace ui::menu {
         if (!inHeaderControls && (mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= wp.y && mp.y <= wp.y + headerH)) {
             if (ImGui::IsMouseClicked(0)) {
                 drag = true;
-                doff = {mp.x-wp.x, mp.y-wp.y};
+                doff = {mp.x - g_menu_pos.x, mp.y - g_menu_pos.y};
             }
         }
         if (drag) {

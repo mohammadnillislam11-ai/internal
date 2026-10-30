@@ -25,20 +25,19 @@ static ImVec2 g_fps_down(0, 0);
 static constexpr float FPS_DRAG_THRESHOLD = 8.f;
 
 static void get_fps_pos(float w, float h) {
-  if (g_fps_x < 0.f || g_fps_y < 0.f || (g_sw > 0.f && g_fps_x > g_sw)) {
-    g_fps_x = g_sw - w - 25.f;
-    g_fps_y = g_sh - h - 35.f;
-  }
-  if (g_sw > 0)
-    g_fps_x = ImMax(0.f, ImMin(g_fps_x, g_sw - w));
-  if (g_sh > 0)
-    g_fps_y = ImMax(0.f, ImMin(g_fps_y, g_sh - h));
+    if (g_fps_x < -0.5f || g_fps_y < -0.5f || (g_sw > 0.f && g_fps_x > g_sw)) {
+        g_fps_x = g_sw - w - 25.f;
+        g_fps_y = g_sh - h - 35.f;
+    }
+    if (g_sw > 0)
+        g_fps_x = ImClamp(g_fps_x, 0.f, ImMax(0.f, g_sw - w));
+    if (g_sh > 0)
+        g_fps_y = ImClamp(g_fps_y, 0.f, ImMax(0.f, g_sh - h));
 }
 
 /**
  * @brief Renders the floating draggable logo puck when the main menu is closed.
- *        Features neon light-purple glowing circular N logo and live FPS
- * counter.
+ *        Features neon light-purple glowing circular N logo and live FPS counter.
  * @param alpha Global opacity multiplier.
  */
 static void render_fps_icon(float alpha) {
@@ -69,8 +68,11 @@ static void render_fps_icon(float alpha) {
   }
 
   if (ImGui::IsMouseReleased(0)) {
-    if (g_fps_potential && !g_fps_drag) {
+    if (g_fps_drag) {
+      logger::log_info("[PUCK] Floating logo moved to: (X: %.1f, Y: %.1f)", g_fps_x, g_fps_y);
+    } else if (g_fps_potential) {
       g_open = true;
+      logger::log_info("[MENU] Menu opened via floating logo tap.");
     }
     g_fps_potential = false;
     g_fps_drag = false;
