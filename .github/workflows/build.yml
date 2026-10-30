@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build Android arm64-v8a
+    name: Build Android arm64-v8a & armeabi-v7a
     runs-on: ubuntu-latest
 
     steps:
@@ -20,10 +20,10 @@ jobs:
           ndk-version: r25c
           add-to-path: true
 
-      - name: Build client.sh
+      - name: Build ninmods (Multi-ABI client.sh)
         run: |
-          cd refer/ZqwClient
-          chmod +x compile.sh h.sh 2>/dev/null || true
+          cd ninmods
+          chmod +x compile.sh run.sh 2>/dev/null || true
           ndk-build -B V=1 2>&1 | tee build.log
 
       - name: Upload Build Log on Failure
@@ -31,22 +31,30 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-failure-log
-          path: refer/ZqwClient/build.log
+          path: ninmods/build.log
 
-      - name: Verify Output Binary
+      - name: Verify Output Binaries
         run: |
-          if [ -f refer/ZqwClient/libs/arm64-v8a/client.sh ]; then
-            echo "Build SUCCESS!"
-            ls -lh refer/ZqwClient/libs/arm64-v8a/client.sh
-            file refer/ZqwClient/libs/arm64-v8a/client.sh
+          echo "=== Checking arm64-v8a ==="
+          if [ -f ninmods/libs/arm64-v8a/client.sh ]; then
+            ls -lh ninmods/libs/arm64-v8a/client.sh
+            file ninmods/libs/arm64-v8a/client.sh
           else
-            echo "Binary not found!"
+            echo "arm64-v8a binary not found!"
             exit 1
           fi
 
-      - name: Upload client.sh Artifact
+          echo "=== Checking armeabi-v7a ==="
+          if [ -f ninmods/libs/armeabi-v7a/client.sh ]; then
+            ls -lh ninmods/libs/armeabi-v7a/client.sh
+            file ninmods/libs/armeabi-v7a/client.sh
+          else
+            echo "armeabi-v7a binary not found!"
+            exit 1
+          fi
+
+      - name: Upload Binaries Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: client.sh-arm64
-          path: refer/ZqwClient/libs/arm64-v8a/client.sh
-          if-no-files-found: error
+          name: ninmods-binaries
+          path: ninmods/libs/
