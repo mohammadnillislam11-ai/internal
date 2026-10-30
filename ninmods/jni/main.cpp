@@ -53,9 +53,14 @@ void request_exit(int code) {
 }
 
 bool InitEGL(int width, int height) {
-    // Unblock touch overlay settings across system, global, and secure
+    // Unblock touch overlay settings across system, global, and secure (identical to refer/ZqwClient)
+    FILE* fp = popen("settings put system block_untrusted_touches 0", "r");
+    if (fp) {
+        char buffer[256];
+        while (fgets(buffer, sizeof(buffer), fp) != NULL) { }
+        pclose(fp);
+    }
     system("settings put global block_untrusted_touches 0 > /dev/null 2>&1");
-    system("settings put system block_untrusted_touches 0 > /dev/null 2>&1");
     system("settings put secure block_untrusted_touches 0 > /dev/null 2>&1");
 
     g_NativeWindow = android::ANativeWindowCreator::Create(
@@ -288,9 +293,18 @@ int main(int argc, char** argv) {
     terminal_listener.detach();
 
     g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
-    int screenW = (g_DisplayInfo.width > 0) ? g_DisplayInfo.width : 2400;
-    int screenH = (g_DisplayInfo.height > 0) ? g_DisplayInfo.height : 1080;
+    int max_size = (g_DisplayInfo.height > g_DisplayInfo.width)
+                   ? g_DisplayInfo.height : g_DisplayInfo.width;
+    int min_size = (g_DisplayInfo.height < g_DisplayInfo.width)
+                   ? g_DisplayInfo.height : g_DisplayInfo.width;
+
+    if (max_size <= 0) max_size = 2400;
+    if (min_size <= 0) min_size = 1080;
+
+    int screenW = max_size;
+    int screenH = min_size;
     uint8_t init_ori = (uint8_t)g_DisplayInfo.orientation;
+    if (init_ori == 0) init_ori = 1;
 
     if (!InitEGL(screenW, screenH)) {
         logger::log_error("[-] EGL initialization failed!");
@@ -327,22 +341,18 @@ int main(int argc, char** argv) {
     while (g_app_running.load()) {
         auto frame_start = std::chrono::steady_clock::now();
 
-        // Dynamically track display orientation and dimensions every frame
+        // Dynamically track display orientation
         g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
-        int cur_w = (g_DisplayInfo.width > 0) ? g_DisplayInfo.width : screenW;
-        int cur_h = (g_DisplayInfo.height > 0) ? g_DisplayInfo.height : screenH;
         uint8_t cur_ori = (uint8_t)g_DisplayInfo.orientation;
 
         static uint8_t s_last_ori = 255;
         if (s_last_ori != cur_ori) {
             s_last_ori = cur_ori;
-            touch::update(cur_w, cur_h, cur_ori);
+            touch::update(screenW, screenH, cur_ori);
         }
 
-        touch::poll();
-
         ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplAndroid_NewFrame(cur_w, cur_h);
+        ImGui_ImplAndroid_NewFrame(screenW, screenH);
         ImGui::NewFrame();
 
         // Stepwise License Verification Gate
@@ -394,7 +404,7 @@ int main(int argc, char** argv) {
         ui::menu::render();
 
         ImGui::Render();
-        glViewport(0, 0, cur_w, cur_h);
+        glViewport(0, 0, screenW, screenH);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

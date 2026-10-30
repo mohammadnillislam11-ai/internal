@@ -42,9 +42,14 @@ void render() {
     // ==================================================================
     static float  s_puck_x = 50.0f;
     static float  s_puck_y = 150.0f;
+    static bool   s_puck_drag = false;
+    static bool   s_puck_potential = false;
+    static ImVec2 s_puck_down(0, 0);
+    static ImVec2 s_puck_off(0, 0);
+    static constexpr float PUCK_DRAG_THRESHOLD = 10.0f;
 
     if (!g_open) {
-        float size = 60.0f;
+        float size = 64.0f;
 
         // Keep within screen bounds
         if (s_puck_x < 10.f) s_puck_x = 10.f;
@@ -52,51 +57,56 @@ void render() {
         if (s_puck_x > ds.x - size - 10.f) s_puck_x = ds.x - size - 10.f;
         if (s_puck_y > ds.y - size - 10.f) s_puck_y = ds.y - size - 10.f;
 
-        ImGui::SetNextWindowPos(ImVec2(s_puck_x, s_puck_y), ImGuiCond_Always);
-        ImGui::Begin("##FloatingBtn", NULL,
-                     ImGuiWindowFlags_NoTitleBar |
-                     ImGuiWindowFlags_NoResize |
-                     ImGuiWindowFlags_AlwaysAutoResize |
-                     ImGuiWindowFlags_NoBackground |
-                     ImGuiWindowFlags_NoBringToFrontOnFocus);
+        ImDrawList* draw = ImGui::GetForegroundDrawList();
+        ImVec2 mp = ImGui::GetMousePos();
+        bool hov = (mp.x >= s_puck_x && mp.x <= s_puck_x + size &&
+                    mp.y >= s_puck_y && mp.y <= s_puck_y + size);
 
-        ImVec2 p = ImGui::GetCursorScreenPos();
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
-
-        if (ImGui::Button("##OpenMenuBtn", ImVec2(size, size))) {
-            g_open = true;
+        // Detect touch press
+        if (hov && ImGui::IsMouseClicked(0)) {
+            s_puck_potential = true;
+            s_puck_down = mp;
+            s_puck_off = ImVec2(mp.x - s_puck_x, mp.y - s_puck_y);
         }
 
-        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
-            s_puck_x += ImGui::GetIO().MouseDelta.x;
-            s_puck_y += ImGui::GetIO().MouseDelta.y;
+        // Drag when finger moves beyond threshold (identical to refer/ZqwClient bar.cpp)
+        if (s_puck_potential && ImGui::IsMouseDown(0)) {
+            float dx = mp.x - s_puck_down.x;
+            float dy = mp.y - s_puck_down.y;
+            if (s_puck_drag || (dx * dx + dy * dy) > (PUCK_DRAG_THRESHOLD * PUCK_DRAG_THRESHOLD)) {
+                s_puck_drag = true;
+                s_puck_x = mp.x - s_puck_off.x;
+                s_puck_y = mp.y - s_puck_off.y;
+            }
         }
 
-        ImGui::PopStyleColor(3);
+        // Release: if not dragged, open menu
+        if (ImGui::IsMouseReleased(0)) {
+            if (s_puck_potential && !s_puck_drag) {
+                g_open = true;
+            }
+            s_puck_potential = false;
+            s_puck_drag = false;
+        }
 
-        // Premium Pink circular floating icon (clean, procedural vector graphics)
-        ImVec2 center(p.x + size * 0.5f, p.y + size * 0.5f);
+        // Draw Premium Circular Floating Icon
+        ImVec2 center(s_puck_x + size * 0.5f, s_puck_y + size * 0.5f);
         float radius = size * 0.5f;
 
-        draw->AddCircleFilled(center, radius + 2.0f,
-                              ImColor(ui::theme::Primary.x, ui::theme::Primary.y, ui::theme::Primary.z, 0.30f), 32);
+        draw->AddCircleFilled(center, radius + 3.0f,
+                              ImColor(ui::theme::Primary.x, ui::theme::Primary.y, ui::theme::Primary.z, 0.35f), 32);
         draw->AddCircleFilled(center, radius,
-                              ImColor(ui::theme::SidebarBg.x, ui::theme::SidebarBg.y, ui::theme::SidebarBg.z, 0.98f), 32);
+                              ImColor(ui::theme::SidebarBg.x, ui::theme::SidebarBg.y, ui::theme::SidebarBg.z, 0.95f), 32);
         draw->AddCircle(center, radius, ImColor(ui::theme::Primary), 32, 2.0f);
 
         ImFont* f = ImGui::GetFont();
         const char* glyph = ICON_FA_CROWN;
-        float iconSize = f->FontSize * 1.3f;
+        float iconSize = f->FontSize * 1.4f;
         ImVec2 tsz = f->CalcTextSizeA(iconSize, FLT_MAX, 0.f, glyph);
         draw->AddText(f, iconSize,
                       ImVec2(center.x - tsz.x * 0.5f, center.y - tsz.y * 0.5f),
                       ImColor(ui::theme::Primary), glyph);
 
-        ImGui::End();
         ImGui::RenderNotifications();
         return;
     }

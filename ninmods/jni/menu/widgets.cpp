@@ -23,11 +23,12 @@ bool Toggle(const char* label, bool* v, bool has_crown) {
     if (width < 60.0f) width = 140.0f;
     float radius = height * 0.5f;
 
-    ImGui::InvisibleButton(label, ImVec2(width, height));
-    bool clicked = ImGui::IsItemClicked();
+    ImGui::PushID(label);
+    ImGui::InvisibleButton("##btn", ImVec2(width, height));
+    bool clicked = ImGui::IsItemClicked() || (ImGui::IsItemActive() && ImGui::IsMouseReleased(0));
     if (clicked) *v = !*v;
 
-    ImGuiID id = ImGui::GetID(label);
+    ImGuiID id = ImGui::GetID("##anim");
     float animPos = ImGui::GetStateStorage()->GetFloat(id, *v ? 1.0f : 0.0f);
     animPos = ImLerp(animPos, *v ? 1.0f : 0.0f, ImClamp(ImGui::GetIO().DeltaTime * 14.0f, 0.0f, 1.0f));
     ImGui::GetStateStorage()->SetFloat(id, animPos);
@@ -48,6 +49,7 @@ bool Toggle(const char* label, bool* v, bool has_crown) {
                            ImColor(255, 180, 0), ICON_FA_CROWN);
     }
 
+    ImGui::PopID();
     return clicked;
 }
 

@@ -506,12 +506,13 @@ struct SurfaceComposerClient {
           layerMetadata, nullptr);
     }
 
-    // Apply SetTrustedOverlay on Android 12+ to prevent touch freeze across the device
+    // Set layer to topmost (0x7FFFFFFF) so overlay floats above all apps
+    static SurfaceComposerClientTransaction transaction;
+    transaction.SetLayer(result, 0x7FFFFFFF);
     if (12 <= Functionals::GetInstance().systemVersion) {
-      static SurfaceComposerClientTransaction transaction;
       transaction.SetTrustedOverlay(result, true);
-      transaction.Apply(false, true);
     }
+    transaction.Apply(false, true);
 
     return {result.get()};
   }
