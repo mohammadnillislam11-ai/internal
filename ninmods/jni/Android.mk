@@ -138,7 +138,7 @@ LOCAL_LDFLAGS := \
     -Wl,-z,now \
     -Wl,-z,noexecstack
 
-LOCAL_CPPFLAGS := -std=c++17 -fexceptions -frtti -Wno-unused-parameter
+LOCAL_CPPFLAGS := -std=c++17 -fexceptions -frtti -Wno-unused-parameter -Wno-register
 LOCAL_CFLAGS := -O3 -fvisibility=hidden -fdata-sections -ffunction-sections
 
 include $(BUILD_EXECUTABLE)

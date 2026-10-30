@@ -31,8 +31,9 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
  * since it's reserved as frame pointer and might not be supported. */
 #define __ASM____R7__
 #define __asm_syscall(...) do { \
+	int __scratch_r7 = 0; \
 	__asm__ __volatile__ ( "mov %1,r7 ; mov r7,%2 ; svc 0 ; mov r7,%1" \
-	: "=r"(r0), "=&r"((int){0}) : __VA_ARGS__ : "memory"); \
+	: "=r"(r0), "=&r"(__scratch_r7) : __VA_ARGS__ : "memory"); \
 	return r0; \
 	} while (0)
 
