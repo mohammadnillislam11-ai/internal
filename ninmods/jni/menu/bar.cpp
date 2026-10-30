@@ -5,6 +5,7 @@
 #include "styles/styles.h"
 #include <cmath>
 #include <cstdio>
+#include "libraries/storage/logger.h"
 
 
 namespace ui::bar {
