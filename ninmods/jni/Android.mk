@@ -73,13 +73,8 @@ FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyUtils.cpp
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/xdl/src/main/cpp/*.c)
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/oxorany/*.cpp)
 
-# 6. NativeShield Anti-Tamper & Security Engine
+# 6. NativeShield Security Engine
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/*.cpp)
-FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/Modules/AntiDebug/*.cpp)
-FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/Modules/AntiDump/*.cpp)
-FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/Modules/AntiLibPatch/*.cpp)
-FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/Modules/FridaDetect/*.cpp)
-FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/Utils/*.cpp)
 
 # 7. Menu UI & License View
 FILE_LIST += $(wildcard $(LOCAL_PATH)/menu/*.cpp)
