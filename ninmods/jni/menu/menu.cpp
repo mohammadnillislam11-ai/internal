@@ -460,12 +460,14 @@ void render() {
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (ImGui::Button("UNLOAD CLIENT", ImVec2(180, 38))) {
-                storage::save_config();
-                auth::stop_heartbeat_watchdog();
-                engine::shutdown();
-                exit(0);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.50f, 0.15f, 0.15f, 0.9f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.70f, 0.20f, 0.20f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.90f, 0.25f, 0.25f, 1.0f));
+            if (ImGui::Button("EXIT CLIENT (CODE 0)", ImVec2(220, 38))) {
+                extern void request_exit(int code);
+                request_exit(0);
             }
+            ImGui::PopStyleColor(3);
         }
 
         ImGui::EndChild();

@@ -2,6 +2,7 @@
 #include "style.hpp"
 #include "license_client.h"
 #include "config_store.h"
+#include "logger.h"
 #include "imgui.h"
 #include "imgui_notify.h"
 #include <cstring>
@@ -22,8 +23,7 @@ bool render() {
     if (!s_key_initialized) {
         auth::set_revoke_callback([]() {
             g_licensed = false;
-            printf("[LICENSE-REVOKED] Session terminated by server! Client locked.\n");
-            fflush(stdout);
+            logger::log_warn("[LICENSE-REVOKED] Session terminated by server! Client locked.");
         });
 
         std::string saved = storage::get_saved_license();
@@ -35,7 +35,7 @@ bool render() {
 
     const ImVec2 ds = ImGui::GetIO().DisplaySize;
     float winW = 440.0f;
-    float winH = 260.0f;
+    float winH = 300.0f;
 
     ImGui::SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2((ds.x - winW) * 0.5f, (ds.y - winH) * 0.5f), ImGuiCond_Always);
@@ -81,7 +81,6 @@ bool render() {
         ImGui::Spacing();
         ImGui::TextColored(s_status_color, "%s", s_status_msg);
         ImGui::Spacing();
-        ImGui::Spacing();
 
         // Activation Button
         ImGui::PushStyleColor(ImGuiCol_Button, ui::theme::PrimaryBg);
@@ -89,15 +88,14 @@ bool render() {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ui::theme::PrimaryLight);
         ImGui::PushStyleColor(ImGuiCol_Text, ui::theme::TextWhite);
 
-        if (ImGui::Button("ACTIVATE NOW", ImVec2(winW - 40.0f, 40.0f))) {
+        if (ImGui::Button("ACTIVATE NOW", ImVec2(winW - 40.0f, 38.0f))) {
             if (strlen(s_license_key) >= 4) {
                 snprintf(s_status_msg, sizeof(s_status_msg), "Connecting to authentication server...");
                 s_status_color = ImVec4(0.9f, 0.9f, 0.2f, 1.0f);
 
-                printf("[LICENSE-SUBMIT] Submitting key for online verification: %s\n", s_license_key);
-                printf("[LICENSE-CONNECT] Authenticating with license database (HWID: %s)...\n",
-                       auth::get_device_hwid().substr(0, 16).c_str());
-                fflush(stdout);
+                logger::log_info("[LICENSE-SUBMIT] Submitting key for online verification: %s", s_license_key);
+                logger::log_info("[LICENSE-CONNECT] Authenticating with license database (HWID: %s)...",
+                                 auth::get_device_hwid().substr(0, 16).c_str());
 
                 auto result = auth::verify_license_online(s_license_key);
                 if (result.success) {
@@ -119,10 +117,9 @@ bool render() {
                     s_status_color = ImVec4(0.2f, 0.9f, 0.3f, 1.0f);
                     ImGui::InsertNotification(ImGuiToast(ImGuiToastType_Success, 4000, "License activated successfully!"));
 
-                    printf("[LICENSE-SUCCESS] Key activated successfully!\n");
-                    printf("[+] Expiry Date: %s | Days Left: %d (Month: %02d, Year: %04d)\n",
-                           g_expiration_date.c_str(), g_days_left, g_exp_month, g_exp_year);
-                    fflush(stdout);
+                    logger::log_info("[LICENSE-SUCCESS] Key activated successfully!");
+                    logger::log_info("[+] Expiry Date: %s | Days Left: %d (Month: %02d, Year: %04d)",
+                                     g_expiration_date.c_str(), g_days_left, g_exp_month, g_exp_year);
 
                     // Start persistent heartbeat watchdog with Firebase
                     auth::start_heartbeat_watchdog(s_license_key);
@@ -131,17 +128,28 @@ bool render() {
                     s_status_color = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
                     ImGui::InsertNotification(ImGuiToast(ImGuiToastType_Error, 4000, "%s", result.message.c_str()));
 
-                    printf("[LICENSE-FAIL] Key verification rejected: %s\n", result.message.c_str());
-                    fflush(stdout);
+                    logger::log_warn("[LICENSE-FAIL] Key verification rejected: %s", result.message.c_str());
                 }
             } else {
                 snprintf(s_status_msg, sizeof(s_status_msg), "Error: License key too short!");
                 s_status_color = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
-                printf("[LICENSE-FAIL] Input rejected: License key too short (%zu characters).\n", strlen(s_license_key));
-                fflush(stdout);
+                logger::log_warn("[LICENSE-FAIL] Input rejected: License key too short (%zu characters).", strlen(s_license_key));
             }
         }
+        ImGui::PopStyleColor(4);
 
+        ImGui::Spacing();
+
+        // Exit / Terminate button from Menu
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.40f, 0.12f, 0.12f, 0.85f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.60f, 0.18f, 0.18f, 0.95f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.80f, 0.22f, 0.22f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.85f, 0.85f, 1.0f));
+
+        if (ImGui::Button("EXIT CLIENT (CODE 0)", ImVec2(winW - 40.0f, 30.0f))) {
+            extern void request_exit(int code);
+            request_exit(0);
+        }
         ImGui::PopStyleColor(4);
     }
     ImGui::End();
