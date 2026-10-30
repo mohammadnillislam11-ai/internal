@@ -158,7 +158,7 @@ namespace engine::mem {
     }
 
     inline bool protect_memory(uintptr_t address, size_t size, int protection) {
-        return KittyMemory::protectAddr(reinterpret_cast<void*>(address), size, protection) == KittyMemory::MemoryOperationSuccess;
+        return KittyMemory::memProtect(address, size, protection);
     }
 
 } // namespace engine::mem

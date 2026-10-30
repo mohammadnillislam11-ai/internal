@@ -10,6 +10,8 @@ namespace display {
 
     inline float g_screen_width   = 2400.0f;
     inline float g_screen_height  = 1080.0f;
+    inline float &width           = g_screen_width;
+    inline float &height          = g_screen_height;
     inline float g_scale_factor   = 1.0f;
     inline float g_font_scale     = 1.0f;
 
