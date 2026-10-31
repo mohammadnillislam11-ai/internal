@@ -176,7 +176,7 @@ namespace engine::esp {
         bool any_esp = cfg::esp::enabled || cfg::esp::box || cfg::esp::tracer || cfg::esp::health;
         if (!any_esp || !data::g_in_match.load()) return;
 
-        ImDrawList* dl = ImGui::GetForegroundDrawList();
+        ImDrawList* dl = ImGui::GetBackgroundDrawList();
         if (!dl) return;
 
         ImGuiIO& io = ImGui::GetIO();

@@ -107,12 +107,13 @@ namespace ui::menu {
         }
     }
 
-    static bool NS_Toggle(const char* id, const char* label, bool* value) {
+    static bool NS_Toggle(const char* id, const char* label, bool* value, float width = 0.0f) {
         ImGui::PushID(id);
         float avail = ImGui::GetContentRegionAvail().x;
+        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
         ImVec2 pos = ImGui::GetCursorScreenPos();
-        float h = 42.f;
-        ImGui::InvisibleButton("btn", ImVec2(avail, h));
+        float h = 40.f;
+        ImGui::InvisibleButton("btn", ImVec2(w, h));
         bool clicked = ImGui::IsItemClicked();
         bool hover = ImGui::IsItemHovered();
         if (clicked) *value = !*value;
@@ -122,10 +123,10 @@ namespace ui::menu {
             float on = NS_Anim(key+"on", *value ? 1.f : 0.f, 16.f);
             float hov = NS_Anim(key+"hov", hover ? 1.f : 0.f, 18.f);
             ImU32 lblCol = NS_Lerp(C_TextSec(), C_TextMain(), ImMax(on, hov*0.5f));
-            dl->AddText(ImGui::GetFont(), 16.0f,
-                {pos.x, pos.y + (h - 16.0f) * 0.5f}, lblCol, label);
-            float tw = 54.f, th = 26.f;
-            float tx = pos.x + avail - tw, ty = pos.y + (h - th) * 0.5f;
+            dl->AddText(ImGui::GetFont(), 15.5f,
+                {pos.x, pos.y + (h - 15.5f) * 0.5f}, lblCol, label);
+            float tw = 50.f, th = 24.f;
+            float tx = pos.x + w - tw, ty = pos.y + (h - th) * 0.5f;
             dl->AddRectFilled({tx, ty}, {tx+tw, ty+th},
                 NS_Lerp(IM_COL32(40,30,60,(int)(content_alpha*255)), C_Accent(), on), th*0.5f);
             if (on > 0.05f) {
@@ -143,9 +144,10 @@ namespace ui::menu {
     }
 
     static bool NS_Slider(const char* id, const char* label, float* value,
-                          float minV, float maxV, const char* suffix = "") {
+                          float minV, float maxV, const char* suffix = "", float width = 0.0f) {
         ImGui::PushID(id);
         float avail = ImGui::GetContentRegionAvail().x;
+        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
         ImVec2 pos = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         if (dl) {
@@ -155,11 +157,11 @@ namespace ui::menu {
             } else {
                 snprintf(valStr, sizeof(valStr), "%.0f", *value);
             }
-            float valW = NS_TextSize(valStr, 15.0f).x;
-            dl->AddText(ImGui::GetFont(), 15.5f, {pos.x, pos.y}, C_TextSec(), label);
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x + avail - valW, pos.y}, C_TextDim(), valStr);
+            float valW = NS_TextSize(valStr, 14.5f).x;
+            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x, pos.y}, C_TextSec(), label);
+            dl->AddText(ImGui::GetFont(), 14.5f, {pos.x + w - valW, pos.y}, C_TextDim(), valStr);
 
-            float ty = pos.y + 24.f, tw2 = avail;
+            float ty = pos.y + 24.f, tw2 = w;
             float rawPct = (maxV > minV) ? ImClamp((*value-minV)/(maxV-minV), 0.f, 1.f) : 0.f;
             float pct = NS_Anim(std::string(id)+"#pct", rawPct, 22.f);
 
@@ -224,30 +226,32 @@ namespace ui::menu {
         return clicked;
     }
 
-    static void NS_InfoRow(const char* label, const char* value, ImU32 valueColor = 0) {
+    static void NS_InfoRow(const char* label, const char* value, ImU32 valueColor = 0, float width = 0.0f) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImVec2 pos = ImGui::GetCursorScreenPos();
         float avail = ImGui::GetContentRegionAvail().x;
+        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
         float rh = 36.f;
-        bool hov = ImGui::IsMouseHoveringRect(pos, {pos.x+avail, pos.y+rh});
+        bool hov = ImGui::IsMouseHoveringRect(pos, {pos.x+w, pos.y+rh});
         if (dl) {
             if (hov) {
-                dl->AddRectFilled({pos.x, pos.y}, {pos.x+avail, pos.y+rh}, C_BgCardHov(), 4.f);
+                dl->AddRectFilled({pos.x, pos.y}, {pos.x+w, pos.y+rh}, C_BgCardHov(), 4.f);
                 dl->AddRectFilled({pos.x, pos.y+6}, {pos.x+3.5f, pos.y+rh-6}, C_Accent(), 1.5f);
             }
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x+10.f, pos.y + (rh - 15.0f)*0.5f}, C_TextDim(), label);
+            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x+8.f, pos.y + (rh - 15.0f)*0.5f}, C_TextDim(), label);
             float vw = NS_TextSize(value, 15.0f).x;
             ImU32 fc = valueColor ? valueColor : C_TextMain();
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x+avail-vw-12.f, pos.y + (rh - 15.0f)*0.5f}, fc, value);
+            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x+w-vw-8.f, pos.y + (rh - 15.0f)*0.5f}, fc, value);
         }
         ImGui::Dummy(ImVec2(0, rh+2.f));
     }
 
     static bool NS_StepSlider(const char* id, const char* label, int* value,
-                              const char** names, int count) {
+                              const char** names, int count, float width = 0.0f) {
         if (!value || count <= 0 || !names) return false;
         ImGui::PushID(id);
         float avail = ImGui::GetContentRegionAvail().x;
+        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
         ImVec2 pos = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
@@ -257,14 +261,14 @@ namespace ui::menu {
         const char* curText = names[*value];
 
         if (dl) {
-            float valW = NS_TextSize(curText, 15.0f).x;
-            dl->AddText(ImGui::GetFont(), 15.5f, {pos.x, pos.y}, C_TextSec(), label);
+            float valW = NS_TextSize(curText, 14.5f).x;
+            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x, pos.y}, C_TextSec(), label);
 
             // If value is 0 (None), render in dimmer color; otherwise accent bright
             ImU32 txtCol = (*value == 0) ? C_TextDim() : C_AccentBright();
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x + avail - valW, pos.y}, txtCol, curText);
+            dl->AddText(ImGui::GetFont(), 14.5f, {pos.x + w - valW, pos.y}, txtCol, curText);
 
-            float ty = pos.y + 24.f, tw2 = avail;
+            float ty = pos.y + 24.f, tw2 = w;
             float maxV = (float)(count - 1);
             float rawPct = (maxV > 0.f) ? ImClamp((float)(*value) / maxV, 0.f, 1.f) : 0.f;
             float pct = NS_Anim(std::string(id)+"#pct", rawPct, 22.f);
@@ -307,20 +311,21 @@ namespace ui::menu {
         return changed;
     }
 
-    static void NS_ColorEdit(const char* id, const char* label, ImVec4* color) {
+    static void NS_ColorEdit(const char* id, const char* label, ImVec4* color, float width = 0.0f) {
         ImGui::PushID(id);
         float avail = ImGui::GetContentRegionAvail().x;
+        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
         ImVec2 pos = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         if (dl) {
             dl->AddText(ImGui::GetFont(), 15.0f, {pos.x, pos.y+6.f}, C_TextSec(), label);
             ImU32 colU32 = ImGui::ColorConvertFloat4ToU32(*color);
             float sw = 30.f;
-            ImVec2 sp = {pos.x + avail - sw - 8.f, pos.y + 2.f};
+            ImVec2 sp = {pos.x + w - sw, pos.y + 2.f};
             dl->AddRectFilled(sp, {sp.x+sw, sp.y+sw}, colU32, 6.f);
             dl->AddRect(sp, {sp.x+sw, sp.y+sw}, C_Border(), 6.f, 0, 1.2f);
         }
-        ImGui::SetCursorScreenPos({pos.x + avail - 70.f, pos.y + 2.f});
+        ImGui::SetCursorScreenPos({pos.x + w - 45.f, pos.y + 2.f});
         ImGui::ColorEdit4("##ce_edit", &color->x,
             ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel |
             ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_NoSidePreview);
@@ -377,6 +382,7 @@ namespace ui::menu {
         NS_CardBegin(dl, cp2, cw, card2H);
         NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Target and Trigger Settings"));
         ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+44});
+        ImGui::BeginGroup();
 
         const char* bones[] = { oxorany("None"), oxorany("Head"), oxorany("Chest"), oxorany("Hip") };
         int cur_bone = (cfg::aim::target_bone >= 0 && cfg::aim::target_bone <= 2) ? (cfg::aim::target_bone + 1) : 0;
@@ -394,6 +400,8 @@ namespace ui::menu {
         NS_Slider("aim_dist", oxorany("Aim Distance"), &cfg::aim::distance, 30.f, 400.f, "m");
         NS_Slider("aim_smth", oxorany("Aim Smooth"),   &cfg::aim::smooth,   1.f,  20.f, "");
 
+        ImGui::EndGroup();
+
         ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
         ImGui::Dummy({0, 30});
 
@@ -410,10 +418,13 @@ namespace ui::menu {
         NS_CardBegin(dl, cp, cw, card1H);
         NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("ESP Visual Overlays"), "Master");
         ImGui::SetCursorScreenPos({cp.x+16, cp.y+48});
+        ImGui::BeginGroup();
 
         NS_Toggle("esp_tracer",  oxorany("ESP Line"),   &cfg::esp::tracer);
         NS_Toggle("esp_box",     oxorany("ESP Box"),    &cfg::esp::box);
         NS_Toggle("esp_health",  oxorany("ESP Health"), &cfg::esp::health);
+
+        ImGui::EndGroup();
 
         cfg::esp::enabled = cfg::esp::tracer || cfg::esp::box || cfg::esp::health;
 
@@ -425,6 +436,7 @@ namespace ui::menu {
         NS_CardBegin(dl, cp2, cw, card2H);
         NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Box & Line Configuration"));
         ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+48});
+        ImGui::BeginGroup();
 
         const char* box_types[] = { oxorany("None"), oxorany("Full Box"), oxorany("Corner"), oxorany("Glow") };
         int cur_box = cfg::esp::box ? (cfg::esp::box_type + 1) : 0;
@@ -440,6 +452,8 @@ namespace ui::menu {
         NS_Slider("box_rd", oxorany("Rounding"),   &cfg::esp::box_rounding,  0.f,  10.f, "");
         NS_Slider("box_rg", oxorany("Max Range"),  &cfg::esp::max_range,     50.f, 500.f, "m");
 
+        ImGui::EndGroup();
+
         ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
         ImGui::Dummy({0,0});
 
@@ -448,8 +462,10 @@ namespace ui::menu {
         NS_CardBegin(dl, cp3, cw, card3H);
         NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("Color Palette"));
         ImGui::SetCursorScreenPos({cp3.x+16, cp3.y+48});
+        ImGui::BeginGroup();
         NS_ColorEdit("col_box",  oxorany("Box & Line"), &cfg::esp::box_col);
         NS_ColorEdit("col_vis",  oxorany("Visible"),    &cfg::esp::box_visible);
+        ImGui::EndGroup();
 
         ImGui::SetCursorScreenPos({cp3.x, cp3.y+card3H+14});
         ImGui::Dummy({0, 30});
@@ -464,12 +480,15 @@ namespace ui::menu {
         NS_CardBegin(dl, cp, cw, card1H);
         NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("Display Engine"));
         ImGui::SetCursorScreenPos({cp.x+16, cp.y+48});
+        ImGui::BeginGroup();
 
         char buf[64];
         snprintf(buf, sizeof(buf), "%.0f x %.0f", g_sw, g_sh);
         NS_InfoRow(oxorany("Resolution"), buf);
         snprintf(buf, sizeof(buf), "%.1f FPS", ImGui::GetIO().Framerate);
         NS_InfoRow(oxorany("Framerate"), buf);
+
+        ImGui::EndGroup();
 
         ImGui::SetCursorScreenPos({cp.x, cp.y+card1H+14});
         ImGui::Dummy({0,0});
@@ -479,11 +498,14 @@ namespace ui::menu {
         NS_CardBegin(dl, cp2, cw, card2H);
         NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Target Process"));
         ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+48});
+        ImGui::BeginGroup();
 
         snprintf(buf, sizeof(buf), "0x%lx", proc::lib);
         NS_InfoRow(oxorany("libil2cpp Base"), buf);
         snprintf(buf, sizeof(buf), "%d", proc::pid);
         NS_InfoRow(oxorany("Process ID"), buf);
+
+        ImGui::EndGroup();
 
         ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
         ImGui::Dummy({0,0});
