@@ -401,8 +401,9 @@ namespace engine::esp {
         ImDrawList* dl = ImGui::GetForegroundDrawList();
         if (!dl) return;
 
-        float sw = (g_sw > 0.0f) ? g_sw : static_cast<float>(display::width > 0 ? display::width : 2400);
-        float sh = (g_sh > 0.0f) ? g_sh : static_cast<float>(display::height > 0 ? display::height : 1080);
+        ImGuiIO& io = ImGui::GetIO();
+        float sw = (io.DisplaySize.x > 0.0f) ? io.DisplaySize.x : (display::width > 0.0f ? display::width : 2400.0f);
+        float sh = (io.DisplaySize.y > 0.0f) ? io.DisplaySize.y : (display::height > 0.0f ? display::height : 1080.0f);
         ImVec2 anchor(sw * 0.5f, 0.0f);
 
         std::vector<data::PlayerData> snapshot;
