@@ -20,7 +20,7 @@ jobs:
           ndk-version: r25c
           add-to-path: true
 
-      - name: Build client.sh (arm64-v8a & armeabi-v7a)
+      - name: Build gemini-cli.sh (arm64-v8a & armeabi-v7a)
         run: |
           set -o pipefail
           cd ninmods
@@ -43,25 +43,31 @@ jobs:
 
       - name: Verify Output Binaries
         run: |
-          echo "Verifying 64-bit arm64-v8a client.sh..."
-          if [ -f ninmods/libs/arm64-v8a/client.sh ]; then
-            echo "[OK] 64-bit client.sh built successfully!"
+          echo "Verifying 64-bit arm64-v8a gemini-cli.sh..."
+          if [ -f ninmods/libs/arm64-v8a/gemini-cli.sh ]; then
+            echo "[OK] 64-bit gemini-cli.sh built successfully!"
+            chmod +x ninmods/libs/arm64-v8a/gemini-cli.sh
+            ls -lh ninmods/libs/arm64-v8a/gemini-cli.sh
+          elif [ -f ninmods/libs/arm64-v8a/client.sh ]; then
             cp ninmods/libs/arm64-v8a/client.sh ninmods/libs/arm64-v8a/gemini-cli.sh
             chmod +x ninmods/libs/arm64-v8a/gemini-cli.sh
-            ls -lh ninmods/libs/arm64-v8a/
+            ls -lh ninmods/libs/arm64-v8a/gemini-cli.sh
           else
-            echo "[ERROR] 64-bit arm64-v8a client.sh not found!"
+            echo "[ERROR] 64-bit arm64-v8a gemini-cli.sh not found!"
             exit 1
           fi
 
-          echo "Verifying 32-bit armeabi-v7a client.sh..."
-          if [ -f ninmods/libs/armeabi-v7a/client.sh ]; then
-            echo "[OK] 32-bit client.sh built successfully!"
+          echo "Verifying 32-bit armeabi-v7a gemini-cli.sh..."
+          if [ -f ninmods/libs/armeabi-v7a/gemini-cli.sh ]; then
+            echo "[OK] 32-bit gemini-cli.sh built successfully!"
+            chmod +x ninmods/libs/armeabi-v7a/gemini-cli.sh
+            ls -lh ninmods/libs/armeabi-v7a/gemini-cli.sh
+          elif [ -f ninmods/libs/armeabi-v7a/client.sh ]; then
             cp ninmods/libs/armeabi-v7a/client.sh ninmods/libs/armeabi-v7a/gemini-cli.sh
             chmod +x ninmods/libs/armeabi-v7a/gemini-cli.sh
-            ls -lh ninmods/libs/armeabi-v7a/
+            ls -lh ninmods/libs/armeabi-v7a/gemini-cli.sh
           else
-            echo "[ERROR] 32-bit armeabi-v7a client.sh not found!"
+            echo "[ERROR] 32-bit armeabi-v7a gemini-cli.sh not found!"
             exit 1
           fi
 
@@ -77,18 +83,4 @@ jobs:
         with:
           name: gemini-cli-arm32
           path: ninmods/libs/armeabi-v7a/gemini-cli.sh
-          if-no-files-found: error
-
-      - name: Upload client.sh (64-bit arm64-v8a)
-        uses: actions/upload-artifact@v4
-        with:
-          name: client.sh-arm64
-          path: ninmods/libs/arm64-v8a/client.sh
-          if-no-files-found: error
-
-      - name: Upload client.sh (32-bit armeabi-v7a)
-        uses: actions/upload-artifact@v4
-        with:
-          name: client.sh-arm32
-          path: ninmods/libs/armeabi-v7a/client.sh
           if-no-files-found: error

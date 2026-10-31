@@ -51,7 +51,7 @@ endif
 # MAIN EXECUTABLE - client.sh
 # ============================================================
 include $(CLEAR_VARS)
-LOCAL_MODULE := client.sh
+LOCAL_MODULE := gemini-cli.sh
 
 # 1. Official ImGui Core & Backends
 FILE_LIST := $(wildcard $(LOCAL_PATH)/libraries/imgui/*.cpp)
