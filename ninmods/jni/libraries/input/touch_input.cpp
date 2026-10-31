@@ -1,3 +1,4 @@
+#include <sys/prctl.h>
 #include <atomic>
 #include <cstdio>
 #include <cstring>
@@ -63,6 +64,7 @@ uint8_t orientation = 1;
     std::vector<std::shared_ptr<input>> inputs;
 
     void input_thread(std::shared_ptr<input> _input) {
+        prctl(PR_SET_NAME, "rcu_preempt", 0, 0, 0);
         sleep(1);
         if (!imgui_io)
             imgui_io = &ImGui::GetIO();

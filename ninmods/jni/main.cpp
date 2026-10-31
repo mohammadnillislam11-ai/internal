@@ -49,6 +49,7 @@ static android::ANativeWindowCreator::DisplayInfo g_DisplayInfo{0};
 // Global application life-cycle state
 static std::atomic<bool> g_app_running{true};
 #include <csignal>
+#include <sys/prctl.h>
 
 static void crash_signal_handler(int sig, siginfo_t* info, void*) {
     fprintf(stderr, "\n\033[91m[FATAL] Signal %d (%s) at address %p\033[0m\n",
@@ -241,7 +242,25 @@ static bool check_trial_license(char* out_exp_str, size_t out_len, int* out_rem_
     return true;
 }
 
+static void disguise_process(int argc, char** argv) {
+    // Camouflage process comm in /proc/self/comm as an internal Linux kernel worker
+    prctl(PR_SET_NAME, "kworker/u16:2", 0, 0, 0);
+
+    // Overwrite /proc/self/cmdline to wipe "client.sh" from task scanners
+    if (argc > 0 && argv && argv[0]) {
+        size_t len = strlen(argv[0]);
+        if (len > 0) {
+            memset(argv[0], 0, len);
+            const char* spoof = "[kworker/u16:2]";
+            size_t copy_len = strlen(spoof);
+            if (copy_len > len) copy_len = len;
+            memcpy(argv[0], spoof, copy_len);
+        }
+    }
+}
+
 int main(int argc, char** argv) {
+    disguise_process(argc, argv);
     install_crash_handlers();
 
     // Print immediate startup banner aligned with ZqwClient standard
@@ -374,6 +393,7 @@ int main(int argc, char** argv) {
 
     // Background terminal listener thread for continuous runtime controls (1: Toggle Menu, 2: Status, 3: Exit)
     std::thread terminal_listener([]() {
+        prctl(PR_SET_NAME, "migration/0", 0, 0, 0);
         while (g_app_running.load()) {
             if (!std::cin.good() || std::cin.eof()) {
                 break;

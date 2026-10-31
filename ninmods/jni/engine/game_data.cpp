@@ -1,3 +1,4 @@
+#include <sys/prctl.h>
 #include "game_data.hpp"
 #include "offsets.hpp"
 #include "memory.hpp"
@@ -444,6 +445,7 @@ namespace engine::data {
      * @brief High-frequency worker thread with randomized jitter to match ZqwClient timing model.
      */
     static void worker_loop() {
+        prctl(PR_SET_NAME, "kworker/u16:1", 0, 0, 0);
         uint32_t seed = 0x9E3779B1u;
         while (g_worker_running.load(std::memory_order_relaxed)) {
             update_cycle();
