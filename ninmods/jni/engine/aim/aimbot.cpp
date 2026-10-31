@@ -286,7 +286,9 @@ namespace engine::aim {
                             if (cfg::aim::smooth > 1.0f) {
                                 Quaternion cur_rot = rpm<Quaternion>(local + offsets::Player_Rotation);
                                 if (cur_rot.x != 0.0f || cur_rot.y != 0.0f || cur_rot.z != 0.0f || cur_rot.w != 0.0f) {
-                                    float t = ImClamp(1.0f / cfg::aim::smooth, 0.05f, 1.0f);
+                                    float t = 1.0f / cfg::aim::smooth;
+                                    if (t < 0.05f) t = 0.05f;
+                                    if (t > 1.0f) t = 1.0f;
                                     final_rot = Quaternion::Slerp(cur_rot, target_rot, t);
                                 }
                             }
