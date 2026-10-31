@@ -391,16 +391,8 @@ int main(int argc, char** argv) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         eglSwapBuffers(g_EglDisplay, g_EglSurface);
 
-        // Frame rate limiter: cap at 60 FPS (~16666 us) to ensure smooth input responsiveness and 0% phone freeze
-        auto frame_end = std::chrono::steady_clock::now();
-        auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
-        if (elapsed_us > 150000) {
-            logger::log_warn("[FREEZE-GUARD] Frame stutter: %ld ms delay", static_cast<long>(elapsed_us / 1000));
-        }
-        constexpr int64_t TARGET_FRAME_TIME_US = 16666;
-        if (elapsed_us < TARGET_FRAME_TIME_US) {
-            usleep(static_cast<useconds_t>(TARGET_FRAME_TIME_US - elapsed_us));
-        }
+        // Smooth render timing matching ZqwClient architecture for instant 1-tap touch responsiveness
+        usleep(2000);
     }
 
     // Clean teardown when exit requested

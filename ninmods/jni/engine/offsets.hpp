@@ -40,6 +40,8 @@ namespace offsets {
     constexpr uintptr_t Player_ColWrite      = 0x80;
     constexpr uintptr_t Player_DeathInfo     = 0x24A8;
     constexpr uintptr_t Player_IsBot         = 0x4A0;
+    constexpr uintptr_t Player_TeamID        = 0x4A4;
+    constexpr uintptr_t Player_TeamAlt       = 0x88;
     constexpr uintptr_t Player_Name          = 0x490;
     constexpr uintptr_t Player_AimInfo       = 0xE50;
     constexpr uintptr_t Player_Velocity      = 0xF0;

@@ -1,3 +1,4 @@
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <thread>
@@ -56,7 +57,8 @@ namespace touch {
         }
     };
 
-    uint8_t orientation = 1;
+    static std::atomic<int> g_active_touch_fd{-1};
+uint8_t orientation = 1;
     ImGuiIO *imgui_io = nullptr;
     std::vector<std::shared_ptr<input>> inputs;
 
@@ -105,10 +107,10 @@ namespace touch {
 #else
                     bool curDown = event_readed_count > 2;
 #endif
-                    imgui_io->MouseDown[0] = curDown;
-                    imgui_io->AddMouseButtonEvent(0, curDown);
-
                     if (curDown) {
+                        g_active_touch_fd.store(_input->fd, std::memory_order_relaxed);
+                        imgui_io->MouseDown[0] = true;
+
                         float calcX = 0.0f;
                         float calcY = 0.0f;
                         switch (orientation) {
@@ -129,12 +131,13 @@ namespace touch {
                                 calcY = _input->y;
                                 break;
                         }
-                        calcX *= _input->absXMultiplier;
-                        calcY *= _input->absYMultiplier;
-
-                        imgui_io->MousePos.x = calcX;
-                        imgui_io->MousePos.y = calcY;
-                        imgui_io->AddMousePosEvent(calcX, calcY);
+                        imgui_io->MousePos.x = calcX * _input->absXMultiplier;
+                        imgui_io->MousePos.y = calcY * _input->absYMultiplier;
+                    } else {
+                        int expected = _input->fd;
+                        if (g_active_touch_fd.compare_exchange_strong(expected, -1, std::memory_order_relaxed)) {
+                            imgui_io->MouseDown[0] = false;
+                        }
                     }
                 }
             }
