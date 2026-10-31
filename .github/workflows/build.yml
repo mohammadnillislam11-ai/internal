@@ -79,8 +79,22 @@ jobs:
 
       - name: Build Official Android Gemini APK
         run: |
+          set -o pipefail
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "ndk.dir=$ANDROID_NDK_ROOT" >> local.properties
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace
+          if ! ./gradlew assembleRelease --stacktrace 2>&1 | tee gradle_build.log; then
+            echo "=== GRADLE BUILD FAILURE LOG ==="
+            tail -n 120 gradle_build.log
+            exit 1
+          fi
+
+      - name: Upload Gradle Failure Log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-failure-log
+          path: gradle_build.log
 
       - name: Verify Gemini APK
         run: |
