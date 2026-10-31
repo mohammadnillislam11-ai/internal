@@ -427,16 +427,13 @@ namespace android {
             // ═══════════════════════════════════════════════════════
                         //      Kalau `hide = false` → screenshot NORMAL
             // ═══════════════════════════════════════════════════════
-            SurfaceControl CreateSurface(const char *name, int32_t width, int32_t height, bool hide, bool secure) {
+            SurfaceControl CreateSurface(const char *name, int32_t width, int32_t height) {
                 void *parentHandle = nullptr;
                 String8 windowName(name);
                 LayerMetadata layerMetadata;
 
-                // Flags default: 0 (transparan, tidak secure)
+                // Flags default: 0 (pure standard transparent overlay)
                 uint32_t flags = 0;
-
-                // Hanya set secure flag kalau memang diminta
-                if (secure) flags |= 0x80;
 
                 if (12 <= Functionals::GetInstance().systemVersion) {
                     static void *fakeParentHandleForBinder = nullptr;
@@ -446,25 +443,13 @@ namespace android {
                 StrongPointer<void> result{};
 
                 if (Functionals::GetInstance().systemVersion <= 9) {
-                    int value = -1;
-                    if (hide) value = 441731;
-
                     result = reinterpret_cast<StrongPointer<void> (*)(void *, void *, uint32_t, uint32_t, int32_t,
                                                                       uint32_t, void *, int32_t, int32_t)>(
                             Functionals::GetInstance().SurfaceComposerClient__CreateSurface)(data, windowName, width,
                                                                                              height, 1, flags,
                                                                                              nullptr,
-                                                                                             value, -1);
+                                                                                             -1, -1);
                 } else {
-                    // Android 10+: Only apply secure metadata / flags if hide (streamer_mode) is true
-                    if (hide) {
-                        if (Functionals::GetInstance().systemVersion > 9 &&
-                            Functionals::GetInstance().systemVersion < 12) {
-                            layerMetadata.setInt32(2, 441731);
-                        } else {
-                            flags |= 0x40;   // SECURE flag for Android 12+
-                        }
-                    }
                     result = Functionals::GetInstance().SurfaceComposerClient__CreateSurface(data, windowName, width,
                                                                                              height, 1, flags,
                                                                                              parentHandle,
@@ -475,10 +460,6 @@ namespace android {
                     SurfaceComposerClientTransaction transaction;
                     if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer) {
                         transaction.SetLayer(result, 0x7fffffff);
-                    }
-                    if (12 <= Functionals::GetInstance().systemVersion &&
-                        Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay) {
-                        transaction.SetTrustedOverlay(result, true);
                     }
                     if (Functionals::GetInstance().SurfaceComposerClient__Transaction__Apply) {
                         transaction.Apply(false, true);
@@ -571,7 +552,7 @@ namespace android {
         }
 
         static ANativeWindow *
-        Create(const char *name, int32_t width = -1, int32_t height = -1, bool hide = true, bool secure = false) {
+        Create(const char *name, int32_t width = -1, int32_t height = -1) {
             auto &surfaceComposerClient = GetComposerInstance();
 
             while (-1 == width || -1 == height) {
@@ -596,7 +577,7 @@ namespace android {
                 break;
             }
 
-            auto surfaceControl = surfaceComposerClient.CreateSurface(name, width, height, hide, secure);
+            auto surfaceControl = surfaceComposerClient.CreateSurface(name, width, height);
             auto nativeWindow = reinterpret_cast<ANativeWindow *>(surfaceControl.GetSurface());
 
             m_cachedSurfaceControl.emplace(nativeWindow, surfaceControl);

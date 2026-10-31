@@ -80,7 +80,7 @@ void request_exit(int code) {
     g_app_running.store(false);
 }
 
-bool InitEGL(int width, int height, bool streamer_mode) {
+bool InitEGL(int width, int height) {
     // Unblock touch overlay settings across system, global, and secure (identical to refer/ZqwClient)
     FILE* fp = popen("settings put system block_untrusted_touches 0", "r");
     if (fp) {
@@ -92,7 +92,7 @@ bool InitEGL(int width, int height, bool streamer_mode) {
     system("settings put secure block_untrusted_touches 0 > /dev/null 2>&1");
 
     g_NativeWindow = android::ANativeWindowCreator::Create(
-        "com.android.systemui", width, height, streamer_mode, false);
+        "com.android.systemui", width, height);
 
     if (!g_NativeWindow) {
         logger::log_error("[-] Failed to create ANativeWindow overlay!");
@@ -341,16 +341,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Parse CLI arguments for non-interactive streamer mode override
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "streamer") == 0 || strcmp(argv[i], "--streamer") == 0 || strcmp(argv[i], "-s") == 0) {
-            cfg::streamer_mode = true;
-        } else if (strcmp(argv[i], "normal") == 0 || strcmp(argv[i], "--normal") == 0) {
-            cfg::streamer_mode = false;
-        }
-    }
-
-    // Terminal Control Panel (Menu open, Streamer mode, Exit)
+    // Terminal Control Panel (Start, Exit)
     if (isatty(fileno(stdin))) {
         while (true) {
             printf("\n\033[96m────────────────────────────────────\033[0m\n");
@@ -358,11 +349,9 @@ int main(int argc, char** argv) {
             printf("\033[90m  Embedded AI Engine\033[0m\n");
             printf("\033[96m────────────────────────────────────\033[0m\n");
             printf("\033[92m  [1] Start Overlay (Migrate to RAM)\033[0m\n");
-            printf("\033[93m  [2] Privacy Shield : [%s]\033[0m\n",
-                   cfg::streamer_mode ? "\033[92mACTIVE\033[93m" : "\033[90mSTANDBY\033[93m");
-            printf("\033[91m  [3] Exit Session\033[0m\n");
+            printf("\033[91m  [2] Exit Session\033[0m\n");
             printf("\033[96m────────────────────────────────────\033[0m\n");
-            printf("\033[96m  Select [1-3] or press Enter: \033[0m");
+            printf("\033[96m  Select [1-2] or press Enter: \033[0m");
             fflush(stdout);
 
             std::string line;
@@ -370,16 +359,7 @@ int main(int argc, char** argv) {
             while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
             while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
 
-            if (line == "2" || line == "streamer" || line == "s" || line == "shield") {
-                cfg::streamer_mode = !cfg::streamer_mode;
-                if (cfg::streamer_mode) {
-                    printf("\033[92m  [+] Privacy Shield: ACTIVE (Screen-Cast Protection Enabled)\033[0m\n");
-                } else {
-                    printf("\033[93m  [+] Privacy Shield: STANDBY (Standard Capture Mode)\033[0m\n");
-                }
-                fflush(stdout);
-                continue;
-            } else if (line == "3" || line == "exit" || line == "q") {
+            if (line == "2" || line == "exit" || line == "q") {
                 printf("\033[91m  [-] Terminating Session...\033[0m\n");
                 fflush(stdout);
                 return 0;
@@ -437,7 +417,7 @@ int main(int argc, char** argv) {
     uint8_t init_ori = (uint8_t)g_DisplayInfo.orientation;
     if (init_ori == 0) init_ori = 1;
 
-    if (!InitEGL(screenW, screenH, cfg::streamer_mode)) {
+    if (!InitEGL(screenW, screenH)) {
         printf("\033[91m  [!] Surface initialization failed.\033[0m\n");
         fflush(stdout);
         return 1;
@@ -477,10 +457,7 @@ int main(int argc, char** argv) {
                     ui::bar::g_open = !ui::bar::g_open;
                     printf("\033[96m[*] Menu: %s\033[0m\n", ui::bar::g_open ? "OPEN" : "CLOSED");
                     fflush(stdout);
-                } else if (line == "2" || line == "streamer" || line == "s" || line == "shield") {
-                    printf("\033[93m[*] Streamer Mode: [%s]\033[0m\n", cfg::streamer_mode ? "ON" : "OFF");
-                    fflush(stdout);
-                } else if (line == "3" || line == "0" || line == "exit" || line == "quit" || line == "q") {
+                } else if (line == "2" || line == "0" || line == "exit" || line == "quit" || line == "q") {
                     printf("\033[91m[*] Exiting...\033[0m\n");
                     request_exit(0);
                     break;
