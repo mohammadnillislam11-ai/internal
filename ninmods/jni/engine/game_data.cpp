@@ -340,27 +340,10 @@ namespace engine::data {
             auto uma = avatar ? rpm<uint64_t>(avatar + offsets::Avatar_Uma) : 0;
             if (!uma) continue;
 
-            // Teammate Filter (Dual-Layer: UMA skip byte/word & Player TeamID matching)
+            // Teammate Filter (Official Free Fire UMA Data Skip flag)
             auto uma_data = rpm<uint64_t>(uma + offsets::Uma_Data);
-            if (uma_data) {
-                if (rpm<uint8_t>(uma_data + offsets::UmaData_Skip) != 0 ||
-                    rpm<uint8_t>(uma_data + 0x90) != 0 ||
-                    rpm<uint8_t>(uma_data + 0x92) != 0) {
-                    continue;
-                }
-            }
-
-            if (local_player) {
-                int my_team = rpm<int>(local_player + offsets::Player_TeamID);
-                if (my_team > 0) {
-                    int enemy_team = rpm<int>(enemy + offsets::Player_TeamID);
-                    if (enemy_team == my_team) continue;
-                }
-                int my_team_alt = rpm<int>(local_player + offsets::Player_TeamAlt);
-                if (my_team_alt > 0 && my_team_alt < 100) {
-                    int enemy_team_alt = rpm<int>(enemy + offsets::Player_TeamAlt);
-                    if (enemy_team_alt == my_team_alt) continue;
-                }
+            if (uma_data && rpm<bool>(uma_data + offsets::UmaData_Skip)) {
+                continue;
             }
 
             bool raw_visible = rpm<bool>(uma + offsets::Uma_Visible);
