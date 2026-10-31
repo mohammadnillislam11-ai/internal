@@ -304,10 +304,8 @@ namespace engine::data {
             return;
         }
 
-        auto match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
         if (!match) return;
 
-        auto local_player = rpm<uint64_t>(match + offsets::Match_LocalPlayer);
         g_local_player.store(local_player ? local_player : 0);
         if (!local_player) return;
 
