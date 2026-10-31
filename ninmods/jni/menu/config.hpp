@@ -30,13 +30,13 @@ namespace cfg {
         // Sliders & Adjustments
         inline float max_range      = 250.0f;
         inline float loot_range     = 150.0f;
-        inline float box_rounding   = 2.0f;
-        inline float box_thickness  = 1.0f; // Thread-thin line
+        inline float box_rounding   = 3.0f;
+        inline float box_thickness  = 1.8f; // ZqwClient standard line
         inline float fix_esp        = 0.0f;
         inline float bracket_frac   = 0.28f;
 
         // Color Themes
-        inline ImVec4 box_col       = ImVec4(0.68f, 0.35f, 0.98f, 1.0f); // Royal Neon Purple
+        inline ImVec4 box_col       = ImVec4(0.0f, 0.90f, 1.0f, 1.0f); // Bright Cyan (ZqwClient standard)
         inline ImVec4 box_visible   = ImVec4(0.30f, 1.00f, 0.55f, 1.0f); // Neon Green (Visible)
         inline ImVec4 name_col      = ImVec4(1.00f, 1.00f, 1.00f, 1.0f); // White
         inline ImVec4 distance_col  = ImVec4(0.95f, 0.95f, 0.30f, 1.0f); // Yellow

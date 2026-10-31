@@ -389,14 +389,25 @@ namespace engine::esp {
         return IM_COL32(200, 200, 200, 255);
     }
 
+    static inline void draw_crosshair(ImDrawList* dl, float cx, float cy) {
+        float gap = 6.0f, len = 10.0f;
+        ImU32 c = IM_COL32(220, 40, 40, 240);
+
+        dl->AddLine(ImVec2(cx - gap - len, cy), ImVec2(cx - gap, cy), c, 1.8f);
+        dl->AddLine(ImVec2(cx + gap, cy), ImVec2(cx + gap + len, cy), c, 1.8f);
+        dl->AddLine(ImVec2(cx, cy - gap - len), ImVec2(cx, cy - gap), c, 1.8f);
+        dl->AddLine(ImVec2(cx, cy + gap), ImVec2(cx, cy + gap + len), c, 1.8f);
+        dl->AddCircleFilled(ImVec2(cx, cy), 1.5f, c);
+    }
+
     /**
      * @brief Main ESP dispatch loop.
      */
     void render_all() {
         bool any_esp = cfg::esp::enabled || cfg::esp::box || cfg::esp::skeleton || cfg::esp::tracer ||
                        cfg::esp::name || cfg::esp::distance || cfg::esp::health || cfg::esp::armor ||
-                       cfg::esp::firing_ind || cfg::esp::weapon || cfg::esp::loot;
-        if (!any_esp || !data::g_in_match.load()) return;
+                       cfg::esp::firing_ind || cfg::esp::weapon || cfg::esp::loot || cfg::esp::crosshair;
+        if (!any_esp) return;
 
         ImDrawList* dl = ImGui::GetForegroundDrawList();
         if (!dl) return;
@@ -404,6 +415,13 @@ namespace engine::esp {
         ImGuiIO& io = ImGui::GetIO();
         float sw = (io.DisplaySize.x > 0.0f) ? io.DisplaySize.x : (display::width > 0.0f ? display::width : 2400.0f);
         float sh = (io.DisplaySize.y > 0.0f) ? io.DisplaySize.y : (display::height > 0.0f ? display::height : 1080.0f);
+
+        if (cfg::esp::crosshair) {
+            draw_crosshair(dl, sw * 0.5f, sh * 0.5f);
+        }
+
+        if (!data::g_in_match.load()) return;
+
         ImVec2 anchor(sw * 0.5f, 0.0f);
 
         std::vector<data::PlayerData> snapshot;
@@ -416,19 +434,20 @@ namespace engine::esp {
             if (p.Head.x < 0.0f || p.Head.y < 0.0f) continue;
             if (p.distance > cfg::esp::max_range) continue;
 
+            // Draw tracer immediately to head - does not require full skeleton box to be computed
+            if (cfg::esp::tracer && ok(p.Head)) {
+                ImVec2 head(p.Head.x, p.Head.y);
+                float aa = ImClamp(1.0f - p.distance / cfg::esp::max_range, 0.25f, 1.0f);
+                dl->AddLine(anchor, head, with_alpha(to_u32(cfg::esp::box_col), 0.35f * aa), 4.0f);
+                dl->AddLine(anchor, head, with_alpha(to_u32(cfg::esp::box_col), 0.95f * aa), 1.8f);
+            }
+
             SkeletonBox sb = compute_skeleton_box(p);
             if (!sb.valid) continue;
 
             float cx = (sb.tl.x + sb.br.x) * 0.5f;
             ImU32 base_col = p.isVisible ? to_u32(cfg::esp::box_visible) : to_u32(cfg::esp::box_col);
             ImU32 box_col  = fade_dist(base_col, p.distance, cfg::esp::max_range);
-
-            if (cfg::esp::tracer) {
-                ImVec2 head(p.Head.x, p.Head.y);
-                float aa = ImClamp(1.0f - p.distance / cfg::esp::max_range, 0.25f, 1.0f);
-                dl->AddLine(anchor, head, with_alpha(to_u32(cfg::esp::box_col), 0.35f * aa), 4.0f);
-                dl->AddLine(anchor, head, with_alpha(to_u32(cfg::esp::box_col), 0.95f * aa), 1.8f);
-            }
 
             if (cfg::esp::box) {
                 draw_box(dl, sb.tl, sb.br, box_col, cfg::esp::box_type);

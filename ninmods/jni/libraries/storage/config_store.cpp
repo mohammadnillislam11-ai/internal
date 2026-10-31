@@ -8,8 +8,8 @@ bool load_config() {
     cfg::esp::enabled    = false;
     cfg::esp::box        = false;
     cfg::esp::box_type   = 0;
-    cfg::esp::box_thickness = 1.0f;
-    cfg::esp::box_rounding  = 2.0f;
+    cfg::esp::box_thickness = 1.8f;
+    cfg::esp::box_rounding  = 3.0f;
     cfg::esp::max_range     = 250.0f;
     cfg::esp::loot_range    = 150.0f;
     cfg::esp::name       = false;
