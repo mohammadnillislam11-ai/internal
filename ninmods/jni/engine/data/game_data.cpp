@@ -425,10 +425,10 @@ namespace engine::data {
             pd.curHP      = hp;
             pd.maxHP      = 200;
 
-            if (proj.on_screen && cfg::aim::enabled && cfg::aim::target_bone == 1) {
+            if (cfg::aim::enabled && cfg::aim::target_bone == 1) {
                 pd.Breast = bone_screen(enemy, offsets::Bone_Breast, screen_w, screen_h);
             }
-            if (proj.on_screen && cfg::aim::enabled && cfg::aim::target_bone == 2) {
+            if (cfg::aim::enabled && cfg::aim::target_bone == 2) {
                 pd.Hip = bone_screen(enemy, offsets::Bone_Hip, screen_w, screen_h);
             }
 
