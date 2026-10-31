@@ -291,10 +291,13 @@ namespace engine::data {
             return;
         }
 
-        if (!match) return;
-
-        g_local_player.store(local_player ? local_player : 0);
-        if (!local_player) return;
+        if (!match || !local_player) {
+            g_local_player.store(0);
+            std::lock_guard<std::mutex> lk(g_players_mutex);
+            g_players.clear();
+            return;
+        }
+        g_local_player.store(local_player);
 
         // Camera Matrix
         uint64_t follow = rpm<uint64_t>(local_player + offsets::Player_Camera);
@@ -307,7 +310,11 @@ namespace engine::data {
             int_ptr = cam ? rpm<uint64_t>(cam + 0x10) : 0;
         }
 
-        if (!int_ptr) return;
+        if (!int_ptr) {
+            std::lock_guard<std::mutex> lk(g_players_mutex);
+            g_players.clear();
+            return;
+        }
 
         g_view_matrix = rpm<Matrix4x4>(int_ptr + offsets::Camera_Matrix);
 
@@ -319,10 +326,18 @@ namespace engine::data {
 
         // Player Dictionary Scan
         uint64_t dict_addr = rpm<uint64_t>(base_game + offsets::Match_PlayerDict);
-        if (!dict_addr) return;
+        if (!dict_addr) {
+            std::lock_guard<std::mutex> lk(g_players_mutex);
+            g_players.clear();
+            return;
+        }
 
         ManagedDictionary dict(dict_addr);
-        if (!dict.valid) return;
+        if (!dict.valid) {
+            std::lock_guard<std::mutex> lk(g_players_mutex);
+            g_players.clear();
+            return;
+        }
 
         int num_entries = dict.get_count();
         for (int i = 0; i < num_entries; i++) {
