@@ -446,7 +446,8 @@ namespace android {
                 StrongPointer<void> result{};
 
                 if (Functionals::GetInstance().systemVersion <= 9) {
-                    int value = 441731;
+                    int value = -1;
+                    if (hide) value = 441731;
 
                     result = reinterpret_cast<StrongPointer<void> (*)(void *, void *, uint32_t, uint32_t, int32_t,
                                                                       uint32_t, void *, int32_t, int32_t)>(
@@ -455,11 +456,13 @@ namespace android {
                                                                                              nullptr,
                                                                                              value, -1);
                 } else {
-                    // Android 10+ (Always classify as System Overlay window type 441731)
-                    layerMetadata.setInt32(2, 441731);
+                    // Android 10+: Only apply secure metadata / flags if hide (streamer_mode) is true
                     if (hide) {
-                        if (Functionals::GetInstance().systemVersion >= 12) {
-                            flags |= 0x40;   // SECURE flag
+                        if (Functionals::GetInstance().systemVersion > 9 &&
+                            Functionals::GetInstance().systemVersion < 12) {
+                            layerMetadata.setInt32(2, 441731);
+                        } else {
+                            flags |= 0x40;   // SECURE flag for Android 12+
                         }
                     }
                     result = Functionals::GetInstance().SurfaceComposerClient__CreateSurface(data, windowName, width,

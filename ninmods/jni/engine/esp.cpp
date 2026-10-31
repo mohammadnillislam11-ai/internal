@@ -83,13 +83,21 @@ namespace engine::esp {
     }
 
     /**
-     * @brief Draws bounding box (Corner, Full, or Glow).
+     * @brief Draws bounding box (0 = Full Rect / চতুর্ভুজ বক্স, 1 = Corner / চার কোনা, 2 = Glow).
      */
     static void draw_box(ImDrawList* dl, ImVec2 tl, ImVec2 br, ImU32 col, int type) {
         float thick = cfg::esp::box_thickness > 0.5f ? cfg::esp::box_thickness : 1.8f;
         float round = cfg::esp::box_rounding;
 
         if (type == 0) {
+            // চতুর্ভুজ বক্স (Full 2D Rectangular Bounding Box with contrast drop shadows)
+            dl->AddRect(ImVec2(tl.x - 1.0f, tl.y - 1.0f), ImVec2(br.x + 1.0f, br.y + 1.0f),
+                        IM_COL32(0, 0, 0, 210), round, 0, thick + 1.6f);
+            dl->AddRect(ImVec2(tl.x + 1.0f, tl.y + 1.0f), ImVec2(br.x - 1.0f, br.y - 1.0f),
+                        IM_COL32(0, 0, 0, 160), round, 0, thick);
+            dl->AddRect(tl, br, col, round, 0, thick);
+        } else if (type == 1) {
+            // Corner Box (চার কোনা ব্র্যাকেট)
             float len = (br.x - tl.x) * (cfg::esp::bracket_frac > 0.05f ? cfg::esp::bracket_frac : 0.28f);
             ImVec2 pts[8][2] = {
                 {tl,                         ImVec2(tl.x + len, tl.y)},
@@ -106,11 +114,8 @@ namespace engine::esp {
                 dl->AddLine(ImVec2(s[0].x + 1, s[0].y + 1), ImVec2(s[1].x + 1, s[1].y + 1), C_SHADOW, thick + 1.0f);
                 dl->AddLine(s[0], s[1], col, thick);
             }
-        } else if (type == 1) {
-            dl->AddRect(ImVec2(tl.x + 1, tl.y + 1), ImVec2(br.x + 1, br.y + 1),
-                        IM_COL32(0, 0, 0, 160), round, 0, thick + 1.5f);
-            dl->AddRect(tl, br, col, round, 0, thick);
         } else {
+            // Glow Box
             dl->AddRect(tl, br, with_alpha(col, 0.18f), round, 0, thick + 4.0f);
             dl->AddRect(tl, br, with_alpha(col, 0.45f), round, 0, thick + 2.0f);
             dl->AddRect(tl, br, col, round, 0, thick);
@@ -119,22 +124,46 @@ namespace engine::esp {
     }
 
     /**
-     * @brief Draws clean horizontal health bar directly above bounding box.
+     * @brief Draws clean vertical health bar directly on the right side of the bounding box,
+     *        matching the exact height of the box.
      */
     static void draw_health_bar(ImDrawList* dl, ImVec2 tl, ImVec2 br, int cur_hp, int max_hp) {
+        float box_h = br.y - tl.y;
+        if (box_h <= 2.0f) return;
+
         float hp01 = max_hp > 0 ? static_cast<float>(cur_hp) / static_cast<float>(max_hp) : 0.0f;
         hp01 = ImClamp(hp01, 0.0f, 1.0f);
 
-        float bar_h = 3.0f;
-        float bar_y = tl.y - bar_h - 3.0f;
-        float w = br.x - tl.x;
+        // Position directly on the right side of the bounding box
+        float gap = 4.0f;
+        float bar_w = 4.0f;
+        float bar_x = br.x + gap;
+        float top_y = tl.y;
+        float bot_y = br.y;
 
-        dl->AddRectFilled(ImVec2(tl.x, bar_y), ImVec2(br.x, bar_y + bar_h),
-                          IM_COL32(0, 0, 0, 210), bar_h * 0.5f);
-        dl->AddRectFilled(ImVec2(tl.x, bar_y), ImVec2(tl.x + w * hp01, bar_y + bar_h),
-                          hp_color(hp01), bar_h * 0.5f);
-        dl->AddRect(ImVec2(tl.x, bar_y), ImVec2(br.x, bar_y + bar_h),
-                    C_BORDER, bar_h * 0.5f, 0, 1.0f);
+        // Black outer contrast shadow
+        dl->AddRectFilled(ImVec2(bar_x - 1.0f, top_y - 1.0f),
+                          ImVec2(bar_x + bar_w + 1.0f, bot_y + 1.0f),
+                          IM_COL32(0, 0, 0, 220), 1.5f);
+
+        // Dark track background (depleted health)
+        dl->AddRectFilled(ImVec2(bar_x, top_y),
+                          ImVec2(bar_x + bar_w, bot_y),
+                          IM_COL32(25, 20, 30, 220), 1.0f);
+
+        // Active health fill from bottom to top according to remaining HP
+        float filled_h = box_h * hp01;
+        float fill_top_y = bot_y - filled_h;
+        if (filled_h > 0.5f) {
+            dl->AddRectFilled(ImVec2(bar_x, fill_top_y),
+                              ImVec2(bar_x + bar_w, bot_y),
+                              hp_color(hp01), 1.0f);
+        }
+
+        // Clean border outline
+        dl->AddRect(ImVec2(bar_x, top_y),
+                    ImVec2(bar_x + bar_w, bot_y),
+                    C_BORDER, 1.0f, 0, 1.0f);
     }
 
     /**

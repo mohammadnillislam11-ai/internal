@@ -426,7 +426,7 @@ namespace ui::menu {
         NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Box & Line Configuration"));
         ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+48});
 
-        const char* box_types[] = { oxorany("None"), oxorany("Corner"), oxorany("Full"), oxorany("Glow") };
+        const char* box_types[] = { oxorany("None"), oxorany("Full Box"), oxorany("Corner"), oxorany("Glow") };
         int cur_box = cfg::esp::box ? (cfg::esp::box_type + 1) : 0;
         if (NS_StepSlider("box_type", oxorany("Box Style"), &cur_box, box_types, 4)) {
             if (cur_box == 0) {
