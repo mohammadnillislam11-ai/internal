@@ -395,7 +395,7 @@ namespace engine::esp {
                        cfg::esp::firing_ind || cfg::esp::weapon || cfg::esp::loot;
         if (!any_esp || !data::g_in_match.load()) return;
 
-        ImDrawList* dl = ImGui::GetForegroundDrawList();
+        ImDrawList* dl = ImGui::GetBackgroundDrawList();
         if (!dl) return;
 
         float sw = static_cast<float>(display::width > 0 ? display::width : 2400);

@@ -4,6 +4,7 @@
 #include "offsets.hpp"
 #include "memory.hpp"
 #include "menu/config.hpp"
+#include "menu/bar.hpp"
 #include "display_metrics.h"
 #include "imgui.h"
 #include <cmath>
@@ -111,9 +112,9 @@ namespace engine::aim {
      * @brief Renders 2D FOV circle overlay centered on the screen.
      */
     void render_fov() {
-        if (!cfg::aim::draw_fov) return;
+        if (!cfg::aim::draw_fov || ui::bar::g_open) return;
 
-        ImDrawList* dl = ImGui::GetForegroundDrawList();
+        ImDrawList* dl = ImGui::GetBackgroundDrawList();
         if (!dl) return;
 
         float cx = static_cast<float>(display::width > 0 ? display::width : 2400) * 0.5f;

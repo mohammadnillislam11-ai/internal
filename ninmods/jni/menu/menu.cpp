@@ -799,7 +799,7 @@ namespace ui::menu {
 
         bool inHeaderControls = (mp.x >= winX - 10.f && mp.y <= wp.y + headerH);
         if (!inHeaderControls && (mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= wp.y && mp.y <= wp.y + headerH)) {
-            if (ImGui::IsMouseClicked(0)) {
+            if (ImGui::IsMouseClicked(0) || (!drag && ImGui::IsMouseDown(0))) {
                 drag = true;
                 doff = {mp.x - g_menu_pos.x, mp.y - g_menu_pos.y};
             }

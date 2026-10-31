@@ -50,7 +50,7 @@ static void render_fps_icon(float alpha) {
   bool hov = (mp.x >= g_fps_x && mp.x <= g_fps_x + w && mp.y >= g_fps_y &&
               mp.y <= g_fps_y + h);
 
-  if (hov && ImGui::IsMouseClicked(0)) {
+  if (hov && (ImGui::IsMouseClicked(0) || (!g_fps_potential && ImGui::IsMouseDown(0)))) {
     g_fps_potential = true;
     g_fps_down = mp;
     g_fps_off = ImVec2(mp.x - g_fps_x, mp.y - g_fps_y);
