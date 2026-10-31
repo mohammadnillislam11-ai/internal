@@ -29,8 +29,9 @@ static bool s_fps_pos_init = false;
 static void get_fps_pos(float w, float h) {
     if (!s_fps_pos_init) {
         if (g_sw > 0.f && g_sh > 0.f) {
-            g_fps_x = g_sw - w - 25.f;
-            g_fps_y = g_sh - h - 35.f;
+            // Position safely within both Portrait (1080) and Landscape (2400) viewports
+            g_fps_x = 45.f;
+            g_fps_y = 160.f;
             s_fps_pos_init = true;
         }
     }

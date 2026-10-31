@@ -66,7 +66,7 @@ bool InitEGL(int width, int height) {
     system("settings put secure block_untrusted_touches 0 > /dev/null 2>&1");
 
     g_NativeWindow = android::ANativeWindowCreator::Create(
-        "com.android.systemui", width, height, false, false);
+        "com.android.systemui", width, height, true, false);
 
     if (!g_NativeWindow) {
         logger::log_error("[-] Failed to create ANativeWindow overlay!");
@@ -324,6 +324,13 @@ int main(int argc, char** argv) {
 
     std::cout << "\033[92m[+] Starting NINMODS floating logo overlay...\033[0m\n";
     logger::log_success("[+] Overlay initialized. Floating logo ready on screen.");
+
+    // If target game is not already running, automatically launch it seamlessly
+    if (initial_pid <= 0) {
+        std::cout << "\033[93m[*] Launching " << engine::TARGET_PACKAGE << "...\033[0m\n";
+        logger::log_info("[LAUNCH] Starting target game: %s", engine::TARGET_PACKAGE);
+        system("am start -n com.dts.freefireth/com.dts.freefireth.FFMainActivity > /dev/null 2>&1");
+    }
 
     // Ensure menu starts closed with floating puck visible
     ui::bar::g_open = false;
