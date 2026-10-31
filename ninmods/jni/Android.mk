@@ -81,6 +81,7 @@ FILE_LIST += $(wildcard $(LOCAL_PATH)/menu/*.cpp)
 
 # 8. Engine Modules (Game Data, ESP, Aimbot, Memory)
 FILE_LIST += $(wildcard $(LOCAL_PATH)/engine/*.cpp)
+FILE_LIST += $(wildcard $(LOCAL_PATH)/engine/*/*.cpp)
 
 # 9. Main Application Entry Loop
 FILE_LIST += $(LOCAL_PATH)/main.cpp
@@ -115,7 +116,14 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/libraries/security/shield/Utils \
     $(LOCAL_PATH)/libraries/unity \
     $(LOCAL_PATH)/menu \
-    $(LOCAL_PATH)/engine
+    $(LOCAL_PATH)/engine \
+    $(LOCAL_PATH)/engine/core \
+    $(LOCAL_PATH)/engine/data \
+    $(LOCAL_PATH)/engine/esp \
+    $(LOCAL_PATH)/engine/aim \
+    $(LOCAL_PATH)/engine/memory \
+    $(LOCAL_PATH)/engine/offsets \
+    $(LOCAL_PATH)/engine/security
 
 LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby
 ifeq ($(TARGET_ARCH_ABI),arm64-v8a)

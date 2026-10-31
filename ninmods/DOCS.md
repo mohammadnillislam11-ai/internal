@@ -108,4 +108,17 @@ NINMODS হলো একটি সম্পূর্ণ বহিরাগত (E
    - নোবিতা ভিউ লকিংয়ের জন্য ক্যামেরা ওয়ার্ল্ড ম্যাট্রিক্স ইনভার্সন (`GetCameraWorldPosManual`) এবং কোয়াটারনিয়ন লুক রোটেশন (`Quaternion::LookRotation`) সরাসরি `Player_Rotation` (`0x61C` / `0x614`)-এ রাইট করার ব্যবস্থা করা হয়েছে।
 
 ---
+
+## ৬. মডুলার ইঞ্জিন আর্কিটেকচার (Dedicated Subfolders & Files)
+ইঞ্জিনের কোড আরও পরিচ্ছন্ন, রক্ষণাবেক্ষণযোগ্য এবং ত্রুটিমুক্ত করার উদ্দেশ্যে সম্পূর্ণ ইঞ্জিনকে আলাদা আলাদা সাব-ডিরেক্টরিতে বিভক্ত করা হয়েছে:
+- `engine/core/` -> `engine.cpp`, `engine.hpp` (ইঞ্জিন লাইফসাইকেল কন্ট্রোলার)
+- `engine/data/` -> `game_data.cpp`, `game_data.hpp` (গেম ডেটা ও মেমোরি স্ক্যানার)
+- `engine/esp/` -> `esp.cpp`, `esp.hpp` (ESP ও ভিজ্যুয়াল রেন্ডারিং)
+- `engine/aim/` -> `aimbot.cpp`, `aimbot.hpp` (এইম অ্যাসিস্ট, সাইলেন্ট এইম ও নোবিতা মোড)
+- `engine/memory/` -> `memory.hpp` (লিনাক্স কার্নেল মেমোরি গেটওয়ে)
+- `engine/offsets/` -> `offsets.hpp` (গেম মেমোরি অফসেট ডেটাবেস)
+- `engine/security/` -> `game_security.cpp`, `game_security.hpp` (ক্র্যাশ গার্ড ও মেমোরি প্রটেকশন)
+- মূল `engine/` ফোল্ডারে ফরোয়ার্ডার হেডার রাখা হয়েছে যাতে যে কোনো ফাইল থেকে `#include "engine/..."` বা সরাসরি `#include "..."` নির্বিঘ্নে কাজ করে।
+
+---
 *Generated and maintained for NINMODS Android Client.*
