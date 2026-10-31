@@ -104,7 +104,7 @@ namespace engine::aim {
         g_current_target = 0;
         if (!g_hook_installed && engine::mem::g_lib_base != 0) {
             g_hook_installed = true;
-            LOGI("[+] Aimbot initialized (Hybrid memory redirection + damage interceptor active)");
+            LOGI("[+] Aimbot initialized (Direct memory vector redirection active)");
         }
     }
 

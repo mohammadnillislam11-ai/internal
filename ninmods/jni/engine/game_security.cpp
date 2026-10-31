@@ -1,5 +1,6 @@
 #include "game_security.hpp"
 #include "oxorany.h"
+#include "memory.hpp"
 #include <cstdio>
 #include <cstring>
 #include <unistd.h>
@@ -21,29 +22,7 @@ namespace engine::security {
      */
     static uint64_t find_anogs_base(int target_pid) {
         if (target_pid <= 0) return 0;
-
-        char path[64];
-        snprintf(path, sizeof(path), "/proc/%d/maps", target_pid);
-
-        FILE* f = fopen(path, "r");
-        if (!f) return 0;
-
-        char line[512];
-        uint64_t base = 0;
-        const char* target_lib = oxorany("libanogs.so");
-
-        while (fgets(line, sizeof(line), f)) {
-            if (strstr(line, target_lib) && strstr(line, "r-xp")) {
-                #if defined(__aarch64__)
-                sscanf(line, "%lx-", (unsigned long*)&base);
-                #else
-                sscanf(line, "%x-", (unsigned int*)&base);
-                #endif
-                break;
-            }
-        }
-        fclose(f);
-        return base;
+        return static_cast<uint64_t>(engine::mem::find_module_base(target_pid, oxorany("libanogs.so")));
     }
 
     /**

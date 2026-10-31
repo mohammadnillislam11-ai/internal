@@ -117,10 +117,13 @@ namespace engine::esp {
 
         if (cnt < 4) {
             if (ok(p.Head) && ok(p.Toe)) {
-                min_x = ImMin(p.Head.x, p.Toe.x);
-                max_x = ImMax(p.Head.x, p.Toe.x);
                 min_y = ImMin(p.Head.y, p.Toe.y);
                 max_y = ImMax(p.Head.y, p.Toe.y);
+                float box_h = max_y - min_y;
+                float half_w = (box_h > 10.0f) ? (box_h * 0.28f) : 15.0f;
+                float center_x = (p.Head.x + p.Toe.x) * 0.5f;
+                min_x = center_x - half_w;
+                max_x = center_x + half_w;
                 sb.valid = true;
             }
             if (!sb.valid) return sb;
