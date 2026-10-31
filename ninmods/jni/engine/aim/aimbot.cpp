@@ -281,9 +281,17 @@ namespace engine::aim {
                         float len = sqrtf(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
                         if (len > 0.001f) {
                             dir.x /= len; dir.y /= len; dir.z /= len;
-                            Quaternion rot = Quaternion::LookRotation(dir, Vector3(0.0f, 1.0f, 0.0f));
-                            wpm<Quaternion>(local + offsets::Player_Rotation, rot);
-                            wpm<Quaternion>(local + 0x614, rot);
+                            Quaternion target_rot = Quaternion::LookRotation(dir, Vector3(0.0f, 1.0f, 0.0f));
+                            Quaternion final_rot = target_rot;
+                            if (cfg::aim::smooth > 1.0f) {
+                                Quaternion cur_rot = rpm<Quaternion>(local + offsets::Player_Rotation);
+                                if (cur_rot.x != 0.0f || cur_rot.y != 0.0f || cur_rot.z != 0.0f || cur_rot.w != 0.0f) {
+                                    float t = ImClamp(1.0f / cfg::aim::smooth, 0.05f, 1.0f);
+                                    final_rot = Quaternion::Slerp(cur_rot, target_rot, t);
+                                }
+                            }
+                            wpm<Quaternion>(local + offsets::Player_Rotation, final_rot);
+                            wpm<Quaternion>(local + 0x614, final_rot);
                         }
                     }
                 }

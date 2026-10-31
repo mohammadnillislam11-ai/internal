@@ -194,9 +194,10 @@ namespace engine::esp {
             if (!ok(p.Head) || !ok(p.Toe)) continue;
             if (p.distance > cfg::esp::max_range) continue;
 
+            float max_r = (cfg::esp::max_range > 1.0f) ? cfg::esp::max_range : 400.0f;
             ImU32 base_col = p.isVisible ? to_u32(cfg::esp::box_visible) : to_u32(cfg::esp::box_col);
-            ImU32 box_col  = fade_dist(base_col, p.distance, cfg::esp::max_range);
-            float aa = ImClamp(1.0f - p.distance / cfg::esp::max_range, 0.25f, 1.0f);
+            ImU32 box_col  = fade_dist(base_col, p.distance, max_r);
+            float aa = ImClamp(1.0f - p.distance / max_r, 0.25f, 1.0f);
 
             if (p.isOnScreen) {
                 PlayerBox box = compute_player_box(p);
