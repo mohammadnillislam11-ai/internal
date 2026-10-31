@@ -39,6 +39,11 @@ static void get_fps_pos(float w, float h) {
         g_fps_x = ImClamp(g_fps_x, 0.f, ImMax(0.f, g_sw - w));
     if (g_sh > 0.f)
         g_fps_y = ImClamp(g_fps_y, 0.f, ImMax(0.f, g_sh - h));
+
+    g_puck_x = g_fps_x;
+    g_puck_y = g_fps_y;
+    g_puck_w = w;
+    g_puck_h = h;
 }
 
 /**
