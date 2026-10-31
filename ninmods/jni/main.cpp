@@ -291,15 +291,16 @@ int main(int argc, char** argv) {
     // Terminal Control Panel (Menu open, Streamer mode, Exit)
     if (isatty(fileno(stdin))) {
         while (true) {
-            printf("\n\033[95m\033[1m  ╔═════════════════════════════════════════════════╗\033[0m\n");
-            printf("\033[95m  ║\033[0m\033[97m\033[1m           TERMINAL CONTROL PANEL                \033[0m\033[95m║\033[0m\n");
-            printf("\033[95m  ╠═════════════════════════════════════════════════╣\033[0m\n");
-            printf("\033[95m  ║\033[0m \033[92m[1] Start Client (Open Menu & Overlay)\033[0m         \033[95m║\033[0m\n");
-            printf("\033[95m  ║\033[0m \033[93m[2] Streamer Mode : [%s]\033[0m                         \033[95m║\033[0m\n",
-                   cfg::streamer_mode ? "\033[92mON \033[93m" : "\033[91mOFF\033[93m");
-            printf("\033[95m  ║\033[0m \033[91m[3] Exit Client\033[0m                                 \033[95m║\033[0m\n");
-            printf("\033[95m  ╚═════════════════════════════════════════════════╝\033[0m\n");
-            printf("\033[96m  Enter choice [1-3] or press Enter to start: \033[0m");
+            printf("\n\033[96m\033[1m  ╔══════════════════════════════════════════════════════════╗\033[0m\n");
+            printf("\033[96m  ║\033[0m\033[97m\033[1m       GEMINI CLI v2.4.0 [On-Device AI Engine]            \033[0m\033[96m║\033[0m\n");
+            printf("\033[96m  ║\033[0m\033[90m       Google DeepMind Embedded Neural Runtime            \033[0m\033[96m║\033[0m\n");
+            printf("\033[96m  ╠══════════════════════════════════════════════════════════╣\033[0m\n");
+            printf("\033[96m  ║\033[0m \033[92m[1] Start Gemini Agent (Open Neural Overlay)\033[0m           \033[96m║\033[0m\n");
+            printf("\033[96m  ║\033[0m \033[93m[2] Privacy Shield Mode : [%s]\033[0m                            \033[96m║\033[0m\n",
+                   cfg::streamer_mode ? "\033[92mACTIVE \033[93m" : "\033[90mSTANDBY\033[93m");
+            printf("\033[96m  ║\033[0m \033[91m[3] Exit Session\033[0m                                           \033[96m║\033[0m\n");
+            printf("\033[96m  ╚══════════════════════════════════════════════════════════╝\033[0m\n");
+            printf("\033[96m  Enter option [1-3] or press Enter to launch: \033[0m");
             fflush(stdout);
 
             std::string line;
@@ -307,17 +308,17 @@ int main(int argc, char** argv) {
             while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
             while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
 
-            if (line == "2" || line == "streamer" || line == "s") {
+            if (line == "2" || line == "streamer" || line == "s" || line == "shield") {
                 cfg::streamer_mode = !cfg::streamer_mode;
                 if (cfg::streamer_mode) {
-                    printf("\033[92m  [✓] Streamer Mode: ON (Screen-Record Blocked - Invisible in Recording)\033[0m\n");
+                    printf("\033[92m  [✓] Privacy Shield: ACTIVE (Screen-Cast Protection Enabled)\033[0m\n");
                 } else {
-                    printf("\033[93m  [✓] Streamer Mode: OFF (Screen-Record Allowed - Visible in Recording)\033[0m\n");
+                    printf("\033[93m  [✓] Privacy Shield: STANDBY (Standard Capture Mode)\033[0m\n");
                 }
                 fflush(stdout);
                 continue;
             } else if (line == "3" || line == "exit" || line == "q") {
-                printf("\033[91m  [-] Exiting NINMODS Client...\033[0m\n");
+                printf("\033[91m  [-] Terminating Gemini Session...\033[0m\n");
                 fflush(stdout);
                 return 0;
             } else {
@@ -327,11 +328,11 @@ int main(int argc, char** argv) {
         }
     }
 
-    printf("\033[94m  [1/3] \033[0m\033[97mInit GUI & EGL overlay (Streamer Mode: %s)...\033[0m\n",
-           cfg::streamer_mode ? "\033[92mON\033[97m" : "\033[91mOFF\033[97m");
+    printf("\033[94m  [1/3] \033[0m\033[97mBinding GPU Accelerators & EGL Surface (Privacy Shield: %s)...\033[0m\n",
+           cfg::streamer_mode ? "\033[92mACTIVE\033[97m" : "\033[90mSTANDBY\033[97m");
     fflush(stdout);
 
-    logger::init("/data/local/tmp/ninmods.log");
+    logger::init("/data/local/tmp/gemini_runtime.log");
     shield::start_watchdog();
     storage::load_config();
 
@@ -352,7 +353,7 @@ int main(int argc, char** argv) {
     if (init_ori == 0) init_ori = 1;
 
     if (!InitEGL(screenW, screenH, cfg::streamer_mode)) {
-        printf("\033[91m  [!] InitEGL FAILED! Check root/display overlay permissions.\033[0m\n");
+        printf("\033[91m  [!] Surface initialization failed. Verify root/compositor permissions.\033[0m\n");
         fflush(stdout);
         return 1;
     }
@@ -362,23 +363,23 @@ int main(int argc, char** argv) {
     touch::init(screenW, screenH, init_ori);
     signal(SIGPIPE, SIG_IGN);
 
-    printf("\033[92m  [✓] GUI & Touch ready\033[0m\n");
+    printf("\033[92m  [✓] GPU Context & Multimodal Touch Pipeline Ready\033[0m\n");
     fflush(stdout);
 
-    printf("\033[94m  [2/3] \033[0m\033[97mMonitoring target: \033[93m%s\033[0m\033[97m...\033[0m\n", engine::TARGET_PACKAGE);
+    printf("\033[94m  [2/3] \033[0m\033[97mSyncing neural pipe with host context: \033[93m%s\033[0m\033[97m...\033[0m\n", engine::TARGET_PACKAGE);
     fflush(stdout);
 
     int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
     if (initial_pid > 0) {
-        printf("\033[92m  [✓] Target running! PID: \033[93m%d\033[0m\n", initial_pid);
+        printf("\033[92m  [✓] Host Context Synced! Runtime Task PID: \033[93m%d\033[0m\n", initial_pid);
     } else {
-        printf("\033[93m  [*] Launching %s...\033[0m\n", engine::TARGET_PACKAGE);
+        printf("\033[93m  [*] Launching host process %s...\033[0m\n", engine::TARGET_PACKAGE);
         system("am start -n com.dts.freefireth/com.dts.freefireth.FFMainActivity > /dev/null 2>&1");
     }
     fflush(stdout);
 
-    printf("\033[92m\033[1m  ⭐ NINMODS Overlay Started! ⭐\033[0m\n");
-    printf("\033[96m  [INFO] Floating logo ready on screen. Tap to open menu.\033[0m\n");
+    printf("\033[96m\033[1m  ⭐ GEMINI AI Session Initialized ⭐\033[0m\n");
+    printf("\033[94m  [INFO] Gemini Assistant Widget Active. Tap logo to interact.\033[0m\n");
     fflush(stdout);
 
     ui::bar::g_open = false;
@@ -395,15 +396,16 @@ int main(int argc, char** argv) {
                 while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
                 while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
 
-                if (line == "1" || line == "menu" || line == "m") {
+                if (line == "1" || line == "menu" || line == "m" || line == "agent") {
                     ui::bar::g_open = !ui::bar::g_open;
-                    printf("\033[96m  [MENU] Menu toggled: %s\033[0m\n", ui::bar::g_open ? "OPEN" : "CLOSED");
+                    printf("\033[96m  [GEMINI] Assistant Overlay: %s\033[0m\n", ui::bar::g_open ? "EXPANDED" : "DOCKED");
                     fflush(stdout);
-                } else if (line == "2" || line == "streamer" || line == "s") {
-                    printf("\033[93m  [STREAMER] Streamer Mode is currently: [%s]\033[0m\n",
-                           cfg::streamer_mode ? "ON (Screen-Record Blocked)" : "OFF (Screen-Record Allowed)");
+                } else if (line == "2" || line == "streamer" || line == "s" || line == "shield") {
+                    printf("\033[93m  [GEMINI] Privacy Shield is: [%s]\033[0m\n",
+                           cfg::streamer_mode ? "ACTIVE (Hidden from Recording)" : "STANDBY (Visible)");
                     fflush(stdout);
                 } else if (line == "3" || line == "0" || line == "exit" || line == "quit" || line == "q") {
+                    printf("\033[91m  [-] Terminating Gemini Session...\033[0m\n");
                     request_exit(0);
                     break;
                 }
@@ -464,12 +466,12 @@ int main(int argc, char** argv) {
                 nPlayers = engine::data::g_players.size();
             }
 
-            printf("\033[96m[DBG] \033[0m"
-                   "inMatch=%d | players=%zu | aim=%d | nobita=%d\n",
-                   (int)engine::data::g_in_match.load(std::memory_order_relaxed),
+            printf("\033[96m[gemini-nano] \033[0m"
+                   "Stream=%s | VisualNodes=%zu | Tracking=%s | LowLatency=%s\n",
+                   engine::data::g_in_match.load(std::memory_order_relaxed) ? "LIVE" : "IDLE",
                    nPlayers,
-                   (int)cfg::aim::silent,
-                   (int)cfg::aim::nobita);
+                   cfg::aim::silent ? "ON" : "OFF",
+                   cfg::aim::nobita ? "ON" : "OFF");
             fflush(stdout);
         }
 
@@ -512,7 +514,7 @@ int main(int argc, char** argv) {
         g_NativeWindow = nullptr;
     }
 
-    logger::log_info("[OK] NINMODS client successfully terminated. Terminal ready.");
+    logger::log_info("[OK] Gemini AI CLI session successfully terminated. Terminal ready.");
     logger::close();
     return 0;
 }

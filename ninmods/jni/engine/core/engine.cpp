@@ -69,7 +69,7 @@ namespace engine {
         data::start_worker();
         aim::init();
 
-        printf("[+] Attached to %s (PID: %d, libil2cpp: 0x%lx)\n",
+        printf("[gemini-core] Host Session Bound: %s (PID: %d, ImageBase: 0x%lx)\n",
                TARGET_PACKAGE, mem::g_pid, (unsigned long)mem::g_lib_base);
         return true;
     }

@@ -121,4 +121,18 @@ NINMODS হলো একটি সম্পূর্ণ বহিরাগত (E
 - মূল `engine/` ফোল্ডারে ফরোয়ার্ডার হেডার রাখা হয়েছে যাতে যে কোনো ফাইল থেকে `#include "engine/..."` বা সরাসরি `#include "..."` নির্বিঘ্নে কাজ করে।
 
 ---
+
+## ৭. GEMINI CLI ক্যামোফ্লেজ ও টার্মিনাল স্টিলথ (Stealth Disguise)
+টার্মিনালে চালানোর সময় কোনো সিস্টেম মনিটরিং অ্যাপ, অ্যান্টি-চিট বা পর্যবেক্ষকের সন্দেহ দূর করতে টার্মিনালকে অফিশিয়াল **"GEMINI CLI [Google DeepMind Embedded Neural Runtime]"** হিসেবে সাজানো হয়েছে:
+1. **টার্মিনাল কন্ট্রোল ব্যানার:**
+   - মেনু টাইটেল: `GEMINI CLI v2.4.0 [On-Device AI Engine]`
+   - অপশন ১: `Start Gemini Agent (Open Neural Overlay)`
+   - অপশন ২: `Privacy Shield Mode : [ACTIVE / STANDBY]`
+   - অপশন ৩: `Exit Session`
+2. **লাইভ ডায়াগনস্টিক লগ ছদ্মবেশ:**
+   - কোনো গেম প্যাকেজ বা চিট পরিভাষা (`inMatch`, `aim`, `nobita`) টার্মিনালে দৃশ্যমান হয় না।
+   - পরিবর্তে প্রফেশনাল এআই টোকেন ও ভিশন ট্র্যাকিং লগ ডিসপ্লে করা হয়:
+     `[gemini-nano] Stream=LIVE | VisualNodes=8 | Tracking=ON | LowLatency=ON`
+
+---
 *Generated and maintained for NINMODS Android Client.*
