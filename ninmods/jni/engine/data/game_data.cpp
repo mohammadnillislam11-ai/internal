@@ -250,24 +250,60 @@ namespace engine::data {
         std::vector<PlayerData> tmp_players;
         tmp_players.reserve(64);
 
-        // Base Chain
-        auto gf_cell = rpm<uint64_t>(lib + oxorany(offsets::GameFacade));
-        if (!gf_cell) return;
+        // Base Chain with dynamic multi-version fallback (Supports Standard & MAX)
+        static uintptr_t s_working_facade_offset = 0;
+        uint64_t base_game = 0;
 
-        auto gf_class = rpm<uint64_t>(gf_cell);
-        if (!gf_class) return;
+        if (s_working_facade_offset != 0) {
+            auto gf_cell = rpm<uint64_t>(lib + s_working_facade_offset);
+            if (gf_cell) {
+                auto gf_class = rpm<uint64_t>(gf_cell);
+                if (gf_class) {
+                    auto static_fields = rpm<uint64_t>(gf_class + offsets::GameFacade_P2);
+                    if (static_fields) {
+                        base_game = rpm<uint64_t>(static_fields + 0x8);
+                    }
+                }
+            }
+            if (!base_game) s_working_facade_offset = 0;
+        }
 
-        auto static_fields = rpm<uint64_t>(gf_class + offsets::GameFacade_P2);
-        if (!static_fields) return;
+        if (!base_game) {
+            static const uintptr_t candidates[] = {
+                offsets::GameFacade, // 0xA72E4E0 (Free Fire Standard)
+                0xB4C41A0,           // Free Fire MAX (NEXOMODS)
+                0xA986B7C,           // Free Fire MAX alternative
+                0xA7384E0,
+                0xA8E44E0
+            };
+            for (uintptr_t cand : candidates) {
+                auto gf_cell = rpm<uint64_t>(lib + cand);
+                if (!gf_cell) continue;
+                auto gf_class = rpm<uint64_t>(gf_cell);
+                if (!gf_class) continue;
+                auto static_fields = rpm<uint64_t>(gf_class + offsets::GameFacade_P2);
+                if (!static_fields) continue;
+                auto bg = rpm<uint64_t>(static_fields + 0x8);
+                if (bg && engine::mem::addr_valid(bg)) {
+                    s_working_facade_offset = cand;
+                    base_game = bg;
+                    break;
+                }
+            }
+        }
 
-        auto base_game = rpm<uint64_t>(static_fields + 0x8);
         if (!base_game) return;
 
-        bool match_active = rpm<bool>(base_game + offsets::MatchIsRunning);
         auto match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
         auto local_player = match ? rpm<uint64_t>(match + offsets::Match_LocalPlayer) : 0;
 
-        // Fallback: If match object or local player exists, the player is actively in-game (Training, BR, CS)
+        bool match_active = false;
+        if (match && engine::mem::addr_valid(match)) {
+            int mir = rpm<int>(match + offsets::MatchIsRunning);
+            if (mir == 1 || mir == 2 || mir == 3 || rpm<bool>(base_game + offsets::MatchIsRunning)) {
+                match_active = true;
+            }
+        }
         if (!match_active && (match && engine::mem::addr_valid(match))) {
             match_active = true;
         }

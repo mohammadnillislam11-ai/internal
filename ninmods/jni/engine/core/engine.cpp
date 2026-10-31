@@ -18,7 +18,7 @@ namespace engine {
 
     /** @return Name of the target game package. */
     const char* get_target_package() {
-        return TARGET_PACKAGE;
+        return g_active_package;
     }
 
     /** @return Region string identifier. */
@@ -46,11 +46,21 @@ namespace engine {
             mem::g_mem_fd = -1;
         }
 
-        int found_pid = mem::find_pid_by_name(TARGET_PACKAGE);
+        static const char* packages[] = { TARGET_PACKAGE, TARGET_PACKAGE_MAX };
+        int found_pid = -1;
+        const char* matched_package = TARGET_PACKAGE;
+        for (const char* pkg : packages) {
+            found_pid = mem::find_pid_by_name(pkg);
+            if (found_pid > 0) {
+                matched_package = pkg;
+                break;
+            }
+        }
         if (found_pid <= 0) {
             return false;
         }
 
+        g_active_package = matched_package;
         mem::g_pid = found_pid;
 
         // Locate libil2cpp.so module base

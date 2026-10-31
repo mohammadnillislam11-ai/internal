@@ -451,6 +451,9 @@ int main(int argc, char** argv) {
     signal(SIGPIPE, SIG_IGN);
 
     int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
+    if (initial_pid <= 0) {
+        initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE_MAX);
+    }
     if (initial_pid > 0) {
         printf("\033[92m[*] Connected: \033[93mcom.gemini.cli\033[0m (PID: \033[92m%d\033[0m)\033[0m\n", initial_pid);
     } else {
