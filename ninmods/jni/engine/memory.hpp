@@ -238,7 +238,7 @@ namespace engine::mem {
                 if (c == '\n' || lpos >= static_cast<int>(sizeof(line)) - 1) {
                     line[lpos] = '\0';
 
-                    if (strstr(line, module_name) && strstr(line, "r-xp")) {
+                    if (strstr(line, module_name) && (strstr(line, "r--p") || strstr(line, "r-xp"))) {
                         char* cur = line;
                         uintptr_t parsed = 0;
                         while (*cur && *cur != '-') {

@@ -1,22 +1,10 @@
 #include "config_store.h"
 #include "../../menu/config.hpp"
-#include <cstdio>
-#include <unistd.h>
 
 namespace storage {
 
-namespace {
-    static const char* CONFIG_FILE_PATH = "/data/local/tmp/ninmods_config.json";
-}
-
 bool load_config() {
-    // Purge any stale legacy config file from disk to ensure zero residual state
-    unlink(CONFIG_FILE_PATH);
-
-    // Strict In-Memory Session Policy:
-    // Every option starts 100% OFF (false) on each launch.
-    // Options only turn ON when explicitly clicked in the menu during this session.
-    // When the terminal is restarted, everything resets to OFF.
+    // Pure real-time in-memory: All cheat toggles strictly start OFF (false).
     cfg::esp::enabled    = false;
     cfg::esp::box        = false;
     cfg::esp::box_type   = 0;
@@ -50,8 +38,7 @@ bool load_config() {
 }
 
 bool save_config() {
-    // Intentionally no-op: No saving to ninmods_config.json.
-    // Every restart opens fresh with all cheat options strictly OFF.
+    // Pure real-time: No persistence to disk.
     return true;
 }
 

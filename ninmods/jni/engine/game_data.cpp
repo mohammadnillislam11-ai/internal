@@ -426,22 +426,20 @@ namespace engine::data {
             Vector3 vel = rpm<Vector3>(enemy + offsets::Player_Velocity);
             pd.speed = sqrtf(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
 
-            // Skeleton bones (computed strictly when skeleton ESP is active to save 60% CPU)
-            pd.LToe = toe_screen;
-            if (cfg::esp::skeleton) {
-                pd.Hip       = bone_screen(enemy, offsets::Bone_Hip, screen_w, screen_h);
-                pd.Breast    = bone_screen(enemy, offsets::Bone_Breast, screen_w, screen_h);
-                pd.Root      = bone_screen(enemy, offsets::Bone_Root, screen_w, screen_h);
-                pd.LShoulder = bone_screen(enemy, offsets::Bone_LeftShoulder, screen_w, screen_h);
-                pd.RShoulder = bone_screen(enemy, offsets::Bone_RightShoulder, screen_w, screen_h);
-                pd.LAnkle    = bone_screen(enemy, offsets::Bone_LeftAnkle, screen_w, screen_h);
-                pd.RAnkle    = bone_screen(enemy, offsets::Bone_RightAnkle, screen_w, screen_h);
-                pd.RToe      = bone_screen(enemy, offsets::Bone_RightToe, screen_w, screen_h);
-                pd.LForeArm  = bone_screen(enemy, offsets::Bone_LeftForeArm, screen_w, screen_h);
-                pd.RForeArm  = bone_screen(enemy, offsets::Bone_RightForeArm, screen_w, screen_h);
-                pd.LHand     = bone_screen(enemy, offsets::Bone_LeftHand, screen_w, screen_h);
-                pd.RHand     = bone_screen(enemy, offsets::Bone_RightHand, screen_w, screen_h);
-            }
+            // Bones (synchronized with ZqwClient model)
+            pd.LToe      = toe_screen;
+            pd.Hip       = bone_screen(enemy, offsets::Bone_Hip, screen_w, screen_h);
+            pd.Breast    = bone_screen(enemy, offsets::Bone_Breast, screen_w, screen_h);
+            pd.Root      = bone_screen(enemy, offsets::Bone_Root, screen_w, screen_h);
+            pd.LShoulder = bone_screen(enemy, offsets::Bone_LeftShoulder, screen_w, screen_h);
+            pd.RShoulder = bone_screen(enemy, offsets::Bone_RightShoulder, screen_w, screen_h);
+            pd.LAnkle    = bone_screen(enemy, offsets::Bone_LeftAnkle, screen_w, screen_h);
+            pd.RAnkle    = bone_screen(enemy, offsets::Bone_RightAnkle, screen_w, screen_h);
+            pd.RToe      = bone_screen(enemy, offsets::Bone_RightToe, screen_w, screen_h);
+            pd.LForeArm  = bone_screen(enemy, offsets::Bone_LeftForeArm, screen_w, screen_h);
+            pd.RForeArm  = bone_screen(enemy, offsets::Bone_RightForeArm, screen_w, screen_h);
+            pd.LHand     = bone_screen(enemy, offsets::Bone_LeftHand, screen_w, screen_h);
+            pd.RHand     = bone_screen(enemy, offsets::Bone_RightHand, screen_w, screen_h);
 
             tmp_players.push_back(pd);
         }

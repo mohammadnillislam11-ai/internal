@@ -401,9 +401,9 @@ namespace engine::esp {
         ImDrawList* dl = ImGui::GetForegroundDrawList();
         if (!dl) return;
 
-        float sw = static_cast<float>(display::width > 0 ? display::width : 2400);
-        float sh = static_cast<float>(display::height > 0 ? display::height : 1080);
-        ImVec2 feet_anchor(sw * 0.5f, sh);
+        float sw = (g_sw > 0.0f) ? g_sw : static_cast<float>(display::width > 0 ? display::width : 2400);
+        float sh = (g_sh > 0.0f) ? g_sh : static_cast<float>(display::height > 0 ? display::height : 1080);
+        ImVec2 anchor(sw * 0.5f, 0.0f);
 
         std::vector<data::PlayerData> snapshot;
         {
@@ -423,8 +423,10 @@ namespace engine::esp {
             ImU32 box_col  = fade_dist(base_col, p.distance, cfg::esp::max_range);
 
             if (cfg::esp::tracer) {
-                float dist_alpha = ImClamp(1.0f - (p.distance / cfg::esp::max_range), 0.25f, 0.9f);
-                dl->AddLine(feet_anchor, ImVec2(p.Head.x, p.Head.y), with_alpha(box_col, dist_alpha), 0.8f);
+                ImVec2 head(p.Head.x, p.Head.y);
+                float aa = ImClamp(1.0f - p.distance / cfg::esp::max_range, 0.25f, 1.0f);
+                dl->AddLine(anchor, head, with_alpha(to_u32(cfg::esp::box_col), 0.35f * aa), 4.0f);
+                dl->AddLine(anchor, head, with_alpha(to_u32(cfg::esp::box_col), 0.95f * aa), 1.8f);
             }
 
             if (cfg::esp::box) {
