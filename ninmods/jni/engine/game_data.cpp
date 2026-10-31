@@ -277,6 +277,16 @@ namespace engine::data {
         if (!base_game) return;
 
         bool match_active = rpm<bool>(base_game + offsets::MatchIsRunning);
+        auto match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
+        auto local_player = match ? rpm<uint64_t>(match + offsets::Match_LocalPlayer) : 0;
+
+        // Fallback: If match object or local player exists, the player is actively in-game (Training, BR, CS)
+        if (!match_active && (match && engine::mem::addr_valid(match))) {
+            match_active = true;
+        }
+        if (!match_active && (local_player && engine::mem::addr_valid(local_player))) {
+            match_active = true;
+        }
         g_in_match.store(match_active);
 
         if (!match_active) {
@@ -391,7 +401,11 @@ namespace engine::data {
             if (head_screen.x < 0) continue;
 
             Vector3 toe_screen = bone_screen(enemy, offsets::Bone_LeftToe, screen_w, screen_h);
-            if (toe_screen.x < 0 || toe_screen.y < 0) continue;
+            if (toe_screen.x < 0.0f || toe_screen.y < 0.0f) {
+                Vector3 toe_est = head_world;
+                toe_est.y -= 1.75f;
+                toe_screen = world_to_screen(g_view_matrix, toe_est, screen_w, screen_h);
+            }
 
             PlayerData pd;
             read_name(enemy, pd.name, sizeof(pd.name));

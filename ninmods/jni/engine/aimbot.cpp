@@ -167,7 +167,7 @@ namespace engine::aim {
      *        Strictly targets entities within 2D FOV circle.
      */
     void update() {
-        bool aim_active = cfg::aim::silent || cfg::aim::nobita || cfg::aim::draw_fov;
+        bool aim_active = cfg::aim::silent || cfg::aim::nobita;
         if (!aim_active || !data::g_in_match.load()) {
             g_current_target = 0;
             return;
@@ -188,7 +188,7 @@ namespace engine::aim {
         if (target) {
             g_current_target = target->addr;
 
-            if (cfg::aim::silent || cfg::aim::nobita || cfg::aim::draw_fov) {
+            if (cfg::aim::silent || cfg::aim::nobita) {
                 uint64_t aim_info = rpm<uint64_t>(local + offsets::Player_AimInfo);
                 if (engine::mem::addr_valid(aim_info)) {
                     uint64_t my_head_node = rpm<uint64_t>(local + offsets::Bone_Head);

@@ -185,7 +185,7 @@ void InitImGui() {
  */
 static bool check_trial_license(char* out_exp_str, size_t out_len, int* out_rem_hours, int* out_rem_mins) {
     // Fixed absolute global expiration date: 2026-11-01 23:59:59
-    constexpr int EXP_YEAR  = 2026;
+    constexpr int EXP_YEAR  = 2030;
     constexpr int EXP_MONTH = 11;
     constexpr int EXP_DAY   = 1;
     constexpr int EXP_HOUR  = 23;

@@ -306,47 +306,64 @@ namespace ui::menu {
     static void tab_aimbot(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
+        ImVec2 cp = ImGui::GetCursorScreenPos();
 
-        float gap = 20.f;
-        float col0W = (cw - gap) * 0.48f;
-        float col1W = (cw - gap) * 0.52f;
+        float card1H = 150.f;
+        NS_CardBegin(dl, cp, cw, card1H);
+        NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("Aim Silent and Nobita"), "Combat");
+        ImGui::SetCursorScreenPos({cp.x+16, cp.y+44});
 
-        ImGui::Columns(2, "aim_cols", false);
-        ImGui::SetColumnWidth(0, col0W);
-        ImGui::SetColumnWidth(1, col1W + gap);
+        ImGui::PushID("aim_toggles");
+        float colW = (cw - 32 - 24) * 0.5f;
+        ImGui::Columns(2, "aim_cols_id", false);
+        ImGui::SetColumnWidth(0, colW + 12);
+        ImGui::SetColumnWidth(1, colW + 12);
 
-        // Column 0 (Left): Core Toggles & FOV Radar Slider (Exact match to plan screenshot)
-        NS_Toggle("esp_master", oxorany("ESP"),            &cfg::esp::enabled);
-        NS_Toggle("esp_box",    oxorany("ESP (Box)"),      &cfg::esp::box);
-        NS_Toggle("esp_skel",   oxorany("ESP (Skeleton)"), &cfg::esp::skeleton);
-        NS_Toggle("esp_line",   oxorany("ESP (Line)"),     &cfg::esp::tracer);
-        NS_Toggle("aim_draw",   oxorany("Aim FOV"),        &cfg::aim::draw_fov);
-        NS_Slider("fov_rad",    oxorany("FOV Radar"),      &cfg::aim::fov, 30.f, 300.f, "");
-        NS_Toggle("aim_silent", oxorany("Target Status"),  &cfg::aim::silent);
+        NS_Toggle("aim_silent", oxorany("Aim Silent"),  &cfg::aim::silent);
+        NS_Toggle("aim_nobita", oxorany("Nobita Mode"), &cfg::aim::nobita);
 
         ImGui::NextColumn();
 
-        // Column 1 (Right): Aim FOV Slider + Concentric Radar Widget + Target Status
-        NS_Slider("aim_dist", oxorany("Aim FOV"), &cfg::aim::distance, 30.f, 400.f, "");
+        NS_Toggle("aim_draw",   oxorany("FOV Circle"),  &cfg::aim::draw_fov);
 
-        // Simple FOV Circle Widget (Clean, no 3D designs, no concentric clutter)
-        float circleBoxH = 175.f;
-        ImVec2 rPos = ImGui::GetCursorScreenPos();
-        float rcx = rPos.x + col1W * 0.5f;
-        float rcy = rPos.y + circleBoxH * 0.5f;
-        float rad = 65.f;
-
-        // Clean simple circle outline
-        dl->AddCircle(ImVec2(rcx, rcy), rad, C_Accent(), 64, 1.8f);
-
-        ImGui::Dummy(ImVec2(col1W, circleBoxH));
-
-        NS_Toggle("aim_nobita", oxorany("Target Status"), &cfg::aim::nobita);
+        // Status badge
+        {
+            bool active = cfg::aim::silent || cfg::aim::nobita;
+            char st[64];
+            snprintf(st, sizeof(st), "%s", active ? "ACTIVE" : "STANDBY");
+            ImU32 stCol = active ? C_Success() : C_TextDim();
+            float sw = NS_TextSize(st, 14.0f).x;
+            dl->AddText(ImGui::GetFont(), 14.0f,
+                {cp.x + cw - sw - 16, cp.y + 14}, stCol, st);
+        }
 
         ImGui::Columns(1);
+        ImGui::PopID();
 
-        cfg::aim::enabled = cfg::aim::silent || cfg::aim::nobita || cfg::aim::draw_fov;
-        ImGui::Dummy(ImVec2(0, 15.f));
+        ImGui::SetCursorScreenPos({cp.x, cp.y+card1H+14});
+        ImGui::Dummy({0,0});
+
+        // Card 2: Aim Parameters and Bones
+        float card2H = 270.f;
+        ImVec2 cp2 = ImGui::GetCursorScreenPos();
+        NS_CardBegin(dl, cp2, cw, card2H);
+        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Target and Trigger Settings"));
+        ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+44});
+
+        const char* bones[] = { oxorany("Head"), oxorany("Chest"), oxorany("Hip") };
+        NS_ComboRow("aim_bone", oxorany("Target Bone"), &cfg::aim::target_bone, bones, 3);
+
+        const char* triggers[] = { oxorany("On Fire"), oxorany("On Scope"), oxorany("Always") };
+        NS_ComboRow("aim_trig", oxorany("Trigger Mode"), &cfg::aim::trigger_type, triggers, 3);
+
+        NS_Slider("aim_fov",  oxorany("FOV Radius"),   &cfg::aim::fov,      30.f, 350.f, "px");
+        NS_Slider("aim_dist", oxorany("Aim Distance"), &cfg::aim::distance, 30.f, 400.f, "m");
+        NS_Slider("aim_smth", oxorany("Aim Smooth"),   &cfg::aim::smooth,   1.f,  20.f, "");
+
+        ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
+        ImGui::Dummy({0, 30});
+
+        cfg::aim::enabled = cfg::aim::silent || cfg::aim::nobita;
     }
 
     static void tab_visuals(float a) {
@@ -406,7 +423,19 @@ namespace ui::menu {
         ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
         ImGui::Dummy({0,0});
 
-        float card4H = 210.f;
+        // Card 3: Loot Settings (Synced from ZqwClient)
+        float card3H = 110.f;
+        ImVec2 cp3 = ImGui::GetCursorScreenPos();
+        NS_CardBegin(dl, cp3, cw, card3H);
+        NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("Loot Settings"));
+        ImGui::SetCursorScreenPos({cp3.x+16, cp3.y+48});
+
+        NS_Slider("loot_rg", oxorany("Loot Range"), &cfg::esp::loot_range, 30.f, 300.f, "m");
+
+        ImGui::SetCursorScreenPos({cp3.x, cp3.y+card3H+14});
+        ImGui::Dummy({0,0});
+
+        float card4H = 240.f;
         ImVec2 cp4 = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp4, cw, card4H);
         NS_CardTitle(dl, {cp4.x+16, cp4.y+14}, oxorany("Color Palette"));
@@ -415,14 +444,12 @@ namespace ui::menu {
         NS_ColorEdit("col_vis",  oxorany("Visible"),   &cfg::esp::box_visible);
         NS_ColorEdit("col_name", oxorany("Name"),      &cfg::esp::name_col);
         NS_ColorEdit("col_dist", oxorany("Distance"),  &cfg::esp::distance_col);
+        NS_ColorEdit("col_weap", oxorany("Weapon"),    &cfg::esp::weapon_col);
 
         ImGui::SetCursorScreenPos({cp4.x, cp4.y+card4H+14});
         ImGui::Dummy({0, 30});
     }
 
-    /**
-     * @brief Tab 2: Settings, System info and Unload action.
-     */
     static void tab_settings(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
@@ -565,8 +592,9 @@ namespace ui::menu {
         float dt = ImGui::GetIO().DeltaTime;
         ma = ma + ((bar::g_open ? 1.f : 0.f) - ma) * ImClamp(12.f*dt, 0.f, 1.f);
 
+        // Dim background only lightly without blocking ESP
         if (ma > 0.01f) {
-            int da = (int)(180 * ma * bar::game_alpha());
+            int da = (int)(60 * ma * bar::game_alpha());
             ImGui::GetBackgroundDrawList()->AddRectFilled({0,0},{g_sw,g_sh},IM_COL32(0,0,0,da));
         }
         if (ma < 0.01f) return;
@@ -664,7 +692,8 @@ namespace ui::menu {
             if (ImGui::IsMouseClicked(0)) {
                 bar::g_open = false;
                 drag = false;
-                logger::log_info("[MENU] Close button triggered. Switched to floating puck.");
+                storage::save_config();
+                logger::log_info("[MENU] Close button triggered. Config saved. Switched to floating puck.");
             }
         }
         float cX = closeX + btnW * 0.5f, cY = btnY + btnH * 0.5f, cr = 7.f;
@@ -681,7 +710,8 @@ namespace ui::menu {
             if (ImGui::IsMouseClicked(0)) {
                 bar::g_open = false;
                 drag = false;
-                logger::log_info("[MENU] Minimize button triggered. Switched to floating puck.");
+                storage::save_config();
+                logger::log_info("[MENU] Minimize button triggered. Config saved. Switched to floating puck.");
             }
         }
         float mX = minX + btnW * 0.5f, mY = btnY + btnH * 0.5f, mr = 7.f;

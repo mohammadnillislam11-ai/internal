@@ -20,24 +20,39 @@ bool load_config() {
 
         if (j.contains("esp")) {
             auto& esp = j["esp"];
-            cfg::esp::enabled    = esp.value("enabled", false);
-            cfg::esp::box        = esp.value("box", false);
-            cfg::esp::tracer     = esp.value("tracer", false);
-            cfg::esp::skeleton   = esp.value("skeleton", false);
-            cfg::esp::health     = esp.value("health", false);
-            cfg::esp::name       = esp.value("name", false);
-            cfg::esp::distance   = esp.value("distance", false);
-            cfg::esp::max_range  = esp.value("max_range", 250.0f);
+            // Strict Security Policy: All cheat feature toggles must start strictly OFF (false).
+            // No automated activation on cold boot. Only user-adjusted sliders are restored.
+            cfg::esp::enabled    = false;
+            cfg::esp::box        = false;
+            cfg::esp::tracer     = false;
+            cfg::esp::skeleton   = false;
+            cfg::esp::health     = false;
+            cfg::esp::name       = false;
+            cfg::esp::distance   = false;
+            cfg::esp::armor      = false;
+            cfg::esp::weapon     = false;
+            cfg::esp::bot_tag    = false;
+            cfg::esp::crosshair  = false;
+            cfg::esp::firing_ind = false;
+            cfg::esp::loot       = false;
+
+            cfg::esp::box_type      = esp.value("box_type", 0);
+            cfg::esp::box_thickness = esp.value("box_thickness", 1.0f);
+            cfg::esp::box_rounding  = esp.value("box_rounding", 2.0f);
+            cfg::esp::max_range     = esp.value("max_range", 250.0f);
+            cfg::esp::loot_range    = esp.value("loot_range", 150.0f);
         }
 
         if (j.contains("aim")) {
             auto& aim = j["aim"];
-            cfg::aim::enabled      = aim.value("enabled", false);
-            cfg::aim::silent       = aim.value("silent", false);
-            cfg::aim::nobita       = aim.value("nobita", false);
+            // Strict Security Policy: All aim toggles start strictly OFF (false).
+            cfg::aim::enabled      = false;
+            cfg::aim::silent       = false;
+            cfg::aim::nobita       = false;
+            cfg::aim::draw_fov     = false;
+
             cfg::aim::target_bone  = aim.value("target_bone", 0);
             cfg::aim::trigger_type = aim.value("trigger_type", 0);
-            cfg::aim::draw_fov     = aim.value("draw_fov", false);
             cfg::aim::fov          = aim.value("fov", 120.0f);
             cfg::aim::distance     = aim.value("distance", 250.0f);
             cfg::aim::smooth       = aim.value("smooth", 8.0f);
@@ -53,14 +68,24 @@ bool save_config() {
         nlohmann::json j;
 
         nlohmann::json esp;
-        esp["enabled"]    = cfg::esp::enabled;
-        esp["box"]        = cfg::esp::box;
-        esp["tracer"]     = cfg::esp::tracer;
-        esp["skeleton"]   = cfg::esp::skeleton;
-        esp["health"]     = cfg::esp::health;
-        esp["name"]       = cfg::esp::name;
-        esp["distance"]   = cfg::esp::distance;
-        esp["max_range"]  = cfg::esp::max_range;
+        esp["enabled"]       = cfg::esp::enabled;
+        esp["box"]           = cfg::esp::box;
+        esp["box_type"]      = cfg::esp::box_type;
+        esp["box_thickness"] = cfg::esp::box_thickness;
+        esp["box_rounding"]  = cfg::esp::box_rounding;
+        esp["tracer"]        = cfg::esp::tracer;
+        esp["skeleton"]      = cfg::esp::skeleton;
+        esp["health"]        = cfg::esp::health;
+        esp["armor"]         = cfg::esp::armor;
+        esp["name"]          = cfg::esp::name;
+        esp["distance"]      = cfg::esp::distance;
+        esp["weapon"]        = cfg::esp::weapon;
+        esp["bot_tag"]       = cfg::esp::bot_tag;
+        esp["crosshair"]     = cfg::esp::crosshair;
+        esp["firing_ind"]    = cfg::esp::firing_ind;
+        esp["loot"]          = cfg::esp::loot;
+        esp["max_range"]     = cfg::esp::max_range;
+        esp["loot_range"]    = cfg::esp::loot_range;
         j["esp"] = esp;
 
         nlohmann::json aim;
