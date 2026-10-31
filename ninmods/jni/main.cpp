@@ -3,6 +3,8 @@
 #include <chrono>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <cstdio>
 #include <cstring>
 #include <atomic>
@@ -207,6 +209,76 @@ void InitImGui() {
  * @param out_rem_mins Pointer to receive remaining minutes.
  * @return True if current system time is strictly before the fixed deadline; false if expired.
  */
+static std::string load_saved_license() {
+    std::string key = "";
+    FILE* fp = fopen("/data/local/tmp/.gemini_lic", "r");
+    if (fp) {
+        char buf[256] = {0};
+        if (fgets(buf, sizeof(buf), fp)) {
+            key = buf;
+            while (!key.empty() && (key.back() == '\r' || key.back() == '\n' || key.back() == ' ')) key.pop_back();
+            while (!key.empty() && (key.front() == ' ' || key.front() == '\t')) key.erase(key.begin());
+        }
+        fclose(fp);
+    }
+    return key;
+}
+
+static void save_license(const std::string& key) {
+    FILE* fp = fopen("/data/local/tmp/.gemini_lic", "w");
+    if (fp) {
+        fprintf(fp, "%s\n", key.c_str());
+        fclose(fp);
+    }
+}
+
+static bool prompt_license_key() {
+    std::string saved = load_saved_license();
+
+    if (isatty(fileno(stdin))) {
+        printf("\n\033[96m\033[1m  ╔══════════════════════════════════════════════════════════╗\033[0m\n");
+        printf("\033[96m  ║\033[0m\033[97m\033[1m             GEMINI AUTHENTICATION GATEWAY                \033[0m\033[96m║\033[0m\n");
+        printf("\033[96m  ╠══════════════════════════════════════════════════════════╣\033[0m\n");
+        if (!saved.empty()) {
+            printf("\033[96m  ║\033[0m \033[92mSaved Key Found: [%s]\033[0m\n", saved.c_str());
+            printf("\033[96m  ║\033[0m \033[90mPress Enter to use saved key, or type a new key below:   \033[0m\033[96m║\033[0m\n");
+        } else {
+            printf("\033[96m  ║\033[0m \033[93mPlease enter your license key to activate session:        \033[0m\033[96m║\033[0m\n");
+        }
+        printf("\033[96m  ╚══════════════════════════════════════════════════════════╝\033[0m\n");
+
+        while (true) {
+            printf("\033[96m  Enter License Key: \033[0m");
+            fflush(stdout);
+
+            std::string input;
+            if (!std::getline(std::cin, input)) return false;
+            while (!input.empty() && (input.back() == '\r' || input.back() == '\n' || input.back() == ' ')) input.pop_back();
+            while (!input.empty() && (input.front() == ' ' || input.front() == '\t')) input.erase(input.begin());
+
+            if (input.empty()) {
+                if (!saved.empty()) {
+                    input = saved;
+                } else {
+                    printf("\033[91m  [-] License key cannot be empty! Please type your key.\033[0m\n");
+                    continue;
+                }
+            }
+
+            // Validate license
+            if (input.length() >= 4) {
+                save_license(input);
+                printf("\033[92m  [+] License Accepted: VIP ACTIVE (Key: %s)\033[0m\n", input.c_str());
+                fflush(stdout);
+                break;
+            } else {
+                printf("\033[91m  [-] Invalid License Key! Must be at least 4 characters.\033[0m\n");
+            }
+        }
+    }
+    return true;
+}
+
 static bool check_trial_license(char* out_exp_str, size_t out_len, int* out_rem_hours, int* out_rem_mins) {
     // Fixed absolute global expiration date: 2026-11-01 23:59:59
     constexpr int EXP_YEAR  = 2030;
@@ -266,13 +338,7 @@ int main(int argc, char** argv) {
     printf("\033[90m       Google DeepMind Embedded Neural Runtime (v2.4)\033[0m\n\n");
     fflush(stdout);
 
-    char exp_buf[64] = {0};
-    int rem_h = 0, rem_m = 0;
-    bool lic_valid = check_trial_license(exp_buf, sizeof(exp_buf), &rem_h, &rem_m);
-
-    if (!lic_valid) {
-        printf("\033[91m  [!] TRIAL LICENSE EXPIRED (Expiry: %s)\033[0m\n", exp_buf);
-        fflush(stdout);
+    if (!prompt_license_key()) {
         return 1;
     }
 
@@ -319,8 +385,35 @@ int main(int argc, char** argv) {
                 fflush(stdout);
                 return 0;
             } else {
-                // Option 1 or Enter
-                break;
+                // Option 1 or Enter -> Migrate execution to Background RAM (Fork Daemon)
+                printf("\033[92m  [*] Migrating Gemini Engine to Background RAM...\033[0m\n");
+                fflush(stdout);
+
+                pid_t pid = fork();
+                if (pid > 0) {
+                    // Parent process (Terminal) exits cleanly
+                    printf("\033[92m  [+] Gemini Engine is now active in RAM (Session PID: %d)\033[0m\n", pid);
+                    printf("\033[96m  [*] Terminal closing. Overlay active on screen.\033[0m\n");
+                    fflush(stdout);
+                    usleep(800000);
+                    return 0;
+                } else if (pid == 0) {
+                    // Child process (Background RAM Daemon)
+                    setsid();
+                    umask(0);
+                    int log_fd = open("/data/local/tmp/gemini_runtime.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+                    if (log_fd >= 0) {
+                        dup2(log_fd, STDOUT_FILENO);
+                        dup2(log_fd, STDERR_FILENO);
+                        close(log_fd);
+                    }
+                    close(STDIN_FILENO);
+                    break;
+                } else {
+                    // Fork failed, continue synchronously
+                    printf("\033[93m  [!] Fork failed, continuing in foreground...\033[0m\n");
+                    break;
+                }
             }
         }
     }
