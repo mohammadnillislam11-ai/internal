@@ -51,6 +51,76 @@ namespace engine::data {
         return Vector3(-1.0f, -1.0f, -1.0f);
     }
 
+    struct ScreenProjection {
+        Vector3 screen_pos;
+        bool    on_screen{false};
+        bool    behind{false};
+    };
+
+    /**
+     * @brief Projects 3D world coordinates to screen with full 360-degree border clamping.
+     *        Enables real-time directional tracer lines pointing towards enemy regardless
+     *        of whether they are in front, behind, or around the player.
+     */
+    static ScreenProjection project_world_to_screen_360(const Matrix4x4& vm, const Vector3& pos, float screen_w, float screen_h) {
+        ScreenProjection res;
+        float cx = screen_w * 0.5f;
+        float cy = screen_h * 0.5f;
+
+        float x = (pos.x * vm.m11) + (pos.y * vm.m21) + (pos.z * vm.m31) + vm.m41;
+        float y = (pos.x * vm.m12) + (pos.y * vm.m22) + (pos.z * vm.m32) + vm.m42;
+        float w = (pos.x * vm.m14) + (pos.y * vm.m24) + (pos.z * vm.m34) + vm.m44;
+
+        if (w > 0.001f) {
+            float inv = 1.0f / w;
+            float sx = cx + cx * x * inv;
+            float sy = cy - cy * y * inv;
+
+            if (sx >= 0.0f && sx <= screen_w && sy >= 0.0f && sy <= screen_h) {
+                res.screen_pos = Vector3(sx, sy, 0.0f);
+                res.on_screen = true;
+                res.behind = false;
+                return res;
+            }
+        }
+
+        res.behind = (w <= 0.001f);
+        res.on_screen = false;
+
+        float dir_x = 0.0f;
+        float dir_y = 0.0f;
+
+        if (w > 0.001f) {
+            float inv = 1.0f / w;
+            dir_x = cx * x * inv;
+            dir_y = -cy * y * inv;
+        } else {
+            float angle = atan2f(x, w);
+            dir_x = sinf(angle);
+            dir_y = -cosf(angle);
+        }
+
+        float len = sqrtf(dir_x * dir_x + dir_y * dir_y);
+        if (len > 0.0001f) {
+            dir_x /= len;
+            dir_y /= len;
+        } else {
+            dir_x = 0.0f;
+            dir_y = 1.0f;
+        }
+
+        float margin = 28.0f;
+        float half_w = cx - margin;
+        float half_h = cy - margin;
+
+        float scale_x = (fabsf(dir_x) > 1e-5f) ? (half_w / fabsf(dir_x)) : 1e9f;
+        float scale_y = (fabsf(dir_y) > 1e-5f) ? (half_h / fabsf(dir_y)) : 1e9f;
+        float t = (scale_x < scale_y) ? scale_x : scale_y;
+
+        res.screen_pos = Vector3(cx + dir_x * t, cy + dir_y * t, 0.0f);
+        return res;
+    }
+
     /**
      * @brief Reconstructs a Unity Transform's world position by walking the parent hierarchy.
      *        Standardized from ZqwClient TRS matrix chain engine.
@@ -305,31 +375,35 @@ namespace engine::data {
             float dist = get_distance_meters(local_pos, head_world);
             if (dist > cfg::esp::max_range) continue;
 
-            Vector3 head_screen = world_to_screen(g_view_matrix, head_world, screen_w, screen_h);
-            if (head_screen.x < 0) continue;
+            ScreenProjection proj = project_world_to_screen_360(g_view_matrix, head_world, screen_w, screen_h);
 
-            Vector3 toe_screen = bone_screen(enemy, offsets::Bone_LeftToe, screen_w, screen_h);
-            if (toe_screen.x < 0.0f || toe_screen.y < 0.0f) {
-                Vector3 toe_est = head_world;
-                toe_est.y -= 1.75f;
-                toe_screen = world_to_screen(g_view_matrix, toe_est, screen_w, screen_h);
+            Vector3 toe_screen = Vector3(-1.0f, -1.0f, -1.0f);
+            if (proj.on_screen) {
+                toe_screen = bone_screen(enemy, offsets::Bone_LeftToe, screen_w, screen_h);
+                if (toe_screen.x < 0.0f || toe_screen.y < 0.0f) {
+                    Vector3 toe_est = head_world;
+                    toe_est.y -= 1.75f;
+                    toe_screen = world_to_screen(g_view_matrix, toe_est, screen_w, screen_h);
+                }
             }
 
             PlayerData pd;
             pd.addr       = enemy;
-            pd.Head       = head_screen;
+            pd.Head       = proj.screen_pos;
             pd.Toe        = toe_screen;
             pd.HeadWorld  = head_world;
+            pd.isOnScreen = proj.on_screen;
+            pd.isBehind   = proj.behind;
             pd.isVisible  = visible;
             pd.isBot      = is_bot;
             pd.distance   = dist;
             pd.curHP      = hp;
             pd.maxHP      = 200;
 
-            if (cfg::aim::enabled && cfg::aim::target_bone == 1) {
+            if (proj.on_screen && cfg::aim::enabled && cfg::aim::target_bone == 1) {
                 pd.Breast = bone_screen(enemy, offsets::Bone_Breast, screen_w, screen_h);
             }
-            if (cfg::aim::enabled && cfg::aim::target_bone == 2) {
+            if (proj.on_screen && cfg::aim::enabled && cfg::aim::target_bone == 2) {
                 pd.Hip = bone_screen(enemy, offsets::Bone_Hip, screen_w, screen_h);
             }
 

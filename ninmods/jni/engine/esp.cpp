@@ -149,6 +149,7 @@ namespace engine::esp {
 
         ImGuiIO& io = ImGui::GetIO();
         float sw = (io.DisplaySize.x > 0.0f) ? io.DisplaySize.x : (display::width > 0.0f ? display::width : 2400.0f);
+        float sh = (io.DisplaySize.y > 0.0f) ? io.DisplaySize.y : (display::height > 0.0f ? display::height : 1080.0f);
         ImVec2 anchor(sw * 0.5f, 0.0f);
 
         std::vector<data::PlayerData> snapshot;
@@ -163,27 +164,61 @@ namespace engine::esp {
 
             ImU32 base_col = p.isVisible ? to_u32(cfg::esp::box_visible) : to_u32(cfg::esp::box_col);
             ImU32 box_col  = fade_dist(base_col, p.distance, cfg::esp::max_range);
+            float aa = ImClamp(1.0f - p.distance / cfg::esp::max_range, 0.25f, 1.0f);
 
-            // 1. ESP Line (Tracer from top-center screen to enemy head)
+            // 1. ESP Line (Tracer line: 360-degree real-time tracking)
             if (cfg::esp::tracer) {
-                ImVec2 head(p.Head.x, p.Head.y);
-                float aa = ImClamp(1.0f - p.distance / cfg::esp::max_range, 0.25f, 1.0f);
-                dl->AddLine(anchor, head, with_alpha(to_u32(cfg::esp::box_col), 0.35f * aa), 4.0f);
-                dl->AddLine(anchor, head, with_alpha(to_u32(cfg::esp::box_col), 0.95f * aa), 1.8f);
+                ImVec2 target_pt(p.Head.x, p.Head.y);
+
+                if (p.isOnScreen) {
+                    // On-screen: Direct tracer line to enemy head
+                    dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.35f * aa), 4.0f);
+                    dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.95f * aa), 1.8f);
+                } else {
+                    // Off-screen / Behind: 360-degree directional line pointing to screen edge
+                    ImU32 alert_col = p.isBehind ? IM_COL32(255, 60, 60, 240) : box_col;
+                    dl->AddLine(anchor, target_pt, with_alpha(alert_col, 0.35f * aa), 4.0f);
+                    dl->AddLine(anchor, target_pt, with_alpha(alert_col, 0.95f * aa), 2.0f);
+
+                    // Directional indicator dot at screen border
+                    dl->AddCircleFilled(target_pt, 4.0f, alert_col);
+                    dl->AddCircle(target_pt, 5.5f, IM_COL32(20, 20, 25, 230), 12, 1.5f);
+
+                    // Compact Distance Badge
+                    char dist_buf[16];
+                    snprintf(dist_buf, sizeof(dist_buf), "%.0fm", p.distance);
+                    ImVec2 ts = ImGui::CalcTextSize(dist_buf);
+
+                    float pad_x = 4.0f, pad_y = 2.0f;
+                    ImVec2 bmin(target_pt.x - ts.x * 0.5f - pad_x, target_pt.y - ts.y * 0.5f - pad_y);
+                    ImVec2 bmax(target_pt.x + ts.x * 0.5f + pad_x, target_pt.y + ts.y * 0.5f + pad_y);
+
+                    if (target_pt.y < 35.0f) {
+                        bmin.y += 16.0f; bmax.y += 16.0f;
+                    } else if (target_pt.y > sh - 35.0f) {
+                        bmin.y -= 16.0f; bmax.y -= 16.0f;
+                    }
+
+                    dl->AddRectFilled(bmin, bmax, IM_COL32(20, 20, 25, 230), 4.0f);
+                    dl->AddRect(bmin, bmax, alert_col, 4.0f, 0, 1.2f);
+                    dl->AddText(ImVec2(bmin.x + pad_x, bmin.y + pad_y), IM_COL32(255, 255, 255, 255), dist_buf);
+                }
             }
 
-            // 2. Compute 2D Box from Head and Toe
-            PlayerBox box = compute_player_box(p);
-            if (!box.valid) continue;
+            // 2. Compute 2D Box from Head and Toe (Rendered ONLY when target is on screen)
+            if (p.isOnScreen) {
+                PlayerBox box = compute_player_box(p);
+                if (box.valid) {
+                    // 3. ESP Box
+                    if (cfg::esp::box) {
+                        draw_box(dl, box.tl, box.br, box_col, cfg::esp::box_type);
+                    }
 
-            // 3. ESP Box
-            if (cfg::esp::box) {
-                draw_box(dl, box.tl, box.br, box_col, cfg::esp::box_type);
-            }
-
-            // 4. ESP Health Bar
-            if (cfg::esp::health) {
-                draw_health_bar(dl, box.tl, box.br, p.curHP, p.maxHP);
+                    // 4. ESP Health Bar
+                    if (cfg::esp::health) {
+                        draw_health_bar(dl, box.tl, box.br, p.curHP, p.maxHP);
+                    }
+                }
             }
         }
     }

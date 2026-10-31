@@ -142,6 +142,7 @@ namespace engine::aim {
         float min_dist_crosshair = cfg::aim::fov;
 
         for (const auto& p : data::g_players) {
+            if (!p.isOnScreen) continue;
             if (p.curHP <= 0 || p.distance > cfg::aim::distance) continue;
 
             Vector3 target_pos = p.Head;

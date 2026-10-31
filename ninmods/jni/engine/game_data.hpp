@@ -50,6 +50,8 @@ namespace engine::data {
         Vector3  RHand;
 
         // Meta & Status
+        bool     isOnScreen;
+        bool     isBehind;
         bool     isVisible;
         bool     isBot;
         float    distance;
@@ -71,6 +73,7 @@ namespace engine::data {
               LToe(Vector3::Zero()), RToe(Vector3::Zero()),
               LForeArm(Vector3::Zero()), RForeArm(Vector3::Zero()),
               LHand(Vector3::Zero()), RHand(Vector3::Zero()),
+              isOnScreen(true), isBehind(false),
               isVisible(false), isBot(false), distance(0.0f),
               curHP(0), maxHP(200), curArmor(0),
               isFiring(false), isGrounded(true), speed(0.0f),
