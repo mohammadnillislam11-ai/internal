@@ -237,19 +237,18 @@ static bool prompt_license_key() {
     std::string saved = load_saved_license();
 
     if (isatty(fileno(stdin))) {
-        printf("\n\033[96m\033[1m  ╔══════════════════════════════════════════════════════════╗\033[0m\n");
-        printf("\033[96m  ║\033[0m\033[97m\033[1m             GEMINI AUTHENTICATION GATEWAY                \033[0m\033[96m║\033[0m\n");
-        printf("\033[96m  ╠══════════════════════════════════════════════════════════╣\033[0m\n");
+        printf("\033[96m────────────────────────────────────\033[0m\n");
+        printf("\033[97m\033[1m  GEMINI AUTHENTICATION\033[0m\n");
+        printf("\033[96m────────────────────────────────────\033[0m\n");
         if (!saved.empty()) {
-            printf("\033[96m  ║\033[0m \033[92mSaved Key Found: [%s]\033[0m\n", saved.c_str());
-            printf("\033[96m  ║\033[0m \033[90mPress Enter to use saved key, or type a new key below:   \033[0m\033[96m║\033[0m\n");
+            printf("\033[92m  [+] Saved Key: [%s]\033[0m\n", saved.c_str());
+            printf("\033[90m  Press Enter or enter new key below:\033[0m\n");
         } else {
-            printf("\033[96m  ║\033[0m \033[93mPlease enter your license key to activate session:        \033[0m\033[96m║\033[0m\n");
+            printf("\033[93m  Enter your license key to activate:\033[0m\n");
         }
-        printf("\033[96m  ╚══════════════════════════════════════════════════════════╝\033[0m\n");
-
+        printf("\033[96m────────────────────────────────────\033[0m\n");
         while (true) {
-            printf("\033[96m  Enter License Key: \033[0m");
+            printf("\033[96m  License Key: \033[0m");
             fflush(stdout);
 
             std::string input;
@@ -269,7 +268,7 @@ static bool prompt_license_key() {
             // Validate license
             if (input.length() >= 4) {
                 save_license(input);
-                printf("\033[92m  [+] License Accepted: VIP ACTIVE (Key: %s)\033[0m\n", input.c_str());
+                printf("\033[92m  [+] VIP Active (Key: %s)\033[0m\n", input.c_str());
                 fflush(stdout);
                 break;
             } else {
@@ -330,13 +329,12 @@ int main(int argc, char** argv) {
 
         // Print Gemini AI CLI banner
     printf("\n\033[96m\033[1m");
-    printf("   ____ _____ __  __ ___ _   _ ___    ____ _     ___ \n");
-    printf("  / ___| ____|  \\/  |_ _| \\ | |_ _|  / ___| |   |_ _|\n");
-    printf(" | |  _|  _| | |\\/| || ||  \\| || |  | |   | |    | | \n");
-    printf(" | |_| | |___| |  | || || |\\  || |  | |___| |___ | | \n");
-    printf("  \\____|_____|_|  |_|___|_| \\_|___|  \\____|_____|___|\n");
+    printf("   ___ ___ __  __ ___ _  _ ___ \n");
+    printf("  / __| __|  \\/  |_ _| \\| |_ _|\n");
+    printf(" | (_ | _|| |\\/| || || .` || | \n");
+    printf("  \\___|___|_|  |_|___|_|\\_|___|\n");
     printf("\033[0m");
-    printf("\033[90m       Google DeepMind Embedded Neural Runtime (v2.4)\033[0m\n\n");
+    printf("\033[90m   Neural Runtime Engine (v2.4)\033[0m\n\n");
     fflush(stdout);
 
     if (!prompt_license_key()) {
@@ -355,16 +353,16 @@ int main(int argc, char** argv) {
     // Terminal Control Panel (Menu open, Streamer mode, Exit)
     if (isatty(fileno(stdin))) {
         while (true) {
-            printf("\n\033[96m\033[1m  ╔══════════════════════════════════════════════════════════╗\033[0m\n");
-            printf("\033[96m  ║\033[0m\033[97m\033[1m       GEMINI CLI v2.4.0 [On-Device AI Engine]            \033[0m\033[96m║\033[0m\n");
-            printf("\033[96m  ║\033[0m\033[90m       Google DeepMind Embedded Neural Runtime            \033[0m\033[96m║\033[0m\n");
-            printf("\033[96m  ╠══════════════════════════════════════════════════════════╣\033[0m\n");
-            printf("\033[96m  ║\033[0m \033[92m[1] Start Gemini Agent (Open Neural Overlay)\033[0m           \033[96m║\033[0m\n");
-            printf("\033[96m  ║\033[0m \033[93m[2] Privacy Shield Mode : [%s]\033[0m                            \033[96m║\033[0m\n",
-                   cfg::streamer_mode ? "\033[92mACTIVE \033[93m" : "\033[90mSTANDBY\033[93m");
-            printf("\033[96m  ║\033[0m \033[91m[3] Exit Session\033[0m                                           \033[96m║\033[0m\n");
-            printf("\033[96m  ╚══════════════════════════════════════════════════════════╝\033[0m\n");
-            printf("\033[96m  Enter option [1-3] or press Enter to launch: \033[0m");
+            printf("\n\033[96m────────────────────────────────────\033[0m\n");
+            printf("\033[97m\033[1m  GEMINI CLI v2.4.0\033[0m\n");
+            printf("\033[90m  Embedded AI Engine\033[0m\n");
+            printf("\033[96m────────────────────────────────────\033[0m\n");
+            printf("\033[92m  [1] Start Overlay (Migrate to RAM)\033[0m\n");
+            printf("\033[93m  [2] Privacy Shield : [%s]\033[0m\n",
+                   cfg::streamer_mode ? "\033[92mACTIVE\033[93m" : "\033[90mSTANDBY\033[93m");
+            printf("\033[91m  [3] Exit Session\033[0m\n");
+            printf("\033[96m────────────────────────────────────\033[0m\n");
+            printf("\033[96m  Select [1-3] or press Enter: \033[0m");
             fflush(stdout);
 
             std::string line;
@@ -382,19 +380,19 @@ int main(int argc, char** argv) {
                 fflush(stdout);
                 continue;
             } else if (line == "3" || line == "exit" || line == "q") {
-                printf("\033[91m  [-] Terminating Gemini Session...\033[0m\n");
+                printf("\033[91m  [-] Terminating Session...\033[0m\n");
                 fflush(stdout);
                 return 0;
             } else {
                 // Option 1 or Enter -> Migrate execution to Background RAM (Fork Daemon)
-                printf("\033[92m  [*] Migrating Gemini Engine to Background RAM...\033[0m\n");
+                printf("\033[92m  [*] Migrating to Background RAM...\033[0m\n");
                 fflush(stdout);
 
                 pid_t pid = fork();
                 if (pid > 0) {
                     // Parent process (Terminal) exits cleanly
-                    printf("\033[92m  [+] Gemini Engine is now active in RAM (Session PID: %d)\033[0m\n", pid);
-                    printf("\033[96m  [*] Terminal closing. Overlay active on screen.\033[0m\n");
+                    printf("\033[92m  [+] Active in RAM (PID: %d)\033[0m\n", pid);
+                    printf("\033[96m  [*] Terminal closing. Overlay active.\033[0m\n");
                     fflush(stdout);
                     usleep(800000);
                     return 0;
