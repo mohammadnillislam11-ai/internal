@@ -129,10 +129,13 @@ NINMODS হলো একটি সম্পূর্ণ বহিরাগত (E
    - অপশন ১: `Start Gemini Agent (Open Neural Overlay)`
    - অপশন ২: `Privacy Shield Mode : [ACTIVE / STANDBY]`
    - অপশন ৩: `Exit Session`
-2. **লাইভ ডায়াগনস্টিক লগ ছদ্মবেশ:**
-   - কোনো গেম প্যাকেজ বা চিট পরিভাষা (`inMatch`, `aim`, `nobita`) টার্মিনালে দৃশ্যমান হয় না।
-   - পরিবর্তে প্রফেশনাল এআই টোকেন ও ভিশন ট্র্যাকিং লগ ডিসপ্লে করা হয়:
-     `[gemini-nano] Stream=LIVE | VisualNodes=8 | Tracking=ON | LowLatency=ON`
+2. **প্যাকেজ নাম মাস্কিং (Package Masking):**
+   - গেমের আসল প্যাকেজ নাম (`com.dts.freefireth`) টার্মিনালে পুরোপুরি হাইড রাখা হয়েছে।
+   - এর পরিবর্তে সর্বদা প্রদর্শিত হবে: `com.gemini.cli` এবং গেমের আসল প্রসেস আইডি:
+     `[*] Connected: com.gemini.cli (PID: 31090)`
+3. **অপ্রয়োজনীয় নয়েজ ও স্প্যাম রিমুভ (Zero Terminal Clutter):**
+   - প্রতি ৫ সেকেন্ডে যে ডায়াগনস্টিক লগ স্ক্রল করত তা পুরোপুরি বন্ধ করে টার্মিনালকে শান্ত ও পেশাদার রাখা হয়েছে।
+   - পূর্বে থাকা অপ্রয়োজনীয় বড় ASCII ব্যানার বাদ দিয়ে পরিচ্ছন্ন এআই ইন্টারফেসে রূপান্তর করা হয়েছে।
 
 ---
 *Generated and maintained for NINMODS Android Client.*

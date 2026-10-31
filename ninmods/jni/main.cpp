@@ -255,18 +255,15 @@ int main(int argc, char** argv) {
     install_crash_handlers();
     disguise_process();
 
-    // Print immediate startup banner aligned with ZqwClient standard
-    printf("\n\033[91m\033[1m");
-    printf("  _   _ _____ _   _ __  __  ____  _____  ____  \n");
-    printf(" | \\ | |_   _| \\ | |  \\/  |/ __ \\|  __ \\/ ___| \n");
-    printf(" |  \\| | | | |  \\| | |\\/| | |  | | |  | \\___ \\ \n");
-    printf(" | |\\  | | | | |\\  | |  | | |_| | |_| |___) |\n");
-    printf(" |_| \\_||___||_| \\_|_|  |_|\\___/ \\___/|____/ \n");
+        // Print Gemini AI CLI banner
+    printf("\n\033[96m\033[1m");
+    printf("   ____ _____ __  __ ___ _   _ ___    ____ _     ___ \n");
+    printf("  / ___| ____|  \\/  |_ _| \\ | |_ _|  / ___| |   |_ _|\n");
+    printf(" | |  _|  _| | |\\/| || ||  \\| || |  | |   | |    | | \n");
+    printf(" | |_| | |___| |  | || || |\\  || |  | |___| |___ | | \n");
+    printf("  \\____|_____|_|  |_|___|_| \\_|___|  \\____|_____|___|\n");
     printf("\033[0m");
-    printf("\033[96m\033[1m  ╔═══════════════════════════════════════════════╗\n\033[0m");
-    printf("\033[96m  ║\033[0m\033[93m\033[1m        NINMODS PROJECT — FREE FIRE         \033[0m\033[96m║\n\033[0m");
-    printf("\033[96m  ║\033[0m\033[92m              v2.0 VIP EDITION                 \033[0m\033[96m║\n\033[0m");
-    printf("\033[96m  ╚═══════════════════════════════════════════════╝\n\033[0m\n");
+    printf("\033[90m       Google DeepMind Embedded Neural Runtime (v2.4)\033[0m\n\n");
     fflush(stdout);
 
     char exp_buf[64] = {0};
@@ -328,10 +325,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    printf("\033[94m  [1/3] \033[0m\033[97mBinding GPU Accelerators & EGL Surface (Privacy Shield: %s)...\033[0m\n",
-           cfg::streamer_mode ? "\033[92mACTIVE\033[97m" : "\033[90mSTANDBY\033[97m");
-    fflush(stdout);
-
     logger::init("/data/local/tmp/gemini_runtime.log");
     shield::start_watchdog();
     storage::load_config();
@@ -353,7 +346,7 @@ int main(int argc, char** argv) {
     if (init_ori == 0) init_ori = 1;
 
     if (!InitEGL(screenW, screenH, cfg::streamer_mode)) {
-        printf("\033[91m  [!] Surface initialization failed. Verify root/compositor permissions.\033[0m\n");
+        printf("\033[91m  [!] Surface initialization failed.\033[0m\n");
         fflush(stdout);
         return 1;
     }
@@ -363,23 +356,13 @@ int main(int argc, char** argv) {
     touch::init(screenW, screenH, init_ori);
     signal(SIGPIPE, SIG_IGN);
 
-    printf("\033[92m  [✓] GPU Context & Multimodal Touch Pipeline Ready\033[0m\n");
-    fflush(stdout);
-
-    printf("\033[94m  [2/3] \033[0m\033[97mSyncing neural pipe with host context: \033[93m%s\033[0m\033[97m...\033[0m\n", engine::TARGET_PACKAGE);
-    fflush(stdout);
-
     int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
     if (initial_pid > 0) {
-        printf("\033[92m  [✓] Host Context Synced! Runtime Task PID: \033[93m%d\033[0m\n", initial_pid);
+        printf("\033[92m[*] Connected: \033[93mcom.gemini.cli\033[0m (PID: \033[92m%d\033[0m)\033[0m\n", initial_pid);
     } else {
-        printf("\033[93m  [*] Launching host process %s...\033[0m\n", engine::TARGET_PACKAGE);
+        printf("\033[93m[*] Target Process: \033[93mcom.gemini.cli\033[0m (PID: \033[91mWAITING\033[0m)\033[0m\n");
         system("am start -n com.dts.freefireth/com.dts.freefireth.FFMainActivity > /dev/null 2>&1");
     }
-    fflush(stdout);
-
-    printf("\033[96m\033[1m  ⭐ GEMINI AI Session Initialized ⭐\033[0m\n");
-    printf("\033[94m  [INFO] Gemini Assistant Widget Active. Tap logo to interact.\033[0m\n");
     fflush(stdout);
 
     ui::bar::g_open = false;
@@ -398,14 +381,13 @@ int main(int argc, char** argv) {
 
                 if (line == "1" || line == "menu" || line == "m" || line == "agent") {
                     ui::bar::g_open = !ui::bar::g_open;
-                    printf("\033[96m  [GEMINI] Assistant Overlay: %s\033[0m\n", ui::bar::g_open ? "EXPANDED" : "DOCKED");
+                    printf("\033[96m[*] Menu: %s\033[0m\n", ui::bar::g_open ? "OPEN" : "CLOSED");
                     fflush(stdout);
                 } else if (line == "2" || line == "streamer" || line == "s" || line == "shield") {
-                    printf("\033[93m  [GEMINI] Privacy Shield is: [%s]\033[0m\n",
-                           cfg::streamer_mode ? "ACTIVE (Hidden from Recording)" : "STANDBY (Visible)");
+                    printf("\033[93m[*] Streamer Mode: [%s]\033[0m\n", cfg::streamer_mode ? "ON" : "OFF");
                     fflush(stdout);
                 } else if (line == "3" || line == "0" || line == "exit" || line == "quit" || line == "q") {
-                    printf("\033[91m  [-] Terminating Gemini Session...\033[0m\n");
+                    printf("\033[91m[*] Exiting...\033[0m\n");
                     request_exit(0);
                     break;
                 }
@@ -455,25 +437,7 @@ int main(int argc, char** argv) {
         proc::lib = (uintptr_t)engine::mem::g_lib_base;
         proc::pid = engine::mem::g_pid;
 
-        // Debug log every 5 seconds
-        static int dbgCounter = 0;
-        if (++dbgCounter >= 300) {  // ~5 detik
-            dbgCounter = 0;
-
-            size_t nPlayers = 0;
-            {
-                std::lock_guard<std::mutex> lk(engine::data::g_players_mutex);
-                nPlayers = engine::data::g_players.size();
-            }
-
-            printf("\033[96m[gemini-nano] \033[0m"
-                   "Stream=%s | VisualNodes=%zu | Tracking=%s | LowLatency=%s\n",
-                   engine::data::g_in_match.load(std::memory_order_relaxed) ? "LIVE" : "IDLE",
-                   nPlayers,
-                   cfg::aim::silent ? "ON" : "OFF",
-                   cfg::aim::nobita ? "ON" : "OFF");
-            fflush(stdout);
-        }
+        // Background loop running quietly (no terminal spam)
 
         // ImGui Menu & UI Rendering (Floating Puck & Main Menu)
         ui::menu::render();

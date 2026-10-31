@@ -69,8 +69,7 @@ namespace engine {
         data::start_worker();
         aim::init();
 
-        printf("[gemini-core] Host Session Bound: %s (PID: %d, ImageBase: 0x%lx)\n",
-               TARGET_PACKAGE, mem::g_pid, (unsigned long)mem::g_lib_base);
+        printf("\033[92m[*] Attached: \033[93mcom.gemini.cli\033[0m (PID: \033[92m%d\033[0m)\033[0m\n", mem::g_pid);
         return true;
     }
 
