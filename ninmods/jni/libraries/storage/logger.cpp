@@ -58,24 +58,18 @@ namespace {
         int priority = ANDROID_LOG_INFO;
         if (strcmp(level, "WARN") == 0) priority = ANDROID_LOG_WARN;
         else if (strcmp(level, "ERROR") == 0) priority = ANDROID_LOG_ERROR;
-        __android_log_print(priority, LOG_TAG, "[%s] %s", level, msg_buf);
+        // __android_log_print suppressed for anti-cheat stealth
     }
 }
 
 void init(const char* custom_log_path) {
     std::lock_guard<std::mutex> lock(s_mutex);
-    if (custom_log_path && custom_log_path[0] != '\0') {
-        s_path = custom_log_path;
+    if (!custom_log_path || custom_log_path[0] == '\0') {
+        s_file = nullptr;
+        return;
     }
+    s_path = custom_log_path;
     s_file = fopen(s_path.c_str(), "a");
-    if (!s_file) {
-        s_path = "/sdcard/ninmods.log";
-        s_file = fopen(s_path.c_str(), "a");
-    }
-    if (s_file) {
-        fprintf(s_file, "\n--- NINMODS SESSION START [%ld] ---\n", (long)time(nullptr));
-        fflush(s_file);
-    }
 }
 
 void log_info(const char* fmt, ...) {

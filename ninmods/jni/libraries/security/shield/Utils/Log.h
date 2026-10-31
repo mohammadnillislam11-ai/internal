@@ -5,7 +5,7 @@
 #include <string>
 
 #ifdef DEBUG_BUILD
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "NativeShield", __VA_ARGS__)) // Disable this on production
+#define LOGI(...) ((void)0) // Disable this on production
 #else
 #define LOGI(...)
 #endif

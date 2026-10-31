@@ -15,7 +15,7 @@ namespace {
 void start_watchdog() {
     if (s_running.load()) return;
     s_running.store(true);
-    __android_log_print(ANDROID_LOG_INFO, SHIELD_TAG, "[+] Native shield initialized in passive safe mode.");
+    // suppressed
 }
 
 void stop_watchdog() {

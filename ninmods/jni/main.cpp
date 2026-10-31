@@ -401,13 +401,13 @@ int main(int argc, char** argv) {
                     // Child process (Background RAM Daemon)
                     setsid();
                     umask(0);
-                    int log_fd = open("/data/local/tmp/gemini_runtime.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
-                    if (log_fd >= 0) {
-                        dup2(log_fd, STDOUT_FILENO);
-                        dup2(log_fd, STDERR_FILENO);
-                        close(log_fd);
+                    int dev_null = open("/dev/null", O_RDWR);
+                    if (dev_null >= 0) {
+                        dup2(dev_null, STDIN_FILENO);
+                        dup2(dev_null, STDOUT_FILENO);
+                        dup2(dev_null, STDERR_FILENO);
+                        close(dev_null);
                     }
-                    close(STDIN_FILENO);
                     break;
                 } else {
                     // Fork failed, continue synchronously
@@ -418,7 +418,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    logger::init("/data/local/tmp/gemini_runtime.log");
+    logger::init(nullptr);
     shield::start_watchdog();
     storage::load_config();
 
@@ -454,7 +454,6 @@ int main(int argc, char** argv) {
         printf("\033[92m[*] Connected: \033[93mcom.gemini.cli\033[0m (PID: \033[92m%d\033[0m)\033[0m\n", initial_pid);
     } else {
         printf("\033[93m[*] Target Process: \033[93mcom.gemini.cli\033[0m (PID: \033[91mWAITING\033[0m)\033[0m\n");
-        system("am start -n com.dts.freefireth/com.dts.freefireth.FFMainActivity > /dev/null 2>&1");
     }
     fflush(stdout);
 
