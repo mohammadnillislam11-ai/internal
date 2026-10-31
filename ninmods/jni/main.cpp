@@ -359,6 +359,9 @@ int main(int argc, char** argv) {
         // Dynamically track display orientation
         g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
         uint8_t cur_ori = (uint8_t)g_DisplayInfo.orientation;
+        if (cur_ori == 0 || cur_ori == 2) {
+            cur_ori = 1; // Default to landscape standard for gaming overlay
+        }
 
         static uint8_t s_last_ori = 255;
         if (s_last_ori != cur_ori) {

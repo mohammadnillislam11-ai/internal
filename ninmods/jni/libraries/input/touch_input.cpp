@@ -58,15 +58,15 @@ namespace touch {
 
     uint8_t orientation = 1;
     ImGuiIO *imgui_io = nullptr;
-    std::vector<input> inputs;
+    std::vector<std::shared_ptr<input>> inputs;
 
-    void input_thread(input _input) {
+    void input_thread(std::shared_ptr<input> _input) {
         sleep(1);
         if (!imgui_io)
             imgui_io = &ImGui::GetIO();
         input_event events[64]{0};
-        while (_input.fd > 0 && imgui_io && imgui_io->BackendRendererUserData) {
-            auto event_readed_count = read(_input.fd, events, sizeof(events));
+        while (_input->fd > 0 && imgui_io && imgui_io->BackendRendererUserData) {
+            auto event_readed_count = read(_input->fd, events, sizeof(events));
             if (event_readed_count == -1)
                 continue;
             event_readed_count /= (ssize_t) sizeof(input_event);
@@ -74,34 +74,34 @@ namespace touch {
             for (long j = 0; j < event_readed_count; j++) {
                 auto &event = events[j];
                 if (event.type == EV_KEY && (event.code == BTN_TOUCH || event.code == BTN_LEFT)) {
-                    _input.isDown = (event.value != 0);
+                    _input->isDown = (event.value != 0);
                 }
                 if (event.type == EV_ABS) {
 #if TOUCH_MODE == 2
-                    if (_input.trackingIDPresent && event.code == ABS_MT_TRACKING_ID) {
-                        _input.isDown = (event.value != -1);
+                    if (_input->trackingIDPresent && event.code == ABS_MT_TRACKING_ID) {
+                        _input->isDown = (event.value != -1);
                         continue;
                     }
 #elif TOUCH_MODE == 0
                     if (event.code == ABS_MT_TRACKING_ID) {
-                        _input.isDown = (event.value != -1);
+                        _input->isDown = (event.value != -1);
                         continue;
                     }
 #endif
                     if (event.code == ABS_MT_POSITION_X) {
-                        _input.x = (float) event.value;
+                        _input->x = (float) event.value;
                         continue;
                     }
                     if (event.code == ABS_MT_POSITION_Y) {
-                        _input.y = (float) event.value;
+                        _input->y = (float) event.value;
                         continue;
                     }
                 }
                 if (event.code == SYN_REPORT && imgui_io) {
 #if TOUCH_MODE == 2
-                    bool curDown = _input.trackingIDPresent ? _input.isDown : (event_readed_count > 2);
+                    bool curDown = _input->trackingIDPresent ? _input->isDown : (event_readed_count > 2);
 #elif TOUCH_MODE == 0
-                    bool curDown = _input.isDown;
+                    bool curDown = _input->isDown;
 #else
                     bool curDown = event_readed_count > 2;
 #endif
@@ -113,24 +113,24 @@ namespace touch {
                         float calcY = 0.0f;
                         switch (orientation) {
                             case 1:
-                                calcX = _input.y;
-                                calcY = _input.absX.maximum - _input.x;
+                                calcX = _input->y;
+                                calcY = _input->absX.maximum - _input->x;
                                 break;
                             case 2:
-                                calcX = _input.absX.maximum - _input.x;
-                                calcY = _input.absY.maximum - _input.y;
+                                calcX = _input->absX.maximum - _input->x;
+                                calcY = _input->absY.maximum - _input->y;
                                 break;
                             case 3:
-                                calcX = _input.absY.maximum - _input.y;
-                                calcY = _input.x;
+                                calcX = _input->absY.maximum - _input->y;
+                                calcY = _input->x;
                                 break;
                             default:
-                                calcX = _input.x;
-                                calcY = _input.y;
+                                calcX = _input->x;
+                                calcY = _input->y;
                                 break;
                         }
-                        calcX *= _input.absXMultiplier;
-                        calcY *= _input.absYMultiplier;
+                        calcX *= _input->absXMultiplier;
+                        calcY *= _input->absYMultiplier;
 
                         imgui_io->MousePos.x = calcX;
                         imgui_io->MousePos.y = calcY;
@@ -155,8 +155,8 @@ namespace touch {
             if (strstr(ptr->d_name, "event")) {
                 char event_path[128];
                 sprintf(event_path, "%s%s", path, ptr->d_name);
-                input _input(event_path, _screen_w, _screen_h);
-                if (_input.canBeUsed) {
+                auto _input = std::make_shared<input>(event_path, _screen_w, _screen_h);
+                if (_input->canBeUsed) {
                     result = true;
                     inputs.push_back(_input);
                     std::thread(input_thread, _input).detach();
@@ -172,7 +172,7 @@ namespace touch {
         orientation = _orientation;
 
         for (auto &_input: inputs) {
-            _input.calculateMultipliers(_screen_w, _screen_h);
+            _input->calculateMultipliers(_screen_w, _screen_h);
         }
     }
 
@@ -198,7 +198,7 @@ namespace touch {
 
     void shutdown() {
         for (auto &_input: inputs)
-            _input.close();
+            _input->close();
         inputs.clear();
         imgui_io = nullptr;
     }

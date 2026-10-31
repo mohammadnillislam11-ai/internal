@@ -25,14 +25,18 @@ static ImVec2 g_fps_off(0, 0);
 static ImVec2 g_fps_down(0, 0);
 static constexpr float FPS_DRAG_THRESHOLD = 8.f;
 
+static bool s_fps_pos_init = false;
 static void get_fps_pos(float w, float h) {
-    if (g_fps_x < -0.5f || g_fps_y < -0.5f || (g_sw > 0.f && g_fps_x > g_sw)) {
-        g_fps_x = g_sw - w - 25.f;
-        g_fps_y = g_sh - h - 35.f;
+    if (!s_fps_pos_init) {
+        if (g_sw > 0.f && g_sh > 0.f) {
+            g_fps_x = g_sw - w - 25.f;
+            g_fps_y = g_sh - h - 35.f;
+            s_fps_pos_init = true;
+        }
     }
-    if (g_sw > 0)
+    if (g_sw > 0.f)
         g_fps_x = ImClamp(g_fps_x, 0.f, ImMax(0.f, g_sw - w));
-    if (g_sh > 0)
+    if (g_sh > 0.f)
         g_fps_y = ImClamp(g_fps_y, 0.f, ImMax(0.f, g_sh - h));
 }
 

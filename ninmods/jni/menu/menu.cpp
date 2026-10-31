@@ -589,22 +589,31 @@ namespace ui::menu {
         ImVec2 wsz(860.f, 530.f);
         if (wsz.x > g_sw && g_sw > 0.f) wsz.x = g_sw * 0.94f;
         if (wsz.y > g_sh && g_sh > 0.f) wsz.y = g_sh * 0.94f;
-        if (g_menu_pos.x < 0.f || (g_sw > 0.f && g_menu_pos.x > g_sw)) {
+        
+        static bool s_menu_pos_init = false;
+        if (!s_menu_pos_init && g_sw > 0.f && g_sh > 0.f) {
             g_menu_pos = {(g_sw - wsz.x) * 0.5f, (g_sh - wsz.y) * 0.5f};
+            s_menu_pos_init = true;
         }
+        if (g_sw > 0.f)
+            g_menu_pos.x = ImClamp(g_menu_pos.x, 0.f, ImMax(0.f, g_sw - wsz.x));
+        if (g_sh > 0.f)
+            g_menu_pos.y = ImClamp(g_menu_pos.y, 0.f, ImMax(0.f, g_sh - wsz.y));
+
         ImGui::SetNextWindowSize(wsz, ImGuiCond_Always);
         ImGui::SetNextWindowPos(g_menu_pos, ImGuiCond_Always);
 
         ImGui::Begin("##m", nullptr,
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-            ImGuiWindowFlags_NoBringToFrontOnFocus);
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
         ImVec2 wp = ImGui::GetWindowPos();
         ImVec2 ws = ImGui::GetWindowSize();
         ImVec2 mp = ImGui::GetMousePos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        ImDrawList* bg = ImGui::GetBackgroundDrawList();
+        ImDrawList* bg = ImGui::GetWindowDrawList();
 
         bg->AddRectFilled({wp.x-4, wp.y-4}, {wp.x+ws.x+4, wp.y+ws.y+4},
                           IM_COL32(180, 105, 255, (int)(45 * ma)), R+4.f);
