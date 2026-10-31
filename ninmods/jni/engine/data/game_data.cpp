@@ -397,25 +397,28 @@ namespace engine::data {
             float dist = get_distance_meters(local_pos, head_world);
             if (dist > cfg::esp::max_range) continue;
 
-            ScreenProjection proj = project_world_to_screen_360(g_view_matrix, head_world, screen_w, screen_h);
-
-            Vector3 toe_screen = Vector3(-1.0f, -1.0f, -1.0f);
-            if (proj.on_screen) {
-                toe_screen = bone_screen(enemy, offsets::Bone_LeftToe, screen_w, screen_h);
-                if (toe_screen.x < 0.0f || toe_screen.y < 0.0f) {
-                    Vector3 toe_est = head_world;
-                    toe_est.y -= 1.75f;
-                    toe_screen = world_to_screen(g_view_matrix, toe_est, screen_w, screen_h);
-                }
+            Vector3 head_screen = world_to_screen(g_view_matrix, head_world, screen_w, screen_h);
+            if (head_screen.x < 0.0f || head_screen.y < 0.0f ||
+                head_screen.x > screen_w || head_screen.y > screen_h) {
+                continue; // NEXOMODS: Skip off-screen / behind targets
             }
+
+            bool is_knocked = rpm<bool>(enemy + offsets::Player_DeathInfo) || (hp <= 0);
+            float model_h = is_knocked ? 0.90f : 1.72f;
+
+            Vector3 foot_world = head_world;
+            foot_world.y -= model_h;
+
+            Vector3 toe_screen = world_to_screen(g_view_matrix, foot_world, screen_w, screen_h);
+            if (toe_screen.x < 0.0f || toe_screen.y < 0.0f) continue;
 
             PlayerData pd;
             pd.addr       = enemy;
-            pd.Head       = proj.screen_pos;
+            pd.Head       = head_screen;
             pd.Toe        = toe_screen;
             pd.HeadWorld  = head_world;
-            pd.isOnScreen = proj.on_screen;
-            pd.isBehind   = proj.behind;
+            pd.isOnScreen = true;
+            pd.isBehind   = false;
             pd.isVisible  = visible;
             pd.isBot      = is_bot;
             pd.distance   = dist;

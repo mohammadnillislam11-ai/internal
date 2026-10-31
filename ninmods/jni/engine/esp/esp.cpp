@@ -68,16 +68,19 @@ namespace engine::esp {
         PlayerBox box{ {0, 0}, {0, 0}, false };
         if (!ok(p.Head) || !ok(p.Toe)) return box;
 
-        float top_y = ImMin(p.Head.y, p.Toe.y);
-        float bot_y = ImMax(p.Head.y, p.Toe.y);
-        float h = bot_y - top_y;
-        if (h < 10.0f) h = 10.0f;
+        float headToFeetHeight = std::abs(p.Toe.y - p.Head.y);
+        if (headToFeetHeight < 6.0f) return box;
 
-        float w = h * 0.48f;
-        float cx = (p.Head.x + p.Toe.x) * 0.5f;
+        // NEXOMODS standard formula:
+        float boxHeight = headToFeetHeight * 1.18f;
+        float boxWidth  = boxHeight * 0.46f;
 
-        box.tl = ImVec2(cx - w * 0.5f, top_y - h * 0.08f);
-        box.br = ImVec2(cx + w * 0.5f, bot_y + h * 0.04f);
+        // Horizontally centered strictly on Head.x (zero animation jitter)
+        float boxX = p.Head.x - (boxWidth * 0.5f);
+        float boxY = p.Head.y - (boxHeight * 0.10f);
+
+        box.tl = ImVec2(boxX, boxY);
+        box.br = ImVec2(boxX + boxWidth, boxY + boxHeight);
         box.valid = true;
         return box;
     }
@@ -188,31 +191,38 @@ namespace engine::esp {
         }
 
         for (const auto& p : snapshot) {
-            if (!ok(p.Head)) continue;
+            if (!ok(p.Head) || !ok(p.Toe)) continue;
             if (p.distance > cfg::esp::max_range) continue;
 
             ImU32 base_col = p.isVisible ? to_u32(cfg::esp::box_visible) : to_u32(cfg::esp::box_col);
             ImU32 box_col  = fade_dist(base_col, p.distance, cfg::esp::max_range);
             float aa = ImClamp(1.0f - p.distance / cfg::esp::max_range, 0.25f, 1.0f);
 
-            // 1. ESP Line (Tracer line: strictly rendered ONLY when enemy is found on screen)
-            if (cfg::esp::tracer && p.isOnScreen) {
-                ImVec2 target_pt(p.Head.x, p.Head.y);
-                if (target_pt.x >= 0.0f && target_pt.x <= sw && target_pt.y >= 0.0f && target_pt.y <= sh) {
-                    dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.35f * aa), 4.0f);
-                    dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.95f * aa), 1.8f);
-                }
-            }
-            // 2. Compute 2D Box from Head and Toe (Rendered ONLY when target is on screen)
             if (p.isOnScreen) {
                 PlayerBox box = compute_player_box(p);
                 if (box.valid) {
-                    // 3. ESP Box
+                    // 1. ESP Line (Tracer line: NEXOMODS architecture attached directly to top of box)
+                    if (cfg::esp::tracer) {
+                        float centerX = (box.tl.x + box.br.x) * 0.5f;
+                        float centerY = box.tl.y; // Attached to top edge of box
+                        ImVec2 target_pt(centerX, centerY);
+
+                        // Top anchor dot
+                        dl->AddCircleFilled(anchor, 4.0f, box_col);
+                        dl->AddCircle(anchor, 5.5f, IM_COL32(0, 0, 0, 180), 12, 1.2f);
+
+                        // Distance adaptive thickness
+                        float line_thick = (p.distance > 70.0f) ? 1.2f : 1.8f;
+                        dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.30f * aa), line_thick + 2.0f);
+                        dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.95f * aa), line_thick);
+                    }
+
+                    // 2. ESP Box (NEXOMODS style)
                     if (cfg::esp::box) {
                         draw_box(dl, box.tl, box.br, box_col, cfg::esp::box_type);
                     }
 
-                    // 4. ESP Health Bar
+                    // 3. ESP Health Bar
                     if (cfg::esp::health) {
                         draw_health_bar(dl, box.tl, box.br, p.curHP, p.maxHP);
                     }
