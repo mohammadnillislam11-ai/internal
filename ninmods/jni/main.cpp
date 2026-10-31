@@ -225,10 +225,11 @@ static std::string load_saved_license() {
 }
 
 static void save_license(const std::string& key) {
-    FILE* fp = fopen("/data/local/tmp/.gemini_lic", "w");
-    if (fp) {
-        fprintf(fp, "%s\n", key.c_str());
-        fclose(fp);
+    int fd = open("/data/local/tmp/.gemini_lic", O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd >= 0) {
+        dprintf(fd, "%s\n", key.c_str());
+        close(fd);
+        chmod("/data/local/tmp/.gemini_lic", 0600);
     }
 }
 
@@ -515,6 +516,10 @@ int main(int argc, char** argv) {
         ImGui::NewFrame();
 
         // Engine attaches immediately or retries when game becomes active
+        if (engine::get_target_pid() <= 0) {
+            s_engine_hooked = false;
+        }
+
         if (!s_engine_hooked) {
             if (engine::init()) {
                 proc::lib = (uintptr_t)engine::mem::g_lib_base;
@@ -566,6 +571,7 @@ int main(int argc, char** argv) {
     g_EglSurface = EGL_NO_SURFACE;
 
     if (g_NativeWindow) {
+        android::ANativeWindowCreator::Destroy(g_NativeWindow);
         ANativeWindow_release(g_NativeWindow);
         g_NativeWindow = nullptr;
     }

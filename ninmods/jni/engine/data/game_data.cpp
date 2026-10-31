@@ -453,6 +453,15 @@ namespace engine::data {
         prctl(PR_SET_NAME, "kworker/u16:1", 0, 0, 0);
         uint32_t seed = 0x9E3779B1u;
         while (g_worker_running.load(std::memory_order_relaxed)) {
+            if (engine::mem::g_pid <= 0 || engine::mem::g_lib_base == 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(250));
+                continue;
+            }
+            if (!g_in_match.load(std::memory_order_relaxed)) {
+                update_cycle();
+                std::this_thread::sleep_for(std::chrono::milliseconds(80));
+                continue;
+            }
             update_cycle();
             seed = seed * 1664525u + 1013904223u;
             int jitter = (seed >> 24) & 7;

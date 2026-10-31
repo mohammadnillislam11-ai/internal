@@ -26,7 +26,8 @@ namespace touch {
         float x{0.0f}, y{0.0f};
 
         input(const char *_path, int32_t _screen_w, int32_t _screen_h) {
-            fd = open(_path, O_RDWR);
+            fd = open(_path, O_RDONLY);
+            if (fd == -1) fd = open(_path, O_RDWR);
             if (fd == -1)
                 return;
             canBeUsed = ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &absX) != -1 && ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &absY) != -1 && absX.maximum > 0 && absY.maximum > 0;
