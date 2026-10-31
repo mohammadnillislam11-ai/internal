@@ -98,4 +98,14 @@ NINMODS হলো একটি সম্পূর্ণ বহিরাগত (E
    - ম্যাজিস্ক / কার্নেল-এসইউ-এর **Zygisk DenyList** বা **Shamiko**-তে গেম প্যাকেজ (`com.dts.freefireth`) যুক্ত রেখে রুট পুরোপুরি হাইড রাখা।
 
 ---
+
+## ৫. STORM_MODS এবং NEXOMODSROOT ভিত্তিক আপডেট (OB55)
+1. **টিমমেট ফিল্টার (Teammate Filter):**
+   - Free Fire OB55 আপডেটে `UmaData` কাঠামোর ভেতরে `isTeam` ফ্ল্যাগ `0x81`-এ অবস্থান করে।
+   - আমরা `rpm<bool>(uma_data + 0x81) || rpm<bool>(uma_data + 0x91)` ডুয়াল চেকিং কার্যকর করেছি, যার ফলে কোনো অবস্থাতেই নিজের দলের খেলোয়াড়দের উপর ট্রেসার লাইন বা বক্স আসবে না। শুধু সক্রিয় শত্রুদের উপর নির্ভুল ট্রেসার লাইন প্রদর্শিত হবে।
+2. **এইমবট ও নোবিতা মোড (Aim Assist & Nobita Mode):**
+   - `Player_AimInfo` অফসেট `0xE58` (ফলব্যাক `0xE50` ও `0xD80` সহ) এবং ট্রিগার ফ্ল্যাগ `Player_IsFiring` (`0x850`) ও `Player_IsSight` (`0x8A0`) নিশ্চিত করা হয়েছে।
+   - নোবিতা ভিউ লকিংয়ের জন্য ক্যামেরা ওয়ার্ল্ড ম্যাট্রিক্স ইনভার্সন (`GetCameraWorldPosManual`) এবং কোয়াটারনিয়ন লুক রোটেশন (`Quaternion::LookRotation`) সরাসরি `Player_Rotation` (`0x61C` / `0x614`)-এ রাইট করার ব্যবস্থা করা হয়েছে।
+
+---
 *Generated and maintained for NINMODS Android Client.*

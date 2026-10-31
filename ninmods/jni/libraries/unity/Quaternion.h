@@ -1,6 +1,7 @@
 #pragma once
 #include <math.h>
 #include <iostream>
+#include "Vector3.hpp"
 
 #define SMALL_FLOAT 0.0000000001
 #define PI 3.14159265358979323846264338327950288419716939937510f

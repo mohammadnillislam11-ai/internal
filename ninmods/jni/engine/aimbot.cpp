@@ -1,7 +1,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "aimbot.hpp"
-#include "Quaternion.h"
 #include "game_data.hpp"
+#include "Quaternion.h"
 #include "offsets.hpp"
 #include "memory.hpp"
 #include "menu/config.hpp"
@@ -250,11 +250,28 @@ namespace engine::aim {
 
                     Vector3 cam_pos = Vector3::Zero();
                     if (int_ptr) {
-                        Matrix4x4 mat = rpm<Matrix4x4>(int_ptr + offsets::Camera_Matrix);
-                        cam_pos = Vector3(mat.m[3][0], mat.m[3][1], mat.m[3][2]);
+                        data::Matrix4x4 m = rpm<data::Matrix4x4>(int_ptr + offsets::Camera_Matrix);
+                        float a11 = m.m11, a12 = m.m21, a13 = m.m31;
+                        float a21 = m.m12, a22 = m.m22, a23 = m.m32;
+                        float a31 = m.m14, a32 = m.m24, a33 = m.m34;
+                        float b1 = -m.m41, b2 = -m.m42, b3 = -m.m44;
+
+                        float det = a11 * (a22 * a33 - a23 * a32)
+                                    - a12 * (a21 * a33 - a23 * a31)
+                                    + a13 * (a21 * a32 - a22 * a31);
+
+                        if (std::abs(det) > 0.0001f) {
+                            float inv = 1.0f / det;
+                            cam_pos = Vector3(
+                                (b1 * (a22 * a33 - a23 * a32) - a12 * (b2 * a33 - a23 * b3) + a13 * (b2 * a32 - a22 * b3)) * inv,
+                                (a11 * (b2 * a33 - a23 * b3) - b1 * (a21 * a33 - a23 * a31) + a13 * (a21 * b3 - b2 * a31)) * inv,
+                                (a11 * (a22 * b3 - b2 * a32) - a12 * (a21 * b3 - b2 * a31) + b1 * (a21 * a32 - a22 * a31)) * inv
+                            );
+                        }
                     }
                     if (cam_pos == Vector3::Zero()) {
                         uint64_t my_head = rpm<uint64_t>(local + offsets::Bone_Head);
+                        if (!my_head) my_head = rpm<uint64_t>(local + offsets::Player_HeadTF);
                         if (!my_head) my_head = rpm<uint64_t>(local + 0x6A0);
                         cam_pos = my_head ? data::get_node_position(my_head) : Vector3::Zero();
                     }
