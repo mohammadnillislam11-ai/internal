@@ -243,39 +243,67 @@ namespace ui::menu {
         ImGui::Dummy(ImVec2(0, rh+2.f));
     }
 
-    static bool NS_ComboRow(const char* id, const char* label, int* value,
-                            const char** items, int itemCount) {
+    static bool NS_StepSlider(const char* id, const char* label, int* value,
+                              const char** names, int count) {
+        if (!value || count <= 0 || !names) return false;
         ImGui::PushID(id);
         float avail = ImGui::GetContentRegionAvail().x;
         ImVec2 pos = ImGui::GetCursorScreenPos();
-        float h = 40.f;
         ImDrawList* dl = ImGui::GetWindowDrawList();
+
+        if (*value < 0) *value = 0;
+        if (*value >= count) *value = count - 1;
+
+        const char* curText = names[*value];
+
         if (dl) {
-            dl->AddRectFilled(pos, {pos.x+avail, pos.y+h}, C_BgDark(), 6.f);
-            dl->AddRect(pos, {pos.x+avail, pos.y+h}, C_Border(), 6.f, 0, 1.f);
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x+12.f, pos.y + (h - 15.0f)*0.5f}, C_TextDim(), label);
-            int cur = *value;
-            const char* curText = (cur>=0 && cur<itemCount) ? items[cur] : "?";
-            float cw = NS_TextSize(curText, 15.0f).x;
-            dl->AddText(ImGui::GetFont(), 15.0f,
-                {pos.x+avail-cw-32.f, pos.y + (h - 15.0f)*0.5f}, C_TextMain(), curText);
-            dl->AddText(ImGui::GetFont(), 12.f,
-                {pos.x+avail-20.f, pos.y + (h - 12.f)*0.5f}, C_TextDim(), "\u25BC");
+            float valW = NS_TextSize(curText, 15.0f).x;
+            dl->AddText(ImGui::GetFont(), 15.5f, {pos.x, pos.y}, C_TextSec(), label);
+
+            // If value is 0 (None), render in dimmer color; otherwise accent bright
+            ImU32 txtCol = (*value == 0) ? C_TextDim() : C_AccentBright();
+            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x + avail - valW, pos.y}, txtCol, curText);
+
+            float ty = pos.y + 24.f, tw2 = avail;
+            float maxV = (float)(count - 1);
+            float rawPct = (maxV > 0.f) ? ImClamp((float)(*value) / maxV, 0.f, 1.f) : 0.f;
+            float pct = NS_Anim(std::string(id)+"#pct", rawPct, 22.f);
+
+            // Track background
+            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2, ty+5.f},
+                IM_COL32(40, 30, 60, (int)(content_alpha*255)), 2.5f);
+            // Track active fill
+            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2*pct, ty+5.f}, C_Accent(), 2.5f);
+            if (pct > 0.01f) {
+                dl->AddRect({pos.x, ty}, {pos.x+tw2*pct, ty+5.f},
+                    (C_Accent() & 0x00FFFFFF) | ((ImU32)90 << 24), 2.5f, 0, 1.f);
+            }
+
+            // Step tick dots along track
+            for (int s = 0; s < count; s++) {
+                float sx = pos.x + (maxV > 0.f ? (tw2 * ((float)s / maxV)) : 0.f);
+                ImU32 dotCol = (s <= *value) ? C_AccentBright() : IM_COL32(80, 60, 110, (int)(content_alpha * 200));
+                dl->AddCircleFilled({sx, ty + 2.5f}, 2.5f, dotCol);
+            }
+
+            // Thumb knob
+            float thumbX = pos.x + tw2 * pct;
+            dl->AddCircleFilled({thumbX, ty + 2.5f}, 8.0f, IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
+            dl->AddCircle({thumbX, ty + 2.5f}, 8.0f, C_Accent(), 16, 1.8f);
+
+            ImGui::SetCursorScreenPos({pos.x, ty - 8.f});
+            ImGui::SetNextItemWidth(tw2);
         }
-        ImGui::PushStyleColor(ImGuiCol_FrameBg,        IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgActive,  IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_PopupBg,        C_BgCard());
-        ImGui::PushStyleColor(ImGuiCol_Header,         C_Accent());
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered,  C_AccentBright());
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive,   C_AccentBright());
-        ImGui::PushStyleColor(ImGuiCol_Text,           C_TextMain());
-        ImGui::SetCursorScreenPos({pos.x+4, pos.y+4});
-        ImGui::SetNextItemWidth(avail-8);
-        bool changed = ImGui::Combo("##combo", value, items, itemCount);
-        ImGui::PopStyleColor(8);
+
+        ImGui::PushStyleColor(ImGuiCol_FrameBg,          IM_COL32(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,   IM_COL32(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive,    IM_COL32(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab,       IM_COL32(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, IM_COL32(0,0,0,0));
+        bool changed = ImGui::SliderInt("##s_step", value, 0, count - 1, "");
+        ImGui::PopStyleColor(5);
+        ImGui::Dummy(ImVec2(0, 14.f));
         ImGui::PopID();
-        ImGui::Dummy(ImVec2(0, 4.f));
         return changed;
     }
 
@@ -350,11 +378,17 @@ namespace ui::menu {
         NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Target and Trigger Settings"));
         ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+44});
 
-        const char* bones[] = { oxorany("Head"), oxorany("Chest"), oxorany("Hip") };
-        NS_ComboRow("aim_bone", oxorany("Target Bone"), &cfg::aim::target_bone, bones, 3);
+        const char* bones[] = { oxorany("None"), oxorany("Head"), oxorany("Chest"), oxorany("Hip") };
+        int cur_bone = (cfg::aim::target_bone >= 0 && cfg::aim::target_bone <= 2) ? (cfg::aim::target_bone + 1) : 0;
+        if (NS_StepSlider("aim_bone", oxorany("Target Bone"), &cur_bone, bones, 4)) {
+            cfg::aim::target_bone = (cur_bone > 0) ? (cur_bone - 1) : -1;
+        }
 
-        const char* triggers[] = { oxorany("On Fire"), oxorany("On Scope"), oxorany("Always") };
-        NS_ComboRow("aim_trig", oxorany("Trigger Mode"), &cfg::aim::trigger_type, triggers, 3);
+        const char* triggers[] = { oxorany("None"), oxorany("On Fire"), oxorany("On Scope"), oxorany("Always") };
+        int cur_trig = (cfg::aim::trigger_type >= 0 && cfg::aim::trigger_type <= 2) ? (cfg::aim::trigger_type + 1) : 0;
+        if (NS_StepSlider("aim_trig", oxorany("Trigger Mode"), &cur_trig, triggers, 4)) {
+            cfg::aim::trigger_type = (cur_trig > 0) ? (cur_trig - 1) : -1;
+        }
 
         NS_Slider("aim_fov",  oxorany("FOV Radius"),   &cfg::aim::fov,      30.f, 350.f, "px");
         NS_Slider("aim_dist", oxorany("Aim Distance"), &cfg::aim::distance, 30.f, 400.f, "m");
@@ -392,8 +426,16 @@ namespace ui::menu {
         NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Box & Line Configuration"));
         ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+48});
 
-        const char* box_types[] = { oxorany("Corner"), oxorany("Full"), oxorany("Glow") };
-        NS_ComboRow("box_type", oxorany("Box Style"), &cfg::esp::box_type, box_types, 3);
+        const char* box_types[] = { oxorany("None"), oxorany("Corner"), oxorany("Full"), oxorany("Glow") };
+        int cur_box = cfg::esp::box ? (cfg::esp::box_type + 1) : 0;
+        if (NS_StepSlider("box_type", oxorany("Box Style"), &cur_box, box_types, 4)) {
+            if (cur_box == 0) {
+                cfg::esp::box = false;
+            } else {
+                cfg::esp::box = true;
+                cfg::esp::box_type = cur_box - 1;
+            }
+        }
         NS_Slider("box_th", oxorany("Thickness"),  &cfg::esp::box_thickness, 0.5f, 5.0f, "");
         NS_Slider("box_rd", oxorany("Rounding"),   &cfg::esp::box_rounding,  0.f,  10.f, "");
         NS_Slider("box_rg", oxorany("Max Range"),  &cfg::esp::max_range,     50.f, 500.f, "m");
@@ -616,7 +658,7 @@ namespace ui::menu {
         bg->AddRect(wp, {wp.x+ws.x, wp.y+ws.y}, col(UITheme::border_light, ma), R, 0, 1.5f);
 
         const float headerH = 64.f;
-        const float sidebarW = 135.f;
+        const float sidebarW = headerH; // Sidebar width matches header height (64.f)
         const float footerH = 48.f;
 
         bg->AddRectFilled(wp, {wp.x+ws.x, wp.y+headerH},
@@ -704,17 +746,16 @@ namespace ui::menu {
 
         struct NavTab {
             const char* icon;
-            const char* label;
         };
         NavTab navTabs[4] = {
-            { ICON_FA_CROSSHAIRS, "AIMBOT" },
-            { ICON_FA_EYE,        "VISUALS" },
-            { ICON_FA_COG,        "SETTINGS" },
-            { ICON_FA_INFO_CIRCLE,"INFO" }
+            { ICON_FA_CROSSHAIRS },
+            { ICON_FA_EYE },
+            { ICON_FA_COG },
+            { ICON_FA_INFO_CIRCLE }
         };
 
-        float navStartY = sbY + 16.f;
-        float navItemH = 64.f;
+        float navStartY = sbY + 12.f;
+        float navItemH = 56.f;
         for (int i = 0; i < 4; i++) {
             float ny = navStartY + i * (navItemH + 8.f);
             bool act = (tab == i);
@@ -733,22 +774,20 @@ namespace ui::menu {
 
             ImU32 itemCol = act ? col(UITheme::accent_light, ma) : (hov ? col(UITheme::text, ma) : col(UITheme::text_dim, ma));
 
-            float iw = NS_TextSize(navTabs[i].icon, 20.f).x;
-            dl->AddText(ImGui::GetFont(), 20.f,
-                {wp.x + (sidebarW - iw) * 0.5f, ny + 12.f}, itemCol, navTabs[i].icon);
-
-            float lw = NS_TextSize(navTabs[i].label, 13.0f).x;
-            dl->AddText(ImGui::GetFont(), 13.0f,
-                {wp.x + (sidebarW - lw) * 0.5f, ny + 38.f}, itemCol, navTabs[i].label);
+            // Render clean, centered icon without text labels
+            float iconSize = 22.f;
+            float iw = NS_TextSize(navTabs[i].icon, iconSize).x;
+            dl->AddText(ImGui::GetFont(), iconSize,
+                {wp.x + (sidebarW - iw) * 0.5f, ny + (navItemH - iconSize) * 0.5f}, itemCol, navTabs[i].icon);
 
             if (hov && ImGui::IsMouseClicked(0)) {
                 tab = i;
             }
         }
 
-        float contentX = wp.x + sidebarW + 22.f;
+        float contentX = wp.x + sidebarW + 20.f;
         float contentY = wp.y + headerH + 20.f;
-        float contentW = ws.x - sidebarW - 40.f;
+        float contentW = ws.x - sidebarW - 36.f;
         float contentH = ws.y - headerH - footerH - 36.f;
 
         ImGui::SetCursorScreenPos({contentX, contentY});

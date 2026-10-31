@@ -136,6 +136,7 @@ namespace engine::aim {
      *        No off-screen 3D distance lock; pure clean circle aiming.
      */
     static bool find_best_target_fov(float screen_cx, float screen_cy, data::PlayerData& out_target) {
+        if (cfg::aim::target_bone < 0) return false;
         std::lock_guard<std::mutex> lk(data::g_players_mutex);
 
         bool found = false;
