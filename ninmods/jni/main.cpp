@@ -308,9 +308,9 @@ int main(int argc, char** argv) {
             if (line == "2" || line == "streamer" || line == "s" || line == "shield") {
                 cfg::streamer_mode = !cfg::streamer_mode;
                 if (cfg::streamer_mode) {
-                    printf("\033[92m  [✓] Privacy Shield: ACTIVE (Screen-Cast Protection Enabled)\033[0m\n");
+                    printf("\033[92m  [+] Privacy Shield: ACTIVE (Screen-Cast Protection Enabled)\033[0m\n");
                 } else {
-                    printf("\033[93m  [✓] Privacy Shield: STANDBY (Standard Capture Mode)\033[0m\n");
+                    printf("\033[93m  [+] Privacy Shield: STANDBY (Standard Capture Mode)\033[0m\n");
                 }
                 fflush(stdout);
                 continue;
