@@ -10,6 +10,9 @@
 
 namespace cfg {
 
+    // Streamer Mode (Anti-Screen-Record / Anti-Screenshot protection)
+    inline bool streamer_mode = false;
+
     namespace esp {
         // Master Toggles - 100% OFF by default (ESP Line, ESP Box, ESP Health only)
         inline bool  enabled        = false;

@@ -74,7 +74,7 @@ void request_exit(int code) {
     g_app_running.store(false);
 }
 
-bool InitEGL(int width, int height) {
+bool InitEGL(int width, int height, bool streamer_mode) {
     // Unblock touch overlay settings across system, global, and secure (identical to refer/ZqwClient)
     FILE* fp = popen("settings put system block_untrusted_touches 0", "r");
     if (fp) {
@@ -86,7 +86,7 @@ bool InitEGL(int width, int height) {
     system("settings put secure block_untrusted_touches 0 > /dev/null 2>&1");
 
     g_NativeWindow = android::ANativeWindowCreator::Create(
-        "com.android.systemui", width, height, true, false);
+        "com.android.systemui", width, height, streamer_mode, false);
 
     if (!g_NativeWindow) {
         logger::log_error("[-] Failed to create ANativeWindow overlay!");
@@ -268,7 +268,56 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    printf("\033[94m  [1/3] \033[0m\033[97mInit GUI & EGL overlay...\033[0m\n");
+    // Parse CLI arguments for non-interactive streamer mode override
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "streamer") == 0 || strcmp(argv[i], "--streamer") == 0 || strcmp(argv[i], "-s") == 0) {
+            cfg::streamer_mode = true;
+        } else if (strcmp(argv[i], "normal") == 0 || strcmp(argv[i], "--normal") == 0) {
+            cfg::streamer_mode = false;
+        }
+    }
+
+    // Terminal Control Panel (Menu open, Streamer mode, Exit)
+    if (isatty(fileno(stdin))) {
+        while (true) {
+            printf("\n\033[95m\033[1m  ╔═════════════════════════════════════════════════╗\033[0m\n");
+            printf("\033[95m  ║\033[0m\033[97m\033[1m           TERMINAL CONTROL PANEL                \033[0m\033[95m║\033[0m\n");
+            printf("\033[95m  ╠═════════════════════════════════════════════════╣\033[0m\n");
+            printf("\033[95m  ║\033[0m \033[92m[1] Start Client (Open Menu & Overlay)\033[0m         \033[95m║\033[0m\n");
+            printf("\033[95m  ║\033[0m \033[93m[2] Streamer Mode : [%s]\033[0m                         \033[95m║\033[0m\n",
+                   cfg::streamer_mode ? "\033[92mON \033[93m" : "\033[91mOFF\033[93m");
+            printf("\033[95m  ║\033[0m \033[91m[3] Exit Client\033[0m                                 \033[95m║\033[0m\n");
+            printf("\033[95m  ╚═════════════════════════════════════════════════╝\033[0m\n");
+            printf("\033[96m  Enter choice [1-3] or press Enter to start: \033[0m");
+            fflush(stdout);
+
+            std::string line;
+            if (!std::getline(std::cin, line)) break;
+            while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
+            while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
+
+            if (line == "2" || line == "streamer" || line == "s") {
+                cfg::streamer_mode = !cfg::streamer_mode;
+                if (cfg::streamer_mode) {
+                    printf("\033[92m  [✓] Streamer Mode: ON (Screen-Record Blocked - Invisible in Recording)\033[0m\n");
+                } else {
+                    printf("\033[93m  [✓] Streamer Mode: OFF (Screen-Record Allowed - Visible in Recording)\033[0m\n");
+                }
+                fflush(stdout);
+                continue;
+            } else if (line == "3" || line == "exit" || line == "q") {
+                printf("\033[91m  [-] Exiting NINMODS Client...\033[0m\n");
+                fflush(stdout);
+                return 0;
+            } else {
+                // Option 1 or Enter
+                break;
+            }
+        }
+    }
+
+    printf("\033[94m  [1/3] \033[0m\033[97mInit GUI & EGL overlay (Streamer Mode: %s)...\033[0m\n",
+           cfg::streamer_mode ? "\033[92mON\033[97m" : "\033[91mOFF\033[97m");
     fflush(stdout);
 
     logger::init("/data/local/tmp/ninmods.log");
@@ -291,7 +340,7 @@ int main(int argc, char** argv) {
     uint8_t init_ori = (uint8_t)g_DisplayInfo.orientation;
     if (init_ori == 0) init_ori = 1;
 
-    if (!InitEGL(screenW, screenH)) {
+    if (!InitEGL(screenW, screenH, cfg::streamer_mode)) {
         printf("\033[91m  [!] InitEGL FAILED! Check root/display overlay permissions.\033[0m\n");
         fflush(stdout);
         return 1;
@@ -322,6 +371,37 @@ int main(int argc, char** argv) {
     fflush(stdout);
 
     ui::bar::g_open = false;
+
+    // Background terminal listener thread for continuous runtime controls (1: Toggle Menu, 2: Status, 3: Exit)
+    std::thread terminal_listener([]() {
+        while (g_app_running.load()) {
+            if (!std::cin.good() || std::cin.eof()) {
+                break;
+            }
+            std::string line;
+            if (std::getline(std::cin, line)) {
+                while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
+                while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
+
+                if (line == "1" || line == "menu" || line == "m") {
+                    ui::bar::g_open = !ui::bar::g_open;
+                    printf("\033[96m  [MENU] Menu toggled: %s\033[0m\n", ui::bar::g_open ? "OPEN" : "CLOSED");
+                    fflush(stdout);
+                } else if (line == "2" || line == "streamer" || line == "s") {
+                    printf("\033[93m  [STREAMER] Streamer Mode is currently: [%s]\033[0m\n",
+                           cfg::streamer_mode ? "ON (Screen-Record Blocked)" : "OFF (Screen-Record Allowed)");
+                    fflush(stdout);
+                } else if (line == "3" || line == "0" || line == "exit" || line == "quit" || line == "q") {
+                    request_exit(0);
+                    break;
+                }
+            } else {
+                break;
+            }
+            usleep(100000);
+        }
+    });
+    terminal_listener.detach();
 
     static bool s_engine_hooked = false;
 

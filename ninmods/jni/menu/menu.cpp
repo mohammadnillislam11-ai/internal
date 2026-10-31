@@ -530,7 +530,7 @@ namespace ui::menu {
         ImGui::SetCursorScreenPos({cp2.x, cp2.y + card2H + 16.f});
         ImGui::Dummy({0,0});
 
-        float card3H = 145.f;
+        float card3H = 175.f;
         ImVec2 cp3 = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp3, cw, card3H);
         NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("System Architecture & Security"));
@@ -540,6 +540,7 @@ namespace ui::menu {
         NS_InfoRow(oxorany("libil2cpp Base"), libBuf, C_Accent());
         NS_InfoRow(oxorany("Protection Layer"), oxorany("NativeShield Active"), C_Success());
         NS_InfoRow(oxorany("Memory Bus"), oxorany("process_vm_readv (Direct Kernel)"));
+        NS_InfoRow(oxorany("Streamer Mode"), cfg::streamer_mode ? oxorany("ACTIVE (Screen-Record Blocked)") : oxorany("OFF (Recording Allowed)"), cfg::streamer_mode ? C_Success() : C_TextDim());
 
         ImGui::SetCursorScreenPos({cp3.x, cp3.y + card3H + 16.f});
         ImGui::Dummy({0, 30});
