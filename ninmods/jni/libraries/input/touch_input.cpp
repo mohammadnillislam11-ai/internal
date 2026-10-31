@@ -14,6 +14,8 @@
 #define TOUCH_MODE 2
 
 namespace touch {
+    inline uint8_t orientation = 1;
+
     struct input {
         int fd;
         bool canBeUsed{false};
@@ -69,7 +71,6 @@ namespace touch {
     };
 
     static std::atomic<int> g_active_touch_fd{-1};
-uint8_t orientation = 1;
     ImGuiIO *imgui_io = nullptr;
     std::vector<std::shared_ptr<input>> inputs;
 
