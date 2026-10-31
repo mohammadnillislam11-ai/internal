@@ -130,42 +130,7 @@ namespace engine::data {
         return rpm<int>(elem + offsets::HP_Value);
     }
 
-    /**
-     * @brief Reads and decodes player UTF-16 name into an ASCII buffer.
-     */
-    static int read_name(uint64_t player, char* buf, size_t buflen) {
-        buf[0] = '\0';
-        auto str_ptr = rpm<uint64_t>(player + offsets::Player_Name);
-        if (!str_ptr || str_ptr < 0x10000) return 0;
 
-        int len = rpm<int>(str_ptr + 0x10);
-        if (len <= 0 || len > 64) return 0;
-
-        uint16_t utf16[65];
-        if (len > 64) len = 64;
-        if (!mem_read(str_ptr + 0x14, utf16, len * sizeof(uint16_t))) return 0;
-
-        int n = 0;
-        for (int i = 0; i < len && n < static_cast<int>(buflen) - 1; i++) {
-            uint16_t c = utf16[i];
-            if (c >= 0x20 && c <= 0x7E) {
-                buf[n++] = static_cast<char>(c);
-            }
-        }
-        buf[n] = '\0';
-        return n;
-    }
-
-    /**
-     * @brief Reads weapon resource identification ID.
-     */
-    static int read_weapon(uint64_t player) {
-        auto w = rpm<uint64_t>(player + offsets::Player_Weapon);
-        if (!w) return -1;
-        auto wd = rpm<uint64_t>(w + offsets::Weapon_Data);
-        if (!wd) return -1;
-        return rpm<int>(wd + 0x64);
-    }
 
     /**
      * @brief Managed IL2CPP Dictionary wrapper matching ZqwClient stealth 1-syscall architecture.
@@ -198,56 +163,7 @@ namespace engine::data {
         }
     };
 
-    /**
-     * @brief Scans dropped loot items using the MetaManager DropObjects dictionary.
-     */
-    static void scan_loot(uint64_t base_game, const Vector3& local_pos, float sw, float sh) {
-        std::vector<LootItem> list;
 
-        uint64_t match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
-        if (!match) return;
-
-        uint64_t meta_mgr = rpm<uint64_t>(match + offsets::Match_MetaManager);
-        if (!meta_mgr) return;
-
-        uint64_t dict_ptr = rpm<uint64_t>(meta_mgr + offsets::MetaManager_DropObjects);
-        if (!dict_ptr) return;
-
-        uint64_t entries = rpm<uint64_t>(dict_ptr + offsets::Dict_Entries);
-        int count = rpm<int>(dict_ptr + offsets::Dict_Count);
-        if (!entries || count <= 0 || count > 500) return;
-
-        uint64_t base = entries + offsets::Dict_ArrayHeader;
-        for (int i = 0; i < count; i++) {
-            uint64_t e = base + (i * offsets::Dict_EntryStride);
-            uint64_t drop_obj = rpm<uint64_t>(e + offsets::Dict_EntryValue);
-            if (!drop_obj || drop_obj < 0x100000) continue;
-
-            bool landed = rpm<bool>(drop_obj + offsets::DropObject_Landed);
-            if (!landed) continue;
-
-            Vector3 world = rpm<Vector3>(drop_obj + offsets::DropObject_Position);
-            if (world == Vector3::Zero()) continue;
-
-            float dist = get_distance_meters(local_pos, world);
-            if (dist > cfg::esp::loot_range) continue;
-
-            Vector3 screen = world_to_screen(g_view_matrix, world, sw, sh);
-            if (screen.x < 0) continue;
-
-            LootItem item;
-            item.addr      = drop_obj;
-            item.guid      = rpm<uint32_t>(drop_obj + offsets::DropObject_Guid);
-            item.resID     = rpm<uint32_t>(drop_obj + offsets::DropObject_ResID);
-            item.worldPos  = world;
-            item.screenPos = screen;
-            item.distance  = dist;
-            list.push_back(item);
-        }
-
-        std::lock_guard<std::mutex> lk(g_loots_mutex);
-        g_loots = std::move(list);
-    }
 
     /**
      * @brief One full entity scan cycle.
@@ -328,13 +244,7 @@ namespace engine::data {
         uint64_t local_head_node = rpm<uint64_t>(local_player + offsets::Bone_Head);
         if (local_head_node) local_pos = get_node_position(local_head_node);
 
-        // Loot Scan
-        if (cfg::esp::loot) {
-            scan_loot(base_game, local_pos, screen_w, screen_h);
-        } else {
-            std::lock_guard<std::mutex> lk(g_loots_mutex);
-            g_loots.clear();
-        }
+        // No loot scan needed (ESP Loot removed)
 
         // Player Dictionary Scan
         uint64_t dict_addr = rpm<uint64_t>(base_game + offsets::Match_PlayerDict);
@@ -406,10 +316,6 @@ namespace engine::data {
             }
 
             PlayerData pd;
-            read_name(enemy, pd.name, sizeof(pd.name));
-            pd.weaponType = read_weapon(enemy);
-            if (!pd.name[0] && is_bot) snprintf(pd.name, sizeof(pd.name), "BOT");
-
             pd.addr       = enemy;
             pd.Head       = head_screen;
             pd.Toe        = toe_screen;
@@ -419,27 +325,13 @@ namespace engine::data {
             pd.distance   = dist;
             pd.curHP      = hp;
             pd.maxHP      = 200;
-            pd.curArmor   = rpm<int>(enemy + offsets::Player_Armor);
-            pd.isFiring   = rpm<bool>(enemy + offsets::Player_IsFiring);
-            pd.isGrounded = rpm<bool>(enemy + offsets::Player_IsGrounded);
 
-            Vector3 vel = rpm<Vector3>(enemy + offsets::Player_Velocity);
-            pd.speed = sqrtf(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
-
-            // Bones (synchronized with ZqwClient model)
-            pd.LToe      = toe_screen;
-            pd.Hip       = bone_screen(enemy, offsets::Bone_Hip, screen_w, screen_h);
-            pd.Breast    = bone_screen(enemy, offsets::Bone_Breast, screen_w, screen_h);
-            pd.Root      = bone_screen(enemy, offsets::Bone_Root, screen_w, screen_h);
-            pd.LShoulder = bone_screen(enemy, offsets::Bone_LeftShoulder, screen_w, screen_h);
-            pd.RShoulder = bone_screen(enemy, offsets::Bone_RightShoulder, screen_w, screen_h);
-            pd.LAnkle    = bone_screen(enemy, offsets::Bone_LeftAnkle, screen_w, screen_h);
-            pd.RAnkle    = bone_screen(enemy, offsets::Bone_RightAnkle, screen_w, screen_h);
-            pd.RToe      = bone_screen(enemy, offsets::Bone_RightToe, screen_w, screen_h);
-            pd.LForeArm  = bone_screen(enemy, offsets::Bone_LeftForeArm, screen_w, screen_h);
-            pd.RForeArm  = bone_screen(enemy, offsets::Bone_RightForeArm, screen_w, screen_h);
-            pd.LHand     = bone_screen(enemy, offsets::Bone_LeftHand, screen_w, screen_h);
-            pd.RHand     = bone_screen(enemy, offsets::Bone_RightHand, screen_w, screen_h);
+            if (cfg::aim::enabled && cfg::aim::target_bone == 1) {
+                pd.Breast = bone_screen(enemy, offsets::Bone_Breast, screen_w, screen_h);
+            }
+            if (cfg::aim::enabled && cfg::aim::target_bone == 2) {
+                pd.Hip = bone_screen(enemy, offsets::Bone_Hip, screen_w, screen_h);
+            }
 
             tmp_players.push_back(pd);
         }

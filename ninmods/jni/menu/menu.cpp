@@ -371,39 +371,17 @@ namespace ui::menu {
         float cw = ImGui::GetContentRegionAvail().x;
 
         float colW = (cw - 32 - 24) * 0.5f;
-        float card1H = 300.f;
+        float card1H = 175.f;
         ImVec2 cp = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp, cw, card1H);
         NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("ESP Visual Overlays"), "Master");
         ImGui::SetCursorScreenPos({cp.x+16, cp.y+48});
 
-        ImGui::PushID("esp_cols");
-        ImGui::Columns(2, "esp_cols_id", false);
-        ImGui::SetColumnWidth(0, colW + 12);
-        ImGui::SetColumnWidth(1, colW + 12);
+        NS_Toggle("esp_tracer",  oxorany("ESP Line"),   &cfg::esp::tracer);
+        NS_Toggle("esp_box",     oxorany("ESP Box"),    &cfg::esp::box);
+        NS_Toggle("esp_health",  oxorany("ESP Health"), &cfg::esp::health);
 
-        NS_Toggle("esp_box",     oxorany("Box"),       &cfg::esp::box);
-        NS_Toggle("esp_name",    oxorany("Name"),      &cfg::esp::name);
-        NS_Toggle("esp_health",  oxorany("Health"),    &cfg::esp::health);
-        NS_Toggle("esp_armor",   oxorany("Armor"),     &cfg::esp::armor);
-        NS_Toggle("esp_dist",    oxorany("Distance"),  &cfg::esp::distance);
-        NS_Toggle("esp_bot",     oxorany("Bot Tag"),   &cfg::esp::bot_tag);
-
-        ImGui::NextColumn();
-
-        NS_Toggle("esp_tracer",  oxorany("Tracer 360"),&cfg::esp::tracer);
-        NS_Toggle("esp_skel",    oxorany("Skeleton"),  &cfg::esp::skeleton);
-        NS_Toggle("esp_cross",   oxorany("Crosshair"), &cfg::esp::crosshair);
-        NS_Toggle("esp_weapon",  oxorany("Weapon"),    &cfg::esp::weapon);
-        NS_Toggle("esp_fire",    oxorany("Firing"),    &cfg::esp::firing_ind);
-        NS_Toggle("esp_loot",    oxorany("Loot"),      &cfg::esp::loot);
-
-        ImGui::Columns(1);
-        ImGui::PopID();
-
-        cfg::esp::enabled = cfg::esp::box || cfg::esp::name || cfg::esp::health || cfg::esp::armor ||
-                            cfg::esp::distance || cfg::esp::bot_tag || cfg::esp::tracer || cfg::esp::skeleton ||
-                            cfg::esp::crosshair || cfg::esp::weapon || cfg::esp::firing_ind || cfg::esp::loot;
+        cfg::esp::enabled = cfg::esp::tracer || cfg::esp::box || cfg::esp::health;
 
         ImGui::SetCursorScreenPos({cp.x, cp.y+card1H+14});
         ImGui::Dummy({0,0});
@@ -411,7 +389,7 @@ namespace ui::menu {
         float card2H = 260.f;
         ImVec2 cp2 = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp2, cw, card2H);
-        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Box Configuration"));
+        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Box & Line Configuration"));
         ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+48});
 
         const char* box_types[] = { oxorany("Corner"), oxorany("Full"), oxorany("Glow") };
@@ -423,30 +401,15 @@ namespace ui::menu {
         ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
         ImGui::Dummy({0,0});
 
-        // Card 3: Loot Settings (Synced from ZqwClient)
-        float card3H = 110.f;
+        float card3H = 145.f;
         ImVec2 cp3 = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp3, cw, card3H);
-        NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("Loot Settings"));
+        NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("Color Palette"));
         ImGui::SetCursorScreenPos({cp3.x+16, cp3.y+48});
-
-        NS_Slider("loot_rg", oxorany("Loot Range"), &cfg::esp::loot_range, 30.f, 300.f, "m");
+        NS_ColorEdit("col_box",  oxorany("Box & Line"), &cfg::esp::box_col);
+        NS_ColorEdit("col_vis",  oxorany("Visible"),    &cfg::esp::box_visible);
 
         ImGui::SetCursorScreenPos({cp3.x, cp3.y+card3H+14});
-        ImGui::Dummy({0,0});
-
-        float card4H = 240.f;
-        ImVec2 cp4 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp4, cw, card4H);
-        NS_CardTitle(dl, {cp4.x+16, cp4.y+14}, oxorany("Color Palette"));
-        ImGui::SetCursorScreenPos({cp4.x+16, cp4.y+48});
-        NS_ColorEdit("col_box",  oxorany("Box"),       &cfg::esp::box_col);
-        NS_ColorEdit("col_vis",  oxorany("Visible"),   &cfg::esp::box_visible);
-        NS_ColorEdit("col_name", oxorany("Name"),      &cfg::esp::name_col);
-        NS_ColorEdit("col_dist", oxorany("Distance"),  &cfg::esp::distance_col);
-        NS_ColorEdit("col_weap", oxorany("Weapon"),    &cfg::esp::weapon_col);
-
-        ImGui::SetCursorScreenPos({cp4.x, cp4.y+card4H+14});
         ImGui::Dummy({0, 30});
     }
 
