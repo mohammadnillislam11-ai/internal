@@ -337,13 +337,17 @@ namespace engine::data {
             bool is_bot = rpm<bool>(enemy + offsets::Player_IsBot);
 
             auto avatar = rpm<uint64_t>(enemy + offsets::Player_Avatar);
+            if (!avatar) avatar = rpm<uint64_t>(enemy + 0x770);
             auto uma = avatar ? rpm<uint64_t>(avatar + offsets::Avatar_Uma) : 0;
             if (!uma) continue;
 
-            // Teammate Filter (Official Free Fire UMA Data Skip flag)
+            // Teammate Filter (Verified across STORM_MODS 0x81, NEXOMODSROOT 0x81, and ZqwClient 0x91)
             auto uma_data = rpm<uint64_t>(uma + offsets::Uma_Data);
-            if (uma_data && rpm<bool>(uma_data + offsets::UmaData_Skip)) {
-                continue;
+            if (uma_data) {
+                if (rpm<bool>(uma_data + offsets::UmaData_isTeam) ||
+                    rpm<bool>(uma_data + offsets::UmaData_Skip)) {
+                    continue; // Teammate: Skip so tracer lines appear ONLY for enemies!
+                }
             }
 
             bool raw_visible = rpm<bool>(uma + offsets::Uma_Visible);

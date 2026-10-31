@@ -1,5 +1,6 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "aimbot.hpp"
+#include "Quaternion.h"
 #include "game_data.hpp"
 #include "offsets.hpp"
 #include "memory.hpp"
@@ -182,10 +183,28 @@ namespace engine::aim {
             return;
         }
 
+        // Trigger condition check (On Fire, On Scope, or Always)
+        if (cfg::aim::trigger_type == 1) { // On Fire
+            bool is_firing = rpm<bool>(local + offsets::Player_IsFiring) || rpm<bool>(local + 0x848);
+            if (!is_firing) {
+                g_current_target = 0;
+                return;
+            }
+        } else if (cfg::aim::trigger_type == 2) { // On Scope
+            bool is_sight = rpm<bool>(local + offsets::Player_IsSight);
+            if (!is_sight) {
+                g_current_target = 0;
+                return;
+            }
+        }
+
+        // Resolve AimInfo with multi-version fallback (0xE58, 0xE50, 0xD80)
         uint64_t aim_info = rpm<uint64_t>(local + offsets::Player_AimInfo);
         if (!engine::mem::addr_valid(aim_info)) {
-            g_current_target = 0;
-            return;
+            aim_info = rpm<uint64_t>(local + 0xE50);
+        }
+        if (!engine::mem::addr_valid(aim_info)) {
+            aim_info = rpm<uint64_t>(local + 0xD80);
         }
 
         float cx = static_cast<float>(display::width > 0 ? display::width : 2400) * 0.5f;
@@ -196,28 +215,58 @@ namespace engine::aim {
         if (find_best_target_fov(cx, cy, target)) {
             g_current_target = target.addr;
 
-            if (cfg::aim::silent || cfg::aim::nobita) {
-                uint64_t my_head_node = rpm<uint64_t>(local + offsets::Bone_Head);
-                Vector3 my_pos = (my_head_node) ? data::get_node_position(my_head_node) : Vector3::Zero();
+            Vector3 enemy_bone_world = target.HeadWorld;
+            if (cfg::aim::target_bone == 1) {
+                uint64_t breast_node = rpm<uint64_t>(target.addr + offsets::Bone_Breast);
+                if (breast_node) enemy_bone_world = data::get_node_position(breast_node);
+            } else if (cfg::aim::target_bone == 2) {
+                uint64_t hip_node = rpm<uint64_t>(target.addr + offsets::Bone_Hip);
+                if (hip_node) enemy_bone_world = data::get_node_position(hip_node);
+            }
 
-                Vector3 enemy_bone_world = target.HeadWorld;
-                if (cfg::aim::target_bone == 1) {
-                    uint64_t breast_node = rpm<uint64_t>(target.addr + offsets::Bone_Breast);
-                    if (breast_node) enemy_bone_world = data::get_node_position(breast_node);
-                } else if (cfg::aim::target_bone == 2) {
-                    uint64_t hip_node = rpm<uint64_t>(target.addr + offsets::Bone_Hip);
-                    if (hip_node) enemy_bone_world = data::get_node_position(hip_node);
+            if (enemy_bone_world != Vector3::Zero()) {
+                // 1. Silent Aim (RayDir vector redirection - verified in STORM_MODS & NEXOMODSROOT)
+                if (cfg::aim::silent && engine::mem::addr_valid(aim_info)) {
+                    Vector3 start_pos = rpm<Vector3>(aim_info + offsets::AimInfo_StartPosition);
+                    if (start_pos == Vector3::Zero()) {
+                        uint64_t my_head_node = rpm<uint64_t>(local + offsets::Bone_Head);
+                        if (!my_head_node) my_head_node = rpm<uint64_t>(local + 0x6A0);
+                        start_pos = (my_head_node) ? data::get_node_position(my_head_node) : Vector3::Zero();
+                    }
+                    if (start_pos != Vector3::Zero()) {
+                        Vector3 dir = enemy_bone_world - start_pos;
+                        wpm<Vector3>(aim_info + offsets::AimInfo_Direction, dir);
+                    }
                 }
 
-                if (my_pos != Vector3::Zero() && enemy_bone_world != Vector3::Zero()) {
-                    float dx = enemy_bone_world.x - my_pos.x;
-                    float dy = enemy_bone_world.y - my_pos.y;
-                    float dz = enemy_bone_world.z - my_pos.z;
-                    float len = sqrtf(dx * dx + dy * dy + dz * dz);
-                    if (std::isfinite(len) && len > 0.001f) {
-                        Vector3 dir_out(dx / len, dy / len, dz / len);
-                        if (std::isfinite(dir_out.x) && std::isfinite(dir_out.y) && std::isfinite(dir_out.z)) {
-                            wpm<Vector3>(aim_info + offsets::AimInfo_Direction, dir_out);
+                // 2. Nobita Mode / Aim Lock (Rotation quaternion write - verified in STORM_MODS)
+                if (cfg::aim::nobita) {
+                    uint64_t follow = rpm<uint64_t>(local + offsets::Player_Camera);
+                    if (!follow) follow = rpm<uint64_t>(local + 0x690);
+                    uint64_t cam = follow ? rpm<uint64_t>(follow + offsets::Camera_Follow) : 0;
+                    if (!cam && follow) cam = rpm<uint64_t>(follow + 0x30);
+                    uint64_t int_ptr = cam ? rpm<uint64_t>(cam + offsets::Camera_IntPtr) : 0;
+                    if (!int_ptr && cam) int_ptr = rpm<uint64_t>(cam + 0x10);
+
+                    Vector3 cam_pos = Vector3::Zero();
+                    if (int_ptr) {
+                        Matrix4x4 mat = rpm<Matrix4x4>(int_ptr + offsets::Camera_Matrix);
+                        cam_pos = Vector3(mat.m[3][0], mat.m[3][1], mat.m[3][2]);
+                    }
+                    if (cam_pos == Vector3::Zero()) {
+                        uint64_t my_head = rpm<uint64_t>(local + offsets::Bone_Head);
+                        if (!my_head) my_head = rpm<uint64_t>(local + 0x6A0);
+                        cam_pos = my_head ? data::get_node_position(my_head) : Vector3::Zero();
+                    }
+
+                    if (cam_pos != Vector3::Zero()) {
+                        Vector3 dir = enemy_bone_world - cam_pos;
+                        float len = sqrtf(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+                        if (len > 0.001f) {
+                            dir.x /= len; dir.y /= len; dir.z /= len;
+                            Quaternion rot = Quaternion::LookRotation(dir, Vector3(0.0f, 1.0f, 0.0f));
+                            wpm<Quaternion>(local + offsets::Player_Rotation, rot);
+                            wpm<Quaternion>(local + 0x614, rot);
                         }
                     }
                 }
