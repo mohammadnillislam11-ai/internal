@@ -476,7 +476,7 @@ namespace android {
                     if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer) {
                         transaction.SetLayer(result, 0x7fffffff);
                     }
-                    if (12 <= Functionals::GetInstance().systemVersion && hide &&
+                    if (12 <= Functionals::GetInstance().systemVersion &&
                         Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay) {
                         transaction.SetTrustedOverlay(result, true);
                     }

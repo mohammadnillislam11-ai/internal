@@ -23,6 +23,7 @@ namespace touch {
         bool trackingIDPresent{false};
 #endif
         bool isDown{false};
+        bool btnTouch{false};
         float x{0.0f}, y{0.0f};
 
         input(const char *_path, int32_t _screen_w, int32_t _screen_h) {
@@ -30,7 +31,7 @@ namespace touch {
             if (fd == -1) fd = open(_path, O_RDWR);
             if (fd == -1)
                 return;
-            canBeUsed = ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &absX) != -1 && ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &absY) != -1 && absX.maximum > 0 && absY.maximum > 0;
+            canBeUsed = ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &absX) != -1 && ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &absY) != -1 && absX.maximum >= 300 && absY.maximum >= 300;
             if (!canBeUsed) {
                 close();
                 return;
@@ -52,10 +53,18 @@ namespace touch {
         }
 
         void calculateMultipliers(int32_t _screen_w, int32_t _screen_h) {
-            auto max = fmax((float) absX.maximum, (float) absY.maximum);
-            auto min = fmin((float) absX.maximum, (float) absY.maximum);
-            absXMultiplier = (float) _screen_w / (_screen_w > _screen_h ? max : min);
-            absYMultiplier = (float) _screen_h / (_screen_w > _screen_h ? min : max);
+            float raw_w = (float)absX.maximum;
+            float raw_h = (float)absY.maximum;
+            if (raw_w <= 0.0f) raw_w = 1080.0f;
+            if (raw_h <= 0.0f) raw_h = 2400.0f;
+
+            if (orientation == 1 || orientation == 3) {
+                absXMultiplier = (float)_screen_w / raw_h;
+                absYMultiplier = (float)_screen_h / raw_w;
+            } else {
+                absXMultiplier = (float)_screen_w / raw_w;
+                absYMultiplier = (float)_screen_h / raw_h;
+            }
         }
     };
 
@@ -79,12 +88,17 @@ uint8_t orientation = 1;
             for (long j = 0; j < event_readed_count; j++) {
                 auto &event = events[j];
                 if (event.type == EV_KEY && (event.code == BTN_TOUCH || event.code == BTN_LEFT)) {
-                    _input->isDown = (event.value != 0);
+                    _input->btnTouch = (event.value != 0);
+                    _input->isDown = _input->btnTouch;
                 }
                 if (event.type == EV_ABS) {
 #if TOUCH_MODE == 2
                     if (_input->trackingIDPresent && event.code == ABS_MT_TRACKING_ID) {
-                        _input->isDown = (event.value != -1);
+                        if (event.value != -1) {
+                            _input->isDown = true;
+                        } else if (!_input->btnTouch) {
+                            _input->isDown = false;
+                        }
                         continue;
                     }
 #elif TOUCH_MODE == 0
