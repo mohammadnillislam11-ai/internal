@@ -441,8 +441,11 @@ namespace engine::data {
 
     void stop_worker() {
         if (!g_worker_running.exchange(false)) return;
-        if (g_worker_thread.joinable()) {
-            g_worker_thread.join();
+        try {
+            if (g_worker_thread.joinable()) {
+                g_worker_thread.join();
+            }
+        } catch (...) {
         }
         std::lock_guard<std::mutex> lk(g_players_mutex);
         g_players.clear();

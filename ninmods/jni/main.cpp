@@ -425,7 +425,6 @@ int main(int argc, char** argv) {
 
     if (g_NativeWindow) {
         ANativeWindow_release(g_NativeWindow);
-        android::ANativeWindowCreator::Destroy(g_NativeWindow);
         g_NativeWindow = nullptr;
     }
 

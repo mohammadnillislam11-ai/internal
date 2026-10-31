@@ -135,10 +135,10 @@ namespace engine::aim {
      * @brief Finds closest enemy to crosshair strictly within 2D FOV circle on screen.
      *        No off-screen 3D distance lock; pure clean circle aiming.
      */
-    static const data::PlayerData* find_best_target_fov(float screen_cx, float screen_cy) {
+    static bool find_best_target_fov(float screen_cx, float screen_cy, data::PlayerData& out_target) {
         std::lock_guard<std::mutex> lk(data::g_players_mutex);
 
-        const data::PlayerData* best = nullptr;
+        bool found = false;
         float min_dist_crosshair = cfg::aim::fov;
 
         for (const auto& p : data::g_players) {
@@ -157,10 +157,11 @@ namespace engine::aim {
 
             if (dist_to_center <= cfg::aim::fov && dist_to_center < min_dist_crosshair) {
                 min_dist_crosshair = dist_to_center;
-                best = &p;
+                out_target = p;
+                found = true;
             }
         }
-        return best;
+        return found;
     }
 
     /**
@@ -169,7 +170,7 @@ namespace engine::aim {
      */
     void update() {
         bool aim_active = cfg::aim::silent || cfg::aim::nobita;
-        if (!aim_active || !data::g_in_match.load()) {
+        if (!aim_active || !data::g_in_match.load(std::memory_order_relaxed)) {
             g_current_target = 0;
             return;
         }
@@ -180,40 +181,42 @@ namespace engine::aim {
             return;
         }
 
+        uint64_t aim_info = rpm<uint64_t>(local + offsets::Player_AimInfo);
+        if (!engine::mem::addr_valid(aim_info)) {
+            g_current_target = 0;
+            return;
+        }
+
         float cx = static_cast<float>(display::width > 0 ? display::width : 2400) * 0.5f;
         float cy = static_cast<float>(display::height > 0 ? display::height : 1080) * 0.5f;
 
-        // Strictly target enemy within the 2D FOV circle
-        const data::PlayerData* target = find_best_target_fov(cx, cy);
-
-        if (target) {
-            g_current_target = target->addr;
+        // Strictly target enemy within the 2D FOV circle (safe copy by value)
+        data::PlayerData target;
+        if (find_best_target_fov(cx, cy, target)) {
+            g_current_target = target.addr;
 
             if (cfg::aim::silent || cfg::aim::nobita) {
-                uint64_t aim_info = rpm<uint64_t>(local + offsets::Player_AimInfo);
-                if (engine::mem::addr_valid(aim_info)) {
-                    uint64_t my_head_node = rpm<uint64_t>(local + offsets::Bone_Head);
-                    Vector3 my_pos = (my_head_node) ? data::get_node_position(my_head_node) : Vector3::Zero();
+                uint64_t my_head_node = rpm<uint64_t>(local + offsets::Bone_Head);
+                Vector3 my_pos = (my_head_node) ? data::get_node_position(my_head_node) : Vector3::Zero();
 
-                    Vector3 enemy_bone_world = target->HeadWorld;
-                    if (cfg::aim::target_bone == 1) {
-                        uint64_t breast_node = rpm<uint64_t>(target->addr + offsets::Bone_Breast);
-                        if (breast_node) enemy_bone_world = data::get_node_position(breast_node);
-                    } else if (cfg::aim::target_bone == 2) {
-                        uint64_t hip_node = rpm<uint64_t>(target->addr + offsets::Bone_Hip);
-                        if (hip_node) enemy_bone_world = data::get_node_position(hip_node);
-                    }
+                Vector3 enemy_bone_world = target.HeadWorld;
+                if (cfg::aim::target_bone == 1) {
+                    uint64_t breast_node = rpm<uint64_t>(target.addr + offsets::Bone_Breast);
+                    if (breast_node) enemy_bone_world = data::get_node_position(breast_node);
+                } else if (cfg::aim::target_bone == 2) {
+                    uint64_t hip_node = rpm<uint64_t>(target.addr + offsets::Bone_Hip);
+                    if (hip_node) enemy_bone_world = data::get_node_position(hip_node);
+                }
 
-                    if (my_pos != Vector3::Zero() && enemy_bone_world != Vector3::Zero()) {
-                        float dx = enemy_bone_world.x - my_pos.x;
-                        float dy = enemy_bone_world.y - my_pos.y;
-                        float dz = enemy_bone_world.z - my_pos.z;
-                        float len = sqrtf(dx * dx + dy * dy + dz * dz);
-                        if (std::isfinite(len) && len > 0.001f) {
-                            Vector3 dir_out(dx / len, dy / len, dz / len);
-                            if (std::isfinite(dir_out.x) && std::isfinite(dir_out.y) && std::isfinite(dir_out.z)) {
-                                wpm<Vector3>(aim_info + offsets::AimInfo_Direction, dir_out);
-                            }
+                if (my_pos != Vector3::Zero() && enemy_bone_world != Vector3::Zero()) {
+                    float dx = enemy_bone_world.x - my_pos.x;
+                    float dy = enemy_bone_world.y - my_pos.y;
+                    float dz = enemy_bone_world.z - my_pos.z;
+                    float len = sqrtf(dx * dx + dy * dy + dz * dz);
+                    if (std::isfinite(len) && len > 0.001f) {
+                        Vector3 dir_out(dx / len, dy / len, dz / len);
+                        if (std::isfinite(dir_out.x) && std::isfinite(dir_out.y) && std::isfinite(dir_out.z)) {
+                            wpm<Vector3>(aim_info + offsets::AimInfo_Direction, dir_out);
                         }
                     }
                 }
