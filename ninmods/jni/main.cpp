@@ -48,6 +48,26 @@ static android::ANativeWindowCreator::DisplayInfo g_DisplayInfo{0};
 
 // Global application life-cycle state
 static std::atomic<bool> g_app_running{true};
+#include <csignal>
+
+static void crash_signal_handler(int sig, siginfo_t* info, void*) {
+    fprintf(stderr, "\n\033[91m[FATAL] Signal %d (%s) at address %p\033[0m\n",
+            sig, strsignal(sig), info ? info->si_addr : nullptr);
+    fflush(stderr);
+    _exit(128 + sig);
+}
+
+static void install_crash_handlers() {
+    struct sigaction sa{};
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = crash_signal_handler;
+    sigaction(SIGSEGV, &sa, nullptr);
+    sigaction(SIGABRT, &sa, nullptr);
+    sigaction(SIGBUS, &sa, nullptr);
+    sigaction(SIGFPE, &sa, nullptr);
+    sigaction(SIGILL, &sa, nullptr);
+}
+
 
 void request_exit(int code) {
     logger::log_info("[SHUTDOWN] Exit requested (code: %d). Stopping NINMODS client...", code);
@@ -222,31 +242,36 @@ static bool check_trial_license(char* out_exp_str, size_t out_len, int* out_rem_
 }
 
 int main(int argc, char** argv) {
+    install_crash_handlers();
+
+    // Print immediate startup banner aligned with ZqwClient standard
+    printf("\n\033[91m\033[1m");
+    printf("  _   _ _____ _   _ __  __  ____  _____  ____  \n");
+    printf(" | \\ | |_   _| \\ | |  \\/  |/ __ \\|  __ \\/ ___| \n");
+    printf(" |  \\| | | | |  \\| | |\\/| | |  | | |  | \\___ \\ \n");
+    printf(" | |\\  | | | | |\\  | |  | | |_| | |_| |___) |\n");
+    printf(" |_| \\_||___||_| \\_|_|  |_|\\___/ \\___/|____/ \n");
+    printf("\033[0m");
+    printf("\033[96m\033[1m  ╔═══════════════════════════════════════════════╗\n\033[0m");
+    printf("\033[96m  ║\033[0m\033[93m\033[1m        NINMODS PROJECT — FREE FIRE         \033[0m\033[96m║\n\033[0m");
+    printf("\033[96m  ║\033[0m\033[92m              v2.0 VIP EDITION                 \033[0m\033[96m║\n\033[0m");
+    printf("\033[96m  ╚═══════════════════════════════════════════════╝\n\033[0m\n");
+    fflush(stdout);
+
     char exp_buf[64] = {0};
     int rem_h = 0, rem_m = 0;
     bool lic_valid = check_trial_license(exp_buf, sizeof(exp_buf), &rem_h, &rem_m);
 
-    // If expired, reject execution immediately
     if (!lic_valid) {
-        std::cout << "\033[38;2;180;105;255m" << R"(
- _   _  ___  _   _ __  __  ___   ___  ____  
-| \ | ||_ _|| \ | |  \/  |/ _ \ / _ \/ ___| 
-|  \| | | | |  \| | |\/| | | | | | | \___ \ 
-| |\  | | | | |\  | |  | | |_| | |_| |___) |
-|_| \_||___||_| \_|_|  |_|\___/ \___/|____/ 
-)" << "\033[0m\n";
-        std::cout << "\033[91m====================================================\033[0m\n";
-        std::cout << "\033[91m [!] TRIAL LICENSE EXPIRED\033[0m\n";
-        std::cout << "\033[91m [-] Expiry Date was: " << exp_buf << "\033[0m\n";
-        std::cout << "\033[91m [-] Your 2-Day NINMODS trial has ended.\033[0m\n";
-        std::cout << "\033[91m [-] Please contact admin for license renewal.\033[0m\n";
-        std::cout << "\033[91m====================================================\033[0m\n";
+        printf("\033[91m  [!] TRIAL LICENSE EXPIRED (Expiry: %s)\033[0m\n", exp_buf);
+        fflush(stdout);
         return 1;
     }
 
-    // Initialize persistent logging
-    logger::init("/data/local/tmp/ninmods.log");
+    printf("\033[94m  [1/3] \033[0m\033[97mInit GUI & EGL overlay...\033[0m\n");
+    fflush(stdout);
 
+    logger::init("/data/local/tmp/ninmods.log");
     shield::start_watchdog();
     storage::load_config();
 
@@ -267,7 +292,8 @@ int main(int argc, char** argv) {
     if (init_ori == 0) init_ori = 1;
 
     if (!InitEGL(screenW, screenH)) {
-        logger::log_error("[-] EGL initialization failed!");
+        printf("\033[91m  [!] InitEGL FAILED! Check root/display overlay permissions.\033[0m\n");
+        fflush(stdout);
         return 1;
     }
 
@@ -276,86 +302,26 @@ int main(int argc, char** argv) {
     touch::init(screenW, screenH, init_ori);
     signal(SIGPIPE, SIG_IGN);
 
+    printf("\033[92m  [✓] GUI & Touch ready\033[0m\n");
+    fflush(stdout);
+
+    printf("\033[94m  [2/3] \033[0m\033[97mMonitoring target: \033[93m%s\033[0m\033[97m...\033[0m\n", engine::TARGET_PACKAGE);
+    fflush(stdout);
+
     int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
     if (initial_pid > 0) {
-        logger::log_success("[+] Game Detected: %s (PID: %d)", engine::TARGET_PACKAGE, initial_pid);
+        printf("\033[92m  [✓] Target running! PID: \033[93m%d\033[0m\n", initial_pid);
     } else {
-        logger::log_info("[*] Monitoring for Target Game: %s...", engine::TARGET_PACKAGE);
-    }
-
-    // Clear screen and display interactive professional console menu
-    std::cout << "\033[H\033[2J";
-    std::cout << "\033[38;2;180;105;255m" << R"(
- _   _  ___  _   _ __  __  ___   ___  ____  
-| \ | ||_ _|| \ | |  \/  |/ _ \ / _ \/ ___| 
-|  \| | | | |  \| | |\/| | | | | | | \___ \ 
-| |\  | | | | |\  | |  | | |_| | |_| |___) |
-|_| \_||___||_| \_|_|  |_|\___/ \___/|____/ 
-)" << "\033[0m\n";
-
-    std::cout << "\033[38;2;180;105;255m====================================================\033[0m\n";
-    std::cout << "\033[97m   NINMODS STANDALONE 2.0 (ARM64 / ARM32)\033[0m\n";
-    std::cout << "\033[38;2;180;105;255m====================================================\033[0m\n";
-    std::cout << "\033[92m [1] Start Client (Open Floating Logo)\033[0m\n";
-    std::cout << "\033[91m [2] Exit & Terminate All Processes\033[0m\n";
-    std::cout << "\033[93m [3] License Status: ACTIVE (Expires: " << exp_buf << " | " << rem_h << "h " << rem_m << "m left)\033[0m\n";
-    std::cout << "\033[38;2;180;105;255m====================================================\033[0m\n";
-    std::cout << "\033[96mEnter your choice [1-2] and press Enter: \033[0m" << std::flush;
-
-    if (isatty(fileno(stdin))) {
-        std::string choice;
-        while (std::getline(std::cin, choice)) {
-            while (!choice.empty() && (choice.back() == '\r' || choice.back() == '\n' || choice.back() == ' ')) choice.pop_back();
-            while (!choice.empty() && (choice.front() == ' ' || choice.front() == '\t')) choice.erase(choice.begin());
-
-            if (choice == "2" || choice == "exit" || choice == "quit" || choice == "q") {
-                std::cout << "\033[91m[-] Exiting NINMODS Client...\033[0m\n";
-                logger::log_info("[EXIT] User selected Option 2. Shutting down.");
-                return 0;
-            } else if (choice == "3") {
-                std::cout << "\033[93m[+] Trial License active until: " << exp_buf << " (" << rem_h << "h " << rem_m << "m remaining).\033[0m\n";
-                std::cout << "\033[96mEnter your choice [1-2] and press Enter: \033[0m" << std::flush;
-            } else {
-                // Option 1 or Enter
-                break;
-            }
-        }
-    }
-
-    std::cout << "\033[92m[+] Starting NINMODS floating logo overlay...\033[0m\n";
-    logger::log_success("[+] Overlay initialized. Floating logo ready on screen.");
-
-    // If target game is not already running, automatically launch it seamlessly
-    if (initial_pid <= 0) {
-        std::cout << "\033[93m[*] Launching " << engine::TARGET_PACKAGE << "...\033[0m\n";
-        logger::log_info("[LAUNCH] Starting target game: %s", engine::TARGET_PACKAGE);
+        printf("\033[93m  [*] Launching %s...\033[0m\n", engine::TARGET_PACKAGE);
         system("am start -n com.dts.freefireth/com.dts.freefireth.FFMainActivity > /dev/null 2>&1");
     }
+    fflush(stdout);
 
-    // Ensure menu starts closed with floating puck visible
+    printf("\033[92m\033[1m  ⭐ NINMODS Overlay Started! ⭐\033[0m\n");
+    printf("\033[96m  [INFO] Floating logo ready on screen. Tap to open menu.\033[0m\n");
+    fflush(stdout);
+
     ui::bar::g_open = false;
-
-    // Start background listener thread for continuous exit command monitoring ('2', '0', 'exit')
-    std::thread terminal_listener([]() {
-        while (g_app_running.load()) {
-            if (!std::cin.good() || std::cin.eof()) {
-                break;
-            }
-            std::string line;
-            if (std::getline(std::cin, line)) {
-                while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) line.pop_back();
-                while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.erase(line.begin());
-                if (line == "2" || line == "0" || line == "exit" || line == "quit" || line == "q") {
-                    request_exit(0);
-                    break;
-                }
-            } else {
-                break;
-            }
-            usleep(100000);
-        }
-    });
-    terminal_listener.detach();
 
     static bool s_engine_hooked = false;
 

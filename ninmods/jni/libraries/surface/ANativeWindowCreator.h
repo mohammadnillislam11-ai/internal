@@ -180,6 +180,13 @@ namespace android {
                                 },
                         },
                         {
+                                13,
+                                {
+                                        {reinterpret_cast<void **>(&LayerMetadata__Constructor),                "_ZN7android3gui13LayerMetadataC2Ev"},
+                                        {reinterpret_cast<void **>(&SurfaceComposerClient__CreateSurface),     "_ZN7android21SurfaceComposerClient13createSurfaceERKNS_7String8EjjiiRKNS_2spINS_7IBinderEEENS_3gui13LayerMetadataEPj"},
+                                },
+                        },
+                        {
                                 12,
                                 {
                                         {reinterpret_cast<void **>(&SurfaceComposerClient__Transaction__Apply), "_ZN7android21SurfaceComposerClient11Transaction5applyEb"},
@@ -271,8 +278,9 @@ namespace android {
                     }
                 }
 
-                symbolMethod.Close(libutils);
-                symbolMethod.Close(libgui);
+                // Keep libutils & libgui handles open so function pointers remain valid in mapped memory
+                // symbolMethod.Close(libutils);
+                // symbolMethod.Close(libgui);
             }
 
             static const Functionals &
@@ -286,11 +294,16 @@ namespace android {
             char data[1024];
 
             String8(const char *const string) {
-                Functionals::GetInstance().String8__Constructor(data, string);
+                memset(data, 0, sizeof(data));
+                if (Functionals::GetInstance().String8__Constructor) {
+                    Functionals::GetInstance().String8__Constructor(data, string);
+                }
             }
 
             ~String8() {
-                Functionals::GetInstance().String8__Destructor(data);
+                if (Functionals::GetInstance().String8__Destructor) {
+                    Functionals::GetInstance().String8__Destructor(data);
+                }
             }
 
             operator void *() {
@@ -302,12 +315,13 @@ namespace android {
             char data[1024];
 
             LayerMetadata() {
-                if (9 < Functionals::GetInstance().systemVersion)
+                memset(data, 0, sizeof(data));
+                if (9 < Functionals::GetInstance().systemVersion && Functionals::GetInstance().LayerMetadata__Constructor)
                     Functionals::GetInstance().LayerMetadata__Constructor(data);
             }
 
             void setInt32(uint32_t type, int32_t value) {
-                if (9 < Functionals::GetInstance().systemVersion)
+                if (9 < Functionals::GetInstance().systemVersion && Functionals::GetInstance().LayerMetadata__setInt32)
                     Functionals::GetInstance().LayerMetadata__setInt32(data, type, value);
             }
 
@@ -362,27 +376,43 @@ namespace android {
             char data[1024];
 
             SurfaceComposerClientTransaction() {
-                Functionals::GetInstance().SurfaceComposerClient__Transaction__Constructor(data);
+                memset(data, 0, sizeof(data));
+                if (Functionals::GetInstance().SurfaceComposerClient__Transaction__Constructor) {
+                    Functionals::GetInstance().SurfaceComposerClient__Transaction__Constructor(data);
+                }
             }
 
             void *SetLayer(StrongPointer<void> &surfaceControl, int32_t z) {
-                return Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer(data, surfaceControl, z);
+                if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer && surfaceControl.get()) {
+                    return Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer(data, surfaceControl, z);
+                }
+                return nullptr;
             }
 
             void *SetTrustedOverlay(StrongPointer<void> &surfaceControl, bool isTrustedOverlay) {
-                return Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay(data,
-                                                                                                        surfaceControl,
-                                                                                                        isTrustedOverlay);
+                if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay && surfaceControl.get()) {
+                    return Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay(data,
+                                                                                                            surfaceControl,
+                                                                                                            isTrustedOverlay);
+                }
+                return nullptr;
             }
 
             int32_t Apply(bool synchronous, bool oneWay) {
-                if (12 >= Functionals::GetInstance().systemVersion)
-                    return reinterpret_cast<int32_t (*)(void *,
-                                                        bool)>(Functionals::GetInstance().SurfaceComposerClient__Transaction__Apply)(
-                            data, synchronous);
-                else
-                    return Functionals::GetInstance().SurfaceComposerClient__Transaction__Apply(data, synchronous,
-                                                                                                oneWay);
+                if (12 >= Functionals::GetInstance().systemVersion) {
+                    if (Functionals::GetInstance().SurfaceComposerClient__Transaction__Apply) {
+                        return reinterpret_cast<int32_t (*)(void *,
+                                                            bool)>(Functionals::GetInstance().SurfaceComposerClient__Transaction__Apply)(
+                                data, synchronous);
+                    }
+                    return 0;
+                } else {
+                    if (Functionals::GetInstance().SurfaceComposerClient__Transaction__Apply) {
+                        return Functionals::GetInstance().SurfaceComposerClient__Transaction__Apply(data, synchronous,
+                                                                                                    oneWay);
+                    }
+                    return 0;
+                }
             }
         };
 
@@ -438,14 +468,18 @@ namespace android {
                                                                                              layerMetadata, nullptr);
                 }
 
-                if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer) {
+                if (result.get() && Functionals::GetInstance().SurfaceComposerClient__Transaction__Constructor) {
                     SurfaceComposerClientTransaction transaction;
-                    transaction.SetLayer(result, 0x7fffffff);
-                    if (12 <= Functionals::GetInstance().systemVersion &&
+                    if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer) {
+                        transaction.SetLayer(result, 0x7fffffff);
+                    }
+                    if (12 <= Functionals::GetInstance().systemVersion && hide &&
                         Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay) {
                         transaction.SetTrustedOverlay(result, true);
                     }
-                    transaction.Apply(false, true);
+                    if (Functionals::GetInstance().SurfaceComposerClient__Transaction__Apply) {
+                        transaction.Apply(false, true);
+                    }
                 }
 
                 return {result.get()};
