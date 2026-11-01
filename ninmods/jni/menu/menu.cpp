@@ -20,9 +20,10 @@
 #include <mutex>
 #include <atomic>
 
-#ifndef oxorany
-#define oxorany(x) (x)
+#ifdef oxorany
+#undef oxorany
 #endif
+#define oxorany(x) (x)
 
 namespace engine {
     void render_esp();
@@ -440,15 +441,15 @@ namespace ui::menu {
         NS_Toggle("aim_nobita", oxorany("Nobita Mode"), &cfg::aim::nobita, pageW - S(24.f));
         NS_Toggle("aim_draw",   oxorany("FOV Circle"),  &cfg::aim::draw_fov, pageW - S(24.f));
 
-        const char* bones[] = { oxorany("None"), oxorany("Head"), oxorany("Chest"), oxorany("Hip") };
+        const char* bones[] = { "None", "Head", "Chest", "Hip" };
         int cur_bone = (cfg::aim::target_bone >= 0 && cfg::aim::target_bone <= 2) ? (cfg::aim::target_bone + 1) : 0;
-        if (NS_StepSlider("aim_bone", oxorany("Target Bone"), &cur_bone, bones, 4, pageW - S(24.f))) {
+        if (NS_StepSlider("aim_bone", "Target Bone", &cur_bone, bones, 4, pageW - S(24.f))) {
             cfg::aim::target_bone = (cur_bone > 0) ? (cur_bone - 1) : -1;
         }
 
-        const char* triggers[] = { oxorany("None"), oxorany("On Fire"), oxorany("On Scope"), oxorany("Always") };
+        const char* triggers[] = { "None", "On Fire", "On Scope", "Always" };
         int cur_trig = (cfg::aim::trigger_type >= 0 && cfg::aim::trigger_type <= 2) ? (cfg::aim::trigger_type + 1) : 0;
-        if (NS_StepSlider("aim_trig", oxorany("Trigger Mode"), &cur_trig, triggers, 4, pageW - S(24.f))) {
+        if (NS_StepSlider("aim_trig", "Trigger Mode", &cur_trig, triggers, 4, pageW - S(24.f))) {
             cfg::aim::trigger_type = (cur_trig > 0) ? (cur_trig - 1) : -1;
         }
         ImGui::EndGroup();
@@ -494,9 +495,9 @@ namespace ui::menu {
         NS_Toggle("esp_box",     oxorany("ESP Box"),    &cfg::esp::box,    pageW - S(24.f));
         NS_Toggle("esp_health",  oxorany("ESP Health"), &cfg::esp::health, pageW - S(24.f));
 
-        const char* box_types[] = { oxorany("None"), oxorany("Full Box"), oxorany("Corner"), oxorany("Glow") };
+        const char* box_types[] = { "None", "Full Box", "Corner", "Glow" };
         int cur_box = cfg::esp::box ? (cfg::esp::box_type + 1) : 0;
-        if (NS_StepSlider("box_type", oxorany("Box Style"), &cur_box, box_types, 4, pageW - S(24.f))) {
+        if (NS_StepSlider("box_type", "Box Style", &cur_box, box_types, 4, pageW - S(24.f))) {
             if (cur_box == 0) cfg::esp::box = false;
             else { cfg::esp::box = true; cfg::esp::box_type = cur_box - 1; }
         }
@@ -616,7 +617,7 @@ namespace ui::menu {
         static double s_copy_feedback_time = -10.0;
         bool recentlyCopied = (ImGui::GetTime() - s_copy_feedback_time < 2.5);
 
-        const char* copyBtnLabel = recentlyCopied ? oxorany("Readings Copied to Clipboard!") : oxorany("Copy Live Readings");
+        const char* copyBtnLabel = recentlyCopied ? "Readings Copied to Clipboard!" : "Copy Live Readings";
         if (NS_Button("copy_telemetry_btn", copyBtnLabel, {pageW - S(24.f), S(30.f)}, recentlyCopied)) {
             char targetPkgStr[128];
             if (isAttached && targetPkg && targetPkg[0] != '\0') snprintf(targetPkgStr, sizeof(targetPkgStr), "%s (DETECTED)", targetPkg);
@@ -714,7 +715,7 @@ namespace ui::menu {
 
         static double s_copy_log_feedback = -10.0;
         bool logCopied = (ImGui::GetTime() - s_copy_log_feedback < 2.5);
-        const char* copyLogLbl = logCopied ? oxorany("Copied!") : oxorany("Copy Terminal Logs");
+        const char* copyLogLbl = logCopied ? "Copied!" : "Copy Terminal Logs";
 
         ImGui::SetCursorScreenPos({termX, btnY});
         if (NS_Button("copy_term_logs", copyLogLbl, {copyW, S(30.f)}, logCopied)) {

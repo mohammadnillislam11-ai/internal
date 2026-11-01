@@ -13,10 +13,27 @@
 #include <unistd.h>
 #include <signal.h>
 #include <ctime>
+#include <cerrno>
 
 namespace engine {
 
     static bool g_attached = false;
+
+    /**
+     * @brief High-precision POSIX liveness verification for Android cross-UID process targets.
+     *        On Android, kill(pid, 0) returns -1 with EPERM when the target process exists
+     *        under a separate app UID without CAP_KILL. Only ESRCH signifies a dead process.
+     */
+    static inline bool is_process_alive(int pid) {
+        if (pid <= 0) return false;
+        errno = 0;
+        int res = kill(pid, 0);
+        if (res == 0) return true;
+        if (errno == EPERM) return true;
+        char path[32];
+        snprintf(path, sizeof(path), "/proc/%d", pid);
+        return (access(path, F_OK) == 0);
+    }
 
     /** @return Name of the target game package when detected & attached, or nullptr. */
     const char* get_target_package() {
@@ -33,14 +50,14 @@ namespace engine {
 
     /** @return Currently targeted game process ID, or -1 if unattached. */
     int get_target_pid() {
-        if (g_attached && mem::g_pid > 0 && kill(mem::g_pid, 0) == 0) {
+        if (g_attached && mem::g_pid > 0 && is_process_alive(mem::g_pid)) {
             return mem::g_pid;
         }
         return -1;
     }
 
     bool is_attached() {
-        return g_attached && mem::g_pid > 0 && mem::g_lib_base > 0;
+        return g_attached && mem::g_pid > 0 && mem::g_lib_base > 0 && is_process_alive(mem::g_pid);
     }
 
     /**
@@ -56,7 +73,7 @@ namespace engine {
             logger::log_info("[MEM] Syscall driver: Direct Kernel Assembly (SVC #0)");
         }
 
-        if (g_attached && mem::g_pid > 0 && kill(mem::g_pid, 0) == 0 && mem::g_lib_base > 0) {
+        if (g_attached && mem::g_pid > 0 && is_process_alive(mem::g_pid) && mem::g_lib_base > 0) {
             return true;
         }
 
@@ -126,7 +143,7 @@ namespace engine {
         }
 
         // Verify game PID is still alive
-        if (kill(mem::g_pid, 0) != 0) {
+        if (!is_process_alive(mem::g_pid)) {
             shutdown();
             return;
         }
