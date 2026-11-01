@@ -199,6 +199,7 @@ public class MainActivity extends Activity {
                         "setenforce 0 2>/dev/null\n" +
                         "mount -o remount,hidepid=0 /proc 2>/dev/null\n" +
                         "chmod 0755 /proc 2>/dev/null\n" +
+                        "echo 0 > /proc/sys/kernel/yama/ptrace_scope 2>/dev/null\n" +
                         "magiskpolicy --live \"allow untrusted_app * * *\" 2>/dev/null\n" +
                         "magiskpolicy --live \"permissive untrusted_app\" 2>/dev/null\n" +
                         "appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow 2>/dev/null\n" +

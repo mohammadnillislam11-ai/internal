@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.IBinder;
@@ -64,6 +65,43 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         return null;
     }
 
+    private void updateScreenDimensions() {
+        if (windowManager == null) return;
+        DisplayMetrics dm = new DisplayMetrics();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            windowManager.getDefaultDisplay().getRealMetrics(dm);
+        } else {
+            windowManager.getDefaultDisplay().getMetrics(dm);
+        }
+        screenWidth = dm.widthPixels;
+        screenHeight = dm.heightPixels;
+        float density = dm.density;
+
+        // Auto-scale comfortably for high-DPI mobile devices as well as emulators
+        float scale = Math.max(density / 1.65f, 1.30f);
+        puckW = (int) (140 * scale);
+        puckH = (int) (52 * scale);
+
+        int maxDim = Math.max(screenWidth, screenHeight);
+        int minDim = Math.min(screenWidth, screenHeight);
+        menuW = (int) Math.min(maxDim * 0.88f, 750 * scale);
+        menuH = (int) Math.min(minDim * 0.90f, 430 * scale);
+        headerHeightPx = (int) (50 * scale);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateScreenDimensions();
+        if (params != null && surfaceView != null && surfaceView.isAttachedToWindow()) {
+            params.width = isMenuOpen ? menuW : puckW;
+            params.height = isMenuOpen ? menuH : puckH;
+            params.x = Math.max(0, Math.min(screenWidth - params.width, params.x));
+            params.y = Math.max(0, Math.min(screenHeight - params.height, params.y));
+            windowManager.updateViewLayout(surfaceView, params);
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public void onCreate() {
@@ -73,20 +111,11 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         startForegroundNotification();
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        updateScreenDimensions();
+
         DisplayMetrics dm = getResources().getDisplayMetrics();
-        screenWidth = dm.widthPixels;
-        screenHeight = dm.heightPixels;
         float density = dm.density;
-
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-
-        // Calculate compact bounded dimensions
-        float scale = Math.min(Math.max(density / 2.0f, 1.0f), 1.20f);
-        puckW = (int) (140 * scale);
-        puckH = (int) (52 * scale);
-        menuW = (int) Math.min(screenWidth * 0.90f, 680 * scale);
-        menuH = (int) Math.min(screenHeight * 0.90f, 400 * scale);
-        headerHeightPx = (int) (50 * scale);
 
         lastPosX = (int) (30 * density);
         lastPosY = (int) (120 * density);
@@ -95,15 +124,19 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
-        // Strictly bounded window: initially sized ONLY to the floating puck
+        // Strictly bounded window: allows movement across entire physical screen including cutouts
         params = new WindowManager.LayoutParams(
                 puckW,
                 puckH,
                 overlayFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT
         );
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = lastPosX;
         params.y = lastPosY;
@@ -120,6 +153,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     public void openMenu() {
         if (isMenuOpen) return;
         isMenuOpen = true;
+        updateScreenDimensions();
 
         params.width = menuW;
         params.height = menuH;
@@ -135,6 +169,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     public void closeMenu() {
         if (!isMenuOpen) return;
         isMenuOpen = false;
+        updateScreenDimensions();
 
         params.width = puckW;
         params.height = puckH;
@@ -179,6 +214,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         if (!isMenuOpen) {
             switch (action) {
                 case MotionEvent.ACTION_DOWN:
+                    updateScreenDimensions();
                     initialX = params.x;
                     initialY = params.y;
                     initialTouchX = rawX;
@@ -226,6 +262,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         // 2. MENU MODE: Header dragging + body option interaction
         switch (action) {
             case MotionEvent.ACTION_DOWN:
+                updateScreenDimensions();
                 initialX = params.x;
                 initialY = params.y;
                 initialTouchX = rawX;

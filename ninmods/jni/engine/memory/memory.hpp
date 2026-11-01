@@ -275,11 +275,27 @@ namespace engine::mem {
             }
         }
 
+        // Rung 3 Fallback for rooted mobile: pidof / pgrep via su
+        if (found <= 0) {
+            char pcmd[128];
+            snprintf(pcmd, sizeof(pcmd), "su -c 'pidof %s 2>/dev/null || pgrep -f %s 2>/dev/null'", process_name, process_name);
+            FILE* fp = popen(pcmd, "r");
+            if (fp) {
+                char pbuf[32] = {0};
+                if (fgets(pbuf, sizeof(pbuf), fp)) {
+                    int p = atoi(pbuf);
+                    if (p > 0) found = p;
+                }
+                pclose(fp);
+            }
+        }
+
         return found;
     }
 
     /**
      * @brief Direct maps inspection without libc fopen/sscanf to locate module base.
+     * Features su-fallback for strict rooted mobile environments to unlock procfs permissions.
      */
     inline uintptr_t find_module_base(int pid, const char* module_name) {
         if (pid <= 0 || !module_name) return 0;
@@ -305,51 +321,81 @@ namespace engine::mem {
         }
         sys::wipe(mp,  sizeof(mp));
         sys::wipe(pds, sizeof(pds));
-        if (mfd < 0) return 0;
 
-        char buf[4096];
-        char line[512];
-        int  lpos = 0;
         uintptr_t base_addr = 0;
 
-        while (true) {
-            long nr = sys::read(mfd, buf, sizeof(buf));
-            if (nr <= 0) break;
+        if (mfd >= 0) {
+            char buf[4096];
+            char line[512];
+            int  lpos = 0;
 
-            for (long i = 0; i < nr; i++) {
-                char c = buf[i];
-                if (c == '\n' || lpos >= static_cast<int>(sizeof(line)) - 1) {
-                    line[lpos] = '\0';
+            while (true) {
+                long nr = sys::read(mfd, buf, sizeof(buf));
+                if (nr <= 0) break;
 
-                    if (strstr(line, module_name) && (strstr(line, "r--p") || strstr(line, "r-xp"))) {
-                        char* cur = line;
-                        uintptr_t parsed = 0;
-                        while (*cur && *cur != '-') {
-                            char h = *cur++;
-                            int digit = 0;
-                            if (h >= '0' && h <= '9') digit = h - '0';
-                            else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
-                            else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
-                            else break;
-                            parsed = (parsed << 4) | digit;
+                for (long i = 0; i < nr; i++) {
+                    char c = buf[i];
+                    if (c == '\n' || lpos >= static_cast<int>(sizeof(line)) - 1) {
+                        line[lpos] = '\0';
+
+                        if (strstr(line, module_name) && (strstr(line, "r--p") || strstr(line, "r-xp"))) {
+                            char* cur = line;
+                            uintptr_t parsed = 0;
+                            while (*cur && *cur != '-') {
+                                char h = *cur++;
+                                int digit = 0;
+                                if (h >= '0' && h <= '9') digit = h - '0';
+                                else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
+                                else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
+                                else break;
+                                parsed = (parsed << 4) | digit;
+                            }
+                            base_addr = parsed;
+                            sys::wipe(line, sizeof(line));
+                            sys::wipe(buf, sizeof(buf));
+                            sys::close(mfd);
+                            return base_addr;
                         }
-                        base_addr = parsed;
-                        sys::wipe(line, sizeof(line));
-                        sys::wipe(buf, sizeof(buf));
-                        sys::close(mfd);
-                        return base_addr;
+                        lpos = 0;
+                    } else {
+                        line[lpos++] = c;
                     }
-                    lpos = 0;
+                }
+            }
+
+            sys::close(mfd);
+            sys::wipe(buf, sizeof(buf));
+            sys::wipe(line, sizeof(line));
+        }
+
+        // Rung 3 Root Fallback: unlock /proc/<pid>/maps and mem permissions and locate module base via su
+        if (base_addr == 0) {
+            char cmd[256];
+            snprintf(cmd, sizeof(cmd), "su -c 'chmod 666 /proc/%d/maps /proc/%d/mem 2>/dev/null; grep %s /proc/%d/maps | head -n 1'", pid, pid, module_name, pid);
+            FILE* fp = popen(cmd, "r");
+            if (fp) {
+                char sline[512] = {0};
+                if (fgets(sline, sizeof(sline), fp)) {
+                    uintptr_t parsed = 0;
+                    char* cur = sline;
+                    while (*cur && *cur != '-') {
+                        char h = *cur++;
+                        int digit = 0;
+                        if (h >= '0' && h <= '9') digit = h - '0';
+                        else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
+                        else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
+                        else break;
+                        parsed = (parsed << 4) | digit;
+                    }
+                    pclose(fp);
+                    if (parsed > 0) return parsed;
                 } else {
-                    line[lpos++] = c;
+                    pclose(fp);
                 }
             }
         }
 
-        sys::close(mfd);
-        sys::wipe(buf, sizeof(buf));
-        sys::wipe(line, sizeof(line));
-        return 0;
+        return base_addr;
     }
 
     /**
@@ -376,6 +422,13 @@ namespace engine::mem {
             g_mem_fd = open(mem_path, O_RDWR);
             if (g_mem_fd < 0) {
                 g_mem_fd = open(mem_path, O_RDONLY);
+            }
+            if (g_mem_fd < 0) {
+                char ucmd[80];
+                snprintf(ucmd, sizeof(ucmd), "su -c 'chmod 666 %s 2>/dev/null'", mem_path);
+                system(ucmd);
+                g_mem_fd = open(mem_path, O_RDWR);
+                if (g_mem_fd < 0) g_mem_fd = open(mem_path, O_RDONLY);
             }
         }
 
@@ -413,6 +466,13 @@ namespace engine::mem {
             g_mem_fd = open(mem_path, O_RDWR);
             if (g_mem_fd < 0) {
                 g_mem_fd = open(mem_path, O_RDONLY);
+            }
+            if (g_mem_fd < 0) {
+                char ucmd[80];
+                snprintf(ucmd, sizeof(ucmd), "su -c 'chmod 666 %s 2>/dev/null'", mem_path);
+                system(ucmd);
+                g_mem_fd = open(mem_path, O_RDWR);
+                if (g_mem_fd < 0) g_mem_fd = open(mem_path, O_RDONLY);
             }
         }
 

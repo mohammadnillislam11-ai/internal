@@ -59,7 +59,7 @@ namespace {
         cfg.OversampleH = 2;
         cfg.OversampleV = 2;
         cfg.RasterizerDensity = 2.0f;
-        float fontSize = 22.0f;
+        float fontSize = 25.5f;
 
         ImFont* mainFont = io.Fonts->AddFontFromMemoryTTF(
             (void*)Custom, sizeof(Custom), fontSize, &cfg);
@@ -77,7 +77,7 @@ namespace {
         io.FontDefault = mainFont;
         io.Fonts->Build();
 
-        ImGui::GetStyle().ScaleAllSizes(1.35f);
+        ImGui::GetStyle().ScaleAllSizes(1.55f);
     }
 
     bool init_egl() {
