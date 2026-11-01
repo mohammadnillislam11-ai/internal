@@ -12,12 +12,12 @@ namespace cfg {
 
 
     namespace esp {
-        // Master Toggles - Active by default for immediate visual feedback
-        inline bool  enabled        = true;
-        inline bool  box            = true;  // ESP Box
+        // Master Toggles - All features strictly default to FALSE (OFF)
+        inline bool  enabled        = false;
+        inline bool  box            = false; // ESP Box
         inline int   box_type       = 0;     // 0 = Corner, 1 = Full, 2 = Glow
-        inline bool  tracer         = true;  // ESP Line
-        inline bool  health         = true;  // ESP Health
+        inline bool  tracer         = false; // ESP Line
+        inline bool  health         = false; // ESP Health
 
         // Sliders & Adjustments
         inline float max_range      = 250.0f;
@@ -33,13 +33,13 @@ namespace cfg {
     }
 
     namespace aim {
-        // Master Toggles
+        // Master Toggles - All features strictly default to FALSE (OFF)
         inline bool  enabled        = false;
         inline bool  silent         = false; // Aim Silent
         inline bool  nobita         = false; // Nobita Mode
         inline int   target_bone    = 0;     // 0 = Head, 1 = Neck, 2 = Chest, 3 = Pelvis
         inline int   trigger_type   = 0;     // 0 = On Fire, 1 = On Scope, 2 = Always
-        inline bool  draw_fov       = true;  // Circle Aim (FOV) Active by default
+        inline bool  draw_fov       = false; // Circle Aim (FOV) strictly OFF by default
 
         // Sliders
         inline float fov            = 120.0f; // Circle Aim Radius (px)

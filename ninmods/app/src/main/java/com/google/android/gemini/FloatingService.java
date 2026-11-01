@@ -79,17 +79,23 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         screenHeight = dm.heightPixels;
         float density = dm.density;
 
-        // Balanced scaling for crisp, comfortable mobile and emulator view
-        float scale = Math.max(density / 1.70f, 1.20f);
-        puckW = (int) (130 * scale);
-        puckH = (int) (48 * scale);
+        float puckScale = Math.max(1.0f, density / 1.7f);
+        puckW = (int) (130 * puckScale);
+        puckH = (int) (48 * puckScale);
 
-        int maxDim = Math.max(screenWidth, screenHeight);
-        int minDim = Math.min(screenWidth, screenHeight);
-        // Compact 2-page book dimensions (won't overwhelm screen or get stuck)
-        menuW = (int) Math.min(maxDim * 0.65f, 580 * scale);
-        menuH = (int) Math.min(minDim * 0.82f, 380 * scale);
-        headerHeightPx = (int) (48 * scale);
+        if (screenWidth < screenHeight) {
+            // PORTRAIT (Phone Vertical / Home Screen)
+            // Occupy 94% of screen width so the 2-page book layout is wide, large and legible
+            menuW = (int) (screenWidth * 0.94f);
+            menuH = (int) Math.min(screenHeight * 0.58f, 540 * density);
+        } else {
+            // LANDSCAPE (In-Game / Free Fire mode)
+            // Occupy 68% of screen width, 85% of screen height
+            menuW = (int) Math.min(screenWidth * 0.70f, 760 * density);
+            menuH = (int) Math.min(screenHeight * 0.86f, 480 * density);
+        }
+
+        headerHeightPx = (int) (64 * density);
     }
 
     @Override
@@ -183,8 +189,9 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         updateScreenDimensions();
 
         float density = getResources().getDisplayMetrics().density;
+        int minX = -(menuW - (int) (80 * density));
         int maxX = screenWidth - (int) (80 * density);
-        int maxY = screenHeight - (int) (60 * density);
+        int maxY = Math.max(0, screenHeight - (int) (60 * density));
 
         params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
@@ -192,7 +199,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
         params.width = menuW;
         params.height = menuH;
-        params.x = Math.max(0, Math.min(maxX, lastPosX));
+        params.x = Math.max(minX, Math.min(maxX, lastPosX));
         params.y = Math.max(0, Math.min(maxY, lastPosY));
         lastPosX = params.x;
         lastPosY = params.y;
@@ -327,9 +334,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
 
                 if (isDragging) {
                     float density = getResources().getDisplayMetrics().density;
+                    int minX = -(params.width - (int) (80 * density));
                     int maxX = screenWidth - (int) (80 * density);
-                    int maxY = screenHeight - (int) (60 * density);
-                    params.x = (int) Math.max(0, Math.min(maxX, initialX + dx));
+                    int maxY = Math.max(0, screenHeight - (int) (60 * density));
+                    params.x = (int) Math.max(minX, Math.min(maxX, initialX + dx));
                     params.y = (int) Math.max(0, Math.min(maxY, initialY + dy));
                     windowManager.updateViewLayout(surfaceView, params);
                     lastPosX = params.x;
