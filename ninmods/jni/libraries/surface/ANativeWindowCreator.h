@@ -103,7 +103,6 @@ namespace android {
             void (*String8__Destructor)(void *thiz) = nullptr;
 
             void (*LayerMetadata__Constructor)(void *thiz) = nullptr;
-            void (*LayerMetadata__setInt32)(void *thiz, uint32_t type, int32_t value) = nullptr;
 
             void (*SurfaceComposerClient__Constructor)(void *thiz) = nullptr;
             void (*SurfaceComposerClient__Destructor)(void *thiz) = nullptr;
@@ -157,7 +156,6 @@ namespace android {
                                 {
                                         {reinterpret_cast<void **>(&LayerMetadata__Constructor),               "_ZN7android3gui13LayerMetadataC2Ev"},
                                         {reinterpret_cast<void **>(&SurfaceComposerClient__CreateSurface),     "_ZN7android21SurfaceComposerClient13createSurfaceERKNS_7String8EjjiiRKNS_2spINS_7IBinderEEENS_3gui13LayerMetadataEPj"},
-                                        {reinterpret_cast<void **>(&LayerMetadata__setInt32),                  "_ZN7android3gui13LayerMetadata8setInt32Eji"},
                                 },
                         },
                         {
@@ -165,7 +163,6 @@ namespace android {
                                 {
                                         {reinterpret_cast<void **>(&LayerMetadata__Constructor),               "_ZN7android3gui13LayerMetadataC2Ev"},
                                         {reinterpret_cast<void **>(&SurfaceComposerClient__CreateSurface),     "_ZN7android21SurfaceComposerClient13createSurfaceERKNS_7String8EjjiiRKNS_2spINS_7IBinderEEENS_3gui13LayerMetadataEPj"},
-                                        {reinterpret_cast<void **>(&LayerMetadata__setInt32),                  "_ZN7android3gui13LayerMetadata8setInt32Eji"},
                                 },
                         },
                         {
@@ -235,7 +232,6 @@ namespace android {
                 ResolveMethod(String8, Destructor, libutils, "_ZN7android7String8D2Ev");
 
                 ResolveMethod(LayerMetadata, Constructor, libgui, "_ZN7android13LayerMetadataC2Ev");
-                ResolveMethod(LayerMetadata, setInt32, libgui, "_ZN7android13LayerMetadata8setInt32Eji");
 
                 ResolveMethod(SurfaceComposerClient, Constructor, libgui, "_ZN7android21SurfaceComposerClientC2Ev");
                 ResolveMethod(SurfaceComposerClient, CreateSurface, libgui,
@@ -314,10 +310,7 @@ namespace android {
                     Functionals::GetInstance().LayerMetadata__Constructor(data);
             }
 
-            void setInt32(uint32_t type, int32_t value) {
-                if (9 < Functionals::GetInstance().systemVersion && Functionals::GetInstance().LayerMetadata__setInt32)
-                    Functionals::GetInstance().LayerMetadata__setInt32(data, type, value);
-            }
+
 
             operator void *() {
                 if (9 < Functionals::GetInstance().systemVersion)
