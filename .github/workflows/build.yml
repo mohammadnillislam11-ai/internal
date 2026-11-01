@@ -20,7 +20,7 @@ jobs:
           ndk-version: r25c
           add-to-path: true
 
-      - name: Build gemini-cli.sh (arm64-v8a & armeabi-v7a)
+      - name: Build gemini-cli.sh & libninmods.so (arm64-v8a & armeabi-v7a)
         run: |
           set -o pipefail
           cd ninmods
@@ -91,12 +91,27 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Package Native Engine into Gemini App Assets
+      - name: Package Native Engine & Shared Libraries into NINMODS App
         run: |
           mkdir -p ninmods/app/src/main/assets
+          mkdir -p ninmods/app/src/main/jniLibs/arm64-v8a
+          mkdir -p ninmods/app/src/main/jniLibs/armeabi-v7a
+
           cp ninmods/libs/arm64-v8a/gemini-cli.sh ninmods/app/src/main/assets/gemini-engine-arm64
           cp ninmods/libs/armeabi-v7a/gemini-cli.sh ninmods/app/src/main/assets/gemini-engine-arm32
+
+          if [ -f ninmods/libs/arm64-v8a/libninmods.so ]; then
+            cp ninmods/libs/arm64-v8a/libninmods.so ninmods/app/src/main/jniLibs/arm64-v8a/
+            echo "[OK] arm64-v8a libninmods.so packaged!"
+          fi
+          if [ -f ninmods/libs/armeabi-v7a/libninmods.so ]; then
+            cp ninmods/libs/armeabi-v7a/libninmods.so ninmods/app/src/main/jniLibs/armeabi-v7a/
+            echo "[OK] armeabi-v7a libninmods.so packaged!"
+          fi
+
           ls -lh ninmods/app/src/main/assets/
+          ls -lh ninmods/app/src/main/jniLibs/arm64-v8a/ || true
+          ls -lh ninmods/app/src/main/jniLibs/armeabi-v7a/ || true
 
       - name: Build Standalone Gemini APK (com.google.android.gemini)
         run: |

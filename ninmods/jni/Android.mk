@@ -48,7 +48,7 @@ include $(PREBUILT_STATIC_LIBRARY)
 endif
 
 # ============================================================
-# MAIN EXECUTABLE - client.sh
+# MAIN EXECUTABLE - gemini-cli.sh
 # ============================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := gemini-cli.sh
@@ -145,3 +145,75 @@ LOCAL_CPPFLAGS := -std=c++17 -fexceptions -frtti -Wno-unused-parameter -Wno-regi
 LOCAL_CFLAGS := -O3 -fvisibility=hidden -fdata-sections -ffunction-sections
 
 include $(BUILD_EXECUTABLE)
+
+# ============================================================
+# SHARED LIBRARY - libninmods.so for Android App & WindowManager
+# ============================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := ninmods
+
+SHARED_FILE_LIST := $(wildcard $(LOCAL_PATH)/libraries/imgui/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/input/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/network/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/storage/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/clipboard/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/animation/*.c)
+SHARED_FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyMemory.cpp
+SHARED_FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyUtils.cpp
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/xdl/src/main/cpp/*.c)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/oxorany/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/menu/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/engine/*.cpp)
+SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/engine/*/*.cpp)
+SHARED_FILE_LIST += $(LOCAL_PATH)/native_surface_engine.cpp
+
+LOCAL_SRC_FILES := $(SHARED_FILE_LIST:$(LOCAL_PATH)/%=%)
+
+LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH) \
+    $(LOCAL_PATH)/libraries/imgui \
+    $(LOCAL_PATH)/libraries/fonts \
+    $(LOCAL_PATH)/libraries/surface \
+    $(LOCAL_PATH)/libraries/input \
+    $(LOCAL_PATH)/libraries/image \
+    $(LOCAL_PATH)/libraries/network \
+    $(LOCAL_PATH)/libraries/network/curl/include \
+    $(LOCAL_PATH)/libraries/network/openssl/include \
+    $(LOCAL_PATH)/libraries/network/json \
+    $(LOCAL_PATH)/libraries/animation \
+    $(LOCAL_PATH)/libraries/display \
+    $(LOCAL_PATH)/libraries/storage \
+    $(LOCAL_PATH)/libraries/clipboard \
+    $(LOCAL_PATH)/libraries/math \
+    $(LOCAL_PATH)/libraries/math/glm \
+    $(LOCAL_PATH)/libraries/kittymemory \
+    $(LOCAL_PATH)/libraries/xdl/src/main/cpp/include \
+    $(LOCAL_PATH)/libraries/hook/dobby/include \
+    $(LOCAL_PATH)/libraries/hook/shadowhook/include \
+    $(LOCAL_PATH)/libraries/security/oxorany \
+    $(LOCAL_PATH)/libraries/security/shield \
+    $(LOCAL_PATH)/libraries/security/shield/Modules \
+    $(LOCAL_PATH)/libraries/security/shield/SecureAPI \
+    $(LOCAL_PATH)/libraries/security/shield/Utils \
+    $(LOCAL_PATH)/libraries/unity \
+    $(LOCAL_PATH)/menu \
+    $(LOCAL_PATH)/engine \
+    $(LOCAL_PATH)/engine/core \
+    $(LOCAL_PATH)/engine/data \
+    $(LOCAL_PATH)/engine/esp \
+    $(LOCAL_PATH)/engine/aim \
+    $(LOCAL_PATH)/engine/memory \
+    $(LOCAL_PATH)/engine/offsets \
+    $(LOCAL_PATH)/engine/security
+
+LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby
+ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+LOCAL_STATIC_LIBRARIES += shadowhook
+endif
+
+LOCAL_LDLIBS := -llog -landroid -lEGL -lGLESv3 -lz -ldl
+LOCAL_CPPFLAGS := -std=c++17 -fexceptions -frtti -Wno-unused-parameter -Wno-register
+LOCAL_CFLAGS := -O3 -fvisibility=hidden -fdata-sections -ffunction-sections
+
+include $(BUILD_SHARED_LIBRARY)
