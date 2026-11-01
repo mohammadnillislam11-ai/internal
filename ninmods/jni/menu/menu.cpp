@@ -768,8 +768,8 @@ namespace ui::menu {
         g_sw = sw;
         g_sh = sh;
 
-        // Dynamic DPI UI Scaling for High-Density Mobile Phones & Emulators
-        s_scale = ImClamp(sw / 620.0f, 1.0f, 2.2f);
+        // Balanced scaling: Crisp, readable, and compact without inflating UI elements
+        s_scale = ImClamp(sh / 420.0f, 0.95f, 1.30f);
 
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ma);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, R);

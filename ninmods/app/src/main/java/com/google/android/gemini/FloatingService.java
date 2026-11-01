@@ -79,25 +79,25 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         screenHeight = dm.heightPixels;
         float density = dm.density;
 
-        // Comfortable standard high-DPI sizing for floating logo puck
-        float puckDpW = 148.0f;
-        float puckDpH = 56.0f;
-        puckW = (int) Math.max(140, puckDpW * density);
-        puckH = (int) Math.max(52, puckDpH * density);
+        // Compact, balanced floating logo puck
+        float puckDpW = 125.0f;
+        float puckDpH = 46.0f;
+        puckW = (int) Math.max(120, puckDpW * density);
+        puckH = (int) Math.max(44, puckDpH * density);
 
         if (screenWidth < screenHeight) {
             // PORTRAIT (Phone Vertical / Home Screen)
-            // Occupy 96% of screen width so the 2-page book layout is wide, large and legible
-            menuW = (int) (screenWidth * 0.96f);
-            menuH = (int) Math.min(screenHeight * 0.65f, 580 * density);
+            // Compact floating console - clean 16:10 aspect ratio without giant empty void
+            menuW = (int) Math.min(screenWidth * 0.88f, 380 * density);
+            menuH = (int) Math.min(screenHeight * 0.36f, menuW * 0.58f);
         } else {
             // LANDSCAPE (In-Game / Free Fire mode)
-            // Occupy 76% of screen width, 90% of screen height
-            menuW = (int) Math.min(screenWidth * 0.76f, 850 * density);
-            menuH = (int) Math.min(screenHeight * 0.90f, 520 * density);
+            // Compact floating console occupying ~54% width, ~68% height
+            menuW = (int) Math.min(screenWidth * 0.54f, 580 * density);
+            menuH = (int) Math.min(screenHeight * 0.68f, 340 * density);
         }
 
-        headerHeightPx = (int) (72 * density);
+        headerHeightPx = (int) (48 * density);
     }
 
     @Override
