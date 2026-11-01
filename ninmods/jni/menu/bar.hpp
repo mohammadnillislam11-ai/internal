@@ -10,6 +10,7 @@ namespace ui::bar {
     inline float g_puck_w = 146.f;
     inline float g_puck_h = 54.f;
 
+    void set_pos(float x, float y);
     void render();
     void set_game_alpha(float a);
     float game_alpha();

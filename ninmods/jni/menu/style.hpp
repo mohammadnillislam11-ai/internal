@@ -11,9 +11,9 @@ namespace ui::theme {
 // Core Color Palette (Crisp Light Pink Theme - Zero Blur Effect)
 inline ImVec4 WindowBg         = ImVec4(0.18f, 0.08f, 0.15f, 0.98f); // Crisp clean solid rose-pink (no background blur)
 inline ImVec4 SidebarBg        = ImVec4(0.14f, 0.06f, 0.12f, 0.98f);
-inline ImVec4 Primary          = ImVec4(1.00f, 0.42f, 0.70f, 1.00f); // Light Vibrant Pink (#FF6BB3)
-inline ImVec4 PrimaryBg        = ImVec4(0.92f, 0.32f, 0.62f, 0.95f); // Light pink solid button
-inline ImVec4 PrimaryLight     = ImVec4(1.00f, 0.65f, 0.82f, 1.00f); // Soft light pink highlight
+inline ImVec4 Primary          = ImVec4(0.00f, 0.90f, 1.00f, 1.00f); // Light Vibrant Pink (#FF6BB3)
+inline ImVec4 PrimaryBg        = ImVec4(0.00f, 0.70f, 0.82f, 0.95f); // Light pink solid button
+inline ImVec4 PrimaryLight     = ImVec4(0.35f, 0.94f, 1.00f, 1.00f); // Soft light pink highlight
 inline ImVec4 PrimaryDim       = ImVec4(0.55f, 0.18f, 0.36f, 0.50f);
 inline ImVec4 TextWhite        = ImVec4(0.98f, 0.98f, 0.98f, 1.00f);
 inline ImVec4 TextGray         = ImVec4(0.78f, 0.68f, 0.74f, 1.00f);

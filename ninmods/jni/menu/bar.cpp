@@ -1,4 +1,5 @@
 #include "bar.hpp"
+#include "menu.hpp"
 #include "Icon.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -6,7 +7,6 @@
 #include <cmath>
 #include <cstdio>
 #include "libraries/storage/logger.h"
-
 
 namespace ui::bar {
 using namespace style;
@@ -26,10 +26,24 @@ static ImVec2 g_fps_down(0, 0);
 static constexpr float FPS_DRAG_THRESHOLD = 8.f;
 
 static bool s_fps_pos_init = false;
+
+void set_pos(float x, float y) {
+    g_fps_x = x;
+    g_fps_y = y;
+    g_puck_x = x;
+    g_puck_y = y;
+    s_fps_pos_init = true;
+    if (g_sw > 0.f)
+        g_fps_x = ImClamp(g_fps_x, 0.f, ImMax(0.f, g_sw - g_puck_w));
+    if (g_sh > 0.f)
+        g_fps_y = ImClamp(g_fps_y, 0.f, ImMax(0.f, g_sh - g_puck_h));
+    g_puck_x = g_fps_x;
+    g_puck_y = g_fps_y;
+}
+
 static void get_fps_pos(float w, float h) {
     if (!s_fps_pos_init) {
         if (g_sw > 0.f && g_sh > 0.f) {
-            // Position safely within both Portrait (1080) and Landscape (2400) viewports
             g_fps_x = 45.f;
             g_fps_y = 160.f;
             s_fps_pos_init = true;
@@ -48,7 +62,7 @@ static void get_fps_pos(float w, float h) {
 
 /**
  * @brief Renders the floating draggable logo puck when the main menu is closed.
- *        Features neon light-purple glowing circular N logo and live FPS counter.
+ *        Matches menu border styling and tracks exact coordinates with the main menu.
  * @param alpha Global opacity multiplier.
  */
 static void render_fps_icon(float alpha) {
@@ -82,41 +96,41 @@ static void render_fps_icon(float alpha) {
     if (g_fps_drag) {
       logger::log_info("[PUCK] Floating logo moved to: (X: %.1f, Y: %.1f)", g_fps_x, g_fps_y);
     } else if (g_fps_potential) {
+      // Open menu at the exact position where the floating logo currently sits!
+      ui::menu::set_pos(g_fps_x, g_fps_y);
       g_open = true;
-      logger::log_info("[MENU] Menu opened via floating logo tap.");
+      logger::log_info("[MENU] Menu opened via floating logo tap at (%.1f, %.1f).", g_fps_x, g_fps_y);
     }
     g_fps_potential = false;
     g_fps_drag = false;
   }
 
   float fps = ImGui::GetIO().Framerate;
-  ImU32 bg_col = IM_COL32(24, 18, 40, static_cast<int>(245 * alpha));
-  ImU32 border_col = g_fps_drag ? col(UITheme::accent_light, alpha)
-                                : col(UITheme::border_light, alpha);
+  ImU32 bg_col = IM_COL32(22, 16, 36, static_cast<int>(245 * alpha));
+  ImU32 border_col = g_fps_drag ? col(UITheme::border_light, alpha)
+                                : col(UITheme::border, alpha);
 
   float pillR = h * 0.5f;
   dl->AddRectFilled(
       {g_fps_x - 3.f, g_fps_y - 3.f}, {g_fps_x + w + 3.f, g_fps_y + h + 3.f},
-      IM_COL32(180, 105, 255, static_cast<int>(40 * alpha)), pillR + 3.f);
+      col(UITheme::border_light, 0.16f * alpha), pillR + 3.f);
   dl->AddRectFilled({g_fps_x, g_fps_y}, {g_fps_x + w, g_fps_y + h}, bg_col,
                     pillR);
   dl->AddRect({g_fps_x, g_fps_y}, {g_fps_x + w, g_fps_y + h}, border_col, pillR,
               0, g_fps_drag ? 2.4f : 1.6f);
 
-  // Top & bottom neon purple accent notches centered exactly like Image 2
+  // Top & bottom accent notches styled with signature border color
   dl->AddRectFilled({g_fps_x + 60.f, g_fps_y - 2.0f},
                     {g_fps_x + 86.f, g_fps_y + 1.5f},
-                    col(UITheme::accent, alpha), 1.5f);
+                    col(UITheme::border_light, alpha), 1.5f);
   dl->AddRectFilled({g_fps_x + 60.f, g_fps_y + h - 1.5f},
                     {g_fps_x + 86.f, g_fps_y + h + 2.0f},
-                    col(UITheme::accent, alpha), 1.5f);
+                    col(UITheme::border_light, alpha), 1.5f);
 
   float cx = g_fps_x + 28.f, cy = g_fps_y + h * 0.5f, radius = 19.f;
   dl->AddCircleFilled({cx, cy}, radius,
-                      IM_COL32(45, 30, 75, static_cast<int>(255 * alpha)));
-  dl->AddCircle({cx, cy}, radius, col(UITheme::accent, alpha), 32, 2.2f);
-  dl->AddCircle({cx, cy}, radius + 2.f, col(UITheme::accent_dark, alpha * 0.5f),
-                32, 1.2f);
+                      IM_COL32(36, 26, 56, static_cast<int>(255 * alpha)));
+  dl->AddCircle({cx, cy}, radius, col(UITheme::border_light, alpha), 32, 2.0f);
 
   ImFont *font = ImGui::GetFont();
   if (font) {

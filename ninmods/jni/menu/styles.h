@@ -17,9 +17,9 @@ namespace UITheme {
     inline ImVec4 widget       = ImVec4(26/255.f, 26/255.f, 32/255.f, 1.f);
 
     // ACCENT — MERAH
-    inline ImVec4 accent       = ImVec4(180/255.f, 30/255.f, 30/255.f, 1.f);
-    inline ImVec4 accent_light = ImVec4(220/255.f, 40/255.f, 40/255.f, 1.f);
-    inline ImVec4 accent_dark  = ImVec4(120/255.f, 20/255.f, 20/255.f, 1.f);
+    inline ImVec4 accent       = ImVec4(0/255.f, 229/255.f, 255/255.f, 1.f);
+    inline ImVec4 accent_light = ImVec4(80/255.f, 240/255.f, 255/255.f, 1.f);
+    inline ImVec4 accent_dark  = ImVec4(0/255.f, 160/255.f, 180/255.f, 1.f);
 
     // TEXT
     inline ImVec4 text         = ImVec4(230/255.f, 230/255.f, 235/255.f, 1.f);
@@ -38,7 +38,7 @@ namespace UITheme {
     inline ImVec4 subtab_bg    = ImVec4(12/255.f, 12/255.f, 15/255.f, 1.f);
 
     // BUTTON
-    inline ImVec4 ButtonColor   = ImVec4(180/255.f, 30/255.f, 30/255.f, 1.f);
+    inline ImVec4 ButtonColor   = ImVec4(0/255.f, 180/255.f, 210/255.f, 0.85f);
     inline ImVec4 ButtonHovered = ImVec4(220/255.f, 40/255.f, 40/255.f, 1.f);
     inline ImVec4 ButtonActive  = ImVec4(120/255.f, 20/255.f, 20/255.f, 1.f);
 

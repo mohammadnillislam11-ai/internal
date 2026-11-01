@@ -49,9 +49,8 @@ namespace ui::menu {
     static int    tab    = 0;
     static bool   drag   = false;
     static ImVec2 doff(0, 0);
-    static ImVec2 g_menu_pos(-1.f, -1.f);
 
-    static constexpr float R  = 14.f;
+    static constexpr float R = 14.f;
 
     static std::unordered_map<std::string, float> g_nsAnim;
     static inline float NS_Anim(const std::string& key, float target, float speed = 14.f) {
@@ -77,19 +76,20 @@ namespace ui::menu {
         return ImVec2(sz.x * scale, sz.y * scale);
     }
 
-    static inline ImU32 C_TextMain()    { return col(UITheme::text,       content_alpha); }
-    static inline ImU32 C_TextSec()     { return col(UITheme::text_dim,   content_alpha); }
-    static inline ImU32 C_TextDim()     { return col(UITheme::text_dim,   content_alpha * 0.75f); }
-    static inline ImU32 C_BgDark()      { return col(UITheme::bg,         content_alpha); }
-    static inline ImU32 C_BgSidebar()   { return col(UITheme::sidebar,    content_alpha); }
-    static inline ImU32 C_BgCard()      { return col(UITheme::panel,      content_alpha); }
-    static inline ImU32 C_BgCardHov()   { return col(UITheme::widget,     content_alpha); }
-    static inline ImU32 C_Border()      { return col(UITheme::border,     content_alpha); }
-    static inline ImU32 C_Accent()      { return col(UITheme::accent,     content_alpha); }
-    static inline ImU32 C_AccentBright(){ return col(UITheme::accent_light, content_alpha); }
-    static inline ImU32 C_AccentDim()   { return col(UITheme::accent, content_alpha * 0.28f); }
-    static inline ImU32 C_Success()     { return IM_COL32(52, 211, 110, (int)(content_alpha * 255)); }
-    static inline ImU32 C_Danger()      { return IM_COL32(255, 69, 58, (int)(content_alpha * 255)); }
+    // Color definitions: Toggles, sliders and buttons derive from the signature border color (No Pink!)
+    static inline ImU32 C_TextMain()     { return col(UITheme::text,         content_alpha); }
+    static inline ImU32 C_TextSec()      { return col(UITheme::text_dim,     content_alpha); }
+    static inline ImU32 C_TextDim()      { return col(UITheme::text_dim,     content_alpha * 0.75f); }
+    static inline ImU32 C_BgDark()       { return col(UITheme::bg,           content_alpha); }
+    static inline ImU32 C_BgSidebar()    { return col(UITheme::sidebar,      content_alpha); }
+    static inline ImU32 C_BgCard()       { return col(UITheme::panel,        content_alpha); }
+    static inline ImU32 C_BgCardHov()    { return col(UITheme::widget,       content_alpha); }
+    static inline ImU32 C_Border()       { return col(UITheme::border,       content_alpha); }
+    static inline ImU32 C_Accent()       { return col(UITheme::border_light, content_alpha); }
+    static inline ImU32 C_AccentBright() { return col(UITheme::border_light, content_alpha); }
+    static inline ImU32 C_AccentDim()    { return col(UITheme::border_light, content_alpha * 0.35f); }
+    static inline ImU32 C_Success()      { return IM_COL32(52, 211, 110, (int)(content_alpha * 255)); }
+    static inline ImU32 C_Danger()       { return IM_COL32(255, 69, 58, (int)(content_alpha * 255)); }
 
     static void NS_CardBegin(ImDrawList* dl, ImVec2 pos, float w, float h) {
         dl->AddRectFilled(pos, {pos.x+w, pos.y+h}, C_BgCard(), 10.f);
@@ -127,11 +127,13 @@ namespace ui::menu {
                 {pos.x, pos.y + (h - 15.5f) * 0.5f}, lblCol, label);
             float tw = 50.f, th = 24.f;
             float tx = pos.x + w - tw, ty = pos.y + (h - th) * 0.5f;
+
+            // Background pill matches border light color when active
             dl->AddRectFilled({tx, ty}, {tx+tw, ty+th},
                 NS_Lerp(IM_COL32(40,30,60,(int)(content_alpha*255)), C_Accent(), on), th*0.5f);
             if (on > 0.05f) {
                 dl->AddRect({tx, ty}, {tx+tw, ty+th},
-                    (C_Accent() & 0x00FFFFFF) | ((ImU32)(110*on) << 24),
+                    (C_Accent() & 0x00FFFFFF) | ((ImU32)(120*on) << 24),
                     th*0.5f, 0, 1.4f);
             }
             float knobR = th*0.5f - 2.8f;
@@ -264,7 +266,6 @@ namespace ui::menu {
             float valW = NS_TextSize(curText, 14.5f).x;
             dl->AddText(ImGui::GetFont(), 15.0f, {pos.x, pos.y}, C_TextSec(), label);
 
-            // If value is 0 (None), render in dimmer color; otherwise accent bright
             ImU32 txtCol = (*value == 0) ? C_TextDim() : C_AccentBright();
             dl->AddText(ImGui::GetFont(), 14.5f, {pos.x + w - valW, pos.y}, txtCol, curText);
 
@@ -412,7 +413,6 @@ namespace ui::menu {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
 
-        float colW = (cw - 32 - 24) * 0.5f;
         float card1H = 175.f;
         ImVec2 cp = ImGui::GetCursorScreenPos();
         NS_CardBegin(dl, cp, cw, card1H);
@@ -525,7 +525,7 @@ namespace ui::menu {
     }
 
     /**
-     * @brief Tab 3: INFO / Dashboard. Renders 4 website-style metric stat cards in one row.
+     * @brief Tab 3: INFO / Dashboard. Renders 4 metric stat cards in one row.
      */
     static void tab_info(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -610,7 +610,7 @@ namespace ui::menu {
     }
 
     /**
-     * @brief Main ImGui Menu frame renderer with mobile scaling and light-purple visual styling.
+     * @brief Main ImGui Menu frame renderer with mobile scaling and border-light matching visual styling.
      */
     void render() {
         func::esp::draw();
@@ -633,8 +633,8 @@ namespace ui::menu {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ma);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, R);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
-        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 10.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 5.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.f); // Completely hide scrollbars
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 0.f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 4));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 5));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(5, 5));
@@ -654,11 +654,10 @@ namespace ui::menu {
         ImVec2 wsz(780.f, 490.f);
         if (wsz.x > sw * 0.94f) wsz.x = sw * 0.94f;
         if (wsz.y > sh * 0.94f) wsz.y = sh * 0.94f;
-        
-        static bool s_menu_pos_init = false;
-        if (!s_menu_pos_init && sw > 0.f && sh > 0.f) {
+
+        // Position memory: If uninitialized, place at screen center; otherwise use preserved g_menu_pos
+        if (g_menu_pos.x < 0.f || g_menu_pos.y < 0.f) {
             g_menu_pos = {(sw - wsz.x) * 0.5f, (sh - wsz.y) * 0.5f};
-            s_menu_pos_init = true;
         }
         float maxX = ImMax(0.f, sw - wsz.x);
         float maxY = ImMax(0.f, sh - wsz.y);
@@ -684,17 +683,17 @@ namespace ui::menu {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImDrawList* bg = ImGui::GetWindowDrawList();
 
+        // Subtle glow using signature border color (no pink!)
         bg->AddRectFilled({wp.x-4, wp.y-4}, {wp.x+ws.x+4, wp.y+ws.y+4},
-                          IM_COL32(180, 105, 255, (int)(45 * ma)), R+4.f);
-        bg->AddRectFilled({wp.x-10, wp.y-10}, {wp.x+ws.x+10, wp.y+ws.y+10},
-                          IM_COL32(180, 105, 255, (int)(18 * ma)), R+8.f);
+                          col(UITheme::border_light, 0.16f * ma), R+4.f);
+        bg->AddRectFilled({wp.x-8, wp.y-8}, {wp.x+ws.x+8, wp.y+ws.y+8},
+                          col(UITheme::border_light, 0.08f * ma), R+8.f);
 
         bg->AddRectFilled(wp, {wp.x+ws.x, wp.y+ws.y}, col(UITheme::bg, ma), R);
         bg->AddRect(wp, {wp.x+ws.x, wp.y+ws.y}, col(UITheme::border_light, ma), R, 0, 1.5f);
 
         const float headerH = 64.f;
         const float sidebarW = headerH; // Sidebar width matches header height (64.f)
-        const float footerH = 48.f;
 
         bg->AddRectFilled(wp, {wp.x+ws.x, wp.y+headerH},
                           col(UITheme::sidebar, ma), R, ImDrawFlags_RoundCornersTop);
@@ -705,48 +704,42 @@ namespace ui::menu {
         float logoX = wp.x + 18.f;
         float logoY = wp.y + (headerH - logoSize) * 0.5f;
         float lcx = logoX + logoSize * 0.5f, lcy = logoY + logoSize * 0.5f;
-        bg->AddCircleFilled({lcx, lcy}, logoSize * 0.5f, IM_COL32(45, 30, 75, (int)(250 * ma)));
-        bg->AddCircle({lcx, lcy}, logoSize * 0.5f, col(UITheme::accent, ma), 32, 2.0f);
+        bg->AddCircleFilled({lcx, lcy}, logoSize * 0.5f, IM_COL32(36, 26, 56, (int)(250 * ma)));
+        bg->AddCircle({lcx, lcy}, logoSize * 0.5f, col(UITheme::border_light, ma), 32, 2.0f);
         float nW = NS_TextSize("N", 20.f).x;
         bg->AddText(ImGui::GetFont(), 20.f,
                     {lcx - nW * 0.5f, lcy - 10.f},
                     IM_COL32(255,255,255,255), "N");
 
-        dl->AddText(ImGui::GetFont(), 17.5f, {logoX + logoSize + 14.f, wp.y + 12.f},
-                    col(UITheme::text, ma), "NINMODS STANDALONE");
-        dl->AddText(ImGui::GetFont(), 13.0f, {logoX + logoSize + 14.f, wp.y + 36.f},
-                    col(UITheme::accent_light, ma), "Global 64/32");
+        // Header Title: Clean "NINMODS" vertically centered with the logo (STANDALONE & 64/32 removed)
+        dl->AddText(ImGui::GetFont(), 19.5f, {logoX + logoSize + 14.f, wp.y + (headerH - 19.5f) * 0.5f},
+                    col(UITheme::text, ma), "NINMODS");
 
-        // Single Close Button [X] - Tap to cleanly close menu and return to floating logo
-        float btnW = 44.f, btnH = 44.f;
-        float closeX = wp.x + ws.x - btnW - 14.f;
+        // Borderless & Backgroundless Clean Close Button [X]
+        float btnW = 36.f, btnH = 36.f;
+        float closeX = wp.x + ws.x - btnW - 16.f;
         float btnY   = wp.y + (headerH - btnH) * 0.5f;
 
-        bool hoverClose = (mp.x >= closeX - 6.f && mp.x <= closeX + btnW + 6.f &&
-                           mp.y >= btnY - 6.f && mp.y <= btnY + btnH + 6.f);
-        if (hoverClose) {
-            bg->AddRectFilled({closeX, btnY}, {closeX + btnW, btnY + btnH},
-                              col(UITheme::danger, ma * 0.90f), 8.f);
-            if (ImGui::IsMouseClicked(0)) {
-                bar::g_open = false;
-                drag = false;
-                storage::save_config();
-                logger::log_info("[MENU] Close button tapped. Saved config and returned to floating puck.");
-            }
-        } else {
-            bg->AddRectFilled({closeX, btnY}, {closeX + btnW, btnY + btnH},
-                              IM_COL32(35, 38, 55, (int)(180 * ma)), 8.f);
-            bg->AddRect({closeX, btnY}, {closeX + btnW, btnY + btnH},
-                        col(UITheme::border_light, ma * 0.6f), 8.f, 0, 1.2f);
+        bool hoverClose = (mp.x >= closeX - 8.f && mp.x <= closeX + btnW + 8.f &&
+                           mp.y >= btnY - 8.f && mp.y <= btnY + btnH + 8.f);
+        if (hoverClose && ImGui::IsMouseClicked(0)) {
+            // Store current menu location back to floating logo so it reappears exactly here!
+            bar::set_pos(wp.x, wp.y);
+            bar::g_open = false;
+            drag = false;
+            storage::save_config();
+            logger::log_info("[MENU] Close tapped. Preserved location (%.1f, %.1f) and returned to floating puck.", wp.x, wp.y);
         }
-        float cX = closeX + btnW * 0.5f, cY = btnY + btnH * 0.5f, cr = 8.f;
-        ImU32 closeCol = hoverClose ? IM_COL32(255, 255, 255, 255) : col(UITheme::text, ma);
-        bg->AddLine({cX - cr, cY - cr}, {cX + cr, cY + cr}, closeCol, 2.4f);
-        bg->AddLine({cX - cr, cY + cr}, {cX + cr, cY - cr}, closeCol, 2.4f);
 
+        float cX = closeX + btnW * 0.5f, cY = btnY + btnH * 0.5f, cr = 8.5f;
+        ImU32 closeCol = hoverClose ? IM_COL32(255, 75, 75, (int)(255 * ma)) : col(UITheme::text_dim, ma);
+        bg->AddLine({cX - cr, cY - cr}, {cX + cr, cY + cr}, closeCol, 2.2f);
+        bg->AddLine({cX - cr, cY + cr}, {cX + cr, cY - cr}, closeCol, 2.2f);
+
+        // Sidebar extending fully to bottom without footer interference
         float sbY = wp.y + headerH;
-        float sbBot = wp.y + ws.y - footerH;
-        bg->AddRectFilled({wp.x, sbY}, {wp.x+sidebarW, sbBot}, col(UITheme::sidebar, ma));
+        float sbBot = wp.y + ws.y;
+        bg->AddRectFilled({wp.x, sbY}, {wp.x+sidebarW, sbBot}, col(UITheme::sidebar, ma), R, ImDrawFlags_RoundCornersBottomLeft);
         bg->AddLine({wp.x+sidebarW, sbY}, {wp.x+sidebarW, sbBot}, col(UITheme::border, ma), 1.2f);
 
         struct NavTab {
@@ -759,27 +752,33 @@ namespace ui::menu {
             { ICON_FA_INFO_CIRCLE }
         };
 
-        float navStartY = sbY + 12.f;
-        float navItemH = 56.f;
+        // Active Sidebar Tab: Floating rounded pill with 8px margin away from edges and dividing frame
+        float navStartY = sbY + 14.f;
+        float navItemH = 48.f;
+        float tabMarginX = 8.f;
         for (int i = 0; i < 4; i++) {
-            float ny = navStartY + i * (navItemH + 8.f);
+            float ny = navStartY + i * (navItemH + 12.f);
             bool act = (tab == i);
             bool hov = (mp.x >= wp.x && mp.x <= wp.x + sidebarW &&
                         mp.y >= ny && mp.y <= ny + navItemH);
 
+            float rx1 = wp.x + tabMarginX;
+            float rx2 = wp.x + sidebarW - tabMarginX;
+            float rRound = 8.f;
+
             if (act) {
-                bg->AddRectFilled({wp.x, ny}, {wp.x+sidebarW, ny+navItemH},
-                                  col(UITheme::accent, ma * 0.25f));
-                bg->AddRectFilled({wp.x, ny}, {wp.x+4.0f, ny+navItemH},
-                                  col(UITheme::accent, ma));
+                // Inset floating highlight that never touches the frame or divider line
+                bg->AddRectFilled({rx1, ny}, {rx2, ny + navItemH},
+                                  col(UITheme::border_light, ma * 0.22f), rRound);
+                bg->AddRect({rx1, ny}, {rx2, ny + navItemH},
+                            col(UITheme::border_light, ma * 0.85f), rRound, 0, 1.4f);
             } else if (hov) {
-                bg->AddRectFilled({wp.x, ny}, {wp.x+sidebarW, ny+navItemH},
-                                  col(UITheme::widget, ma * 0.65f));
+                bg->AddRectFilled({rx1, ny}, {rx2, ny + navItemH},
+                                  col(UITheme::widget, ma * 0.50f), rRound);
             }
 
-            ImU32 itemCol = act ? col(UITheme::accent_light, ma) : (hov ? col(UITheme::text, ma) : col(UITheme::text_dim, ma));
+            ImU32 itemCol = act ? col(UITheme::border_light, ma) : (hov ? col(UITheme::text, ma) : col(UITheme::text_dim, ma));
 
-            // Render clean, centered icon without text labels
             float iconSize = 22.f;
             float iw = NS_TextSize(navTabs[i].icon, iconSize).x;
             dl->AddText(ImGui::GetFont(), iconSize,
@@ -790,20 +789,40 @@ namespace ui::menu {
             }
         }
 
+        // Full content region utilizing vertical space formerly occupied by footer
         float contentX = wp.x + sidebarW + 20.f;
-        float contentY = wp.y + headerH + 20.f;
+        float contentY = wp.y + headerH + 16.f;
         float contentW = ws.x - sidebarW - 36.f;
-        float contentH = ws.y - headerH - footerH - 36.f;
+        float contentH = ws.y - headerH - 24.f;
 
         ImGui::SetCursorScreenPos({contentX, contentY});
 
-        ImGui::PushStyleColor(ImGuiCol_ScrollbarBg,           IM_COL32(0,0,0,0));
-        ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab,         col(UITheme::accent, ma * 0.6f));
-        ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered,  col(UITheme::accent_light, ma));
-        ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive,   col(UITheme::accent_light, ma));
+        // Hidden scrollbar with smooth native touch drag scrolling
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.f);
 
         ImGui::BeginChild("content_pane", {contentW, contentH}, false,
-                          ImGuiWindowFlags_NoBackground);
+                          ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
+
+        // Native touch-drag scrolling across entire options page
+        static bool s_is_touch_scrolling = false;
+        static float s_touch_start_y = 0.f;
+        static float s_scroll_start_y = 0.f;
+
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)) {
+            if (ImGui::IsMouseClicked(0)) {
+                s_is_touch_scrolling = true;
+                s_touch_start_y = mp.y;
+                s_scroll_start_y = ImGui::GetScrollY();
+            }
+        }
+        if (s_is_touch_scrolling) {
+            if (ImGui::IsMouseDown(0)) {
+                float deltaY = s_touch_start_y - mp.y;
+                ImGui::SetScrollY(s_scroll_start_y + deltaY);
+            } else {
+                s_is_touch_scrolling = false;
+            }
+        }
 
         dl = ImGui::GetWindowDrawList();
         content_w = ImGui::GetContentRegionAvail().x;
@@ -817,44 +836,11 @@ namespace ui::menu {
         }
 
         ImGui::EndChild();
-        ImGui::PopStyleColor(4);
+        ImGui::PopStyleVar(); // Pop ScrollbarSize
 
-        float fy = wp.y + ws.y - footerH;
-        bg->AddRectFilled({wp.x, fy}, {wp.x+ws.x, wp.y+ws.y},
-                          col(UITheme::sidebar, ma), R, ImDrawFlags_RoundCornersBottom);
-        bg->AddLine({wp.x, fy}, {wp.x+ws.x, fy}, col(UITheme::border, ma), 1.2f);
-
-        float fDotX = wp.x + 22.f, fDotY = fy + footerH * 0.5f;
-        bg->AddCircleFilled({fDotX, fDotY}, 5.5f, IM_COL32(52, 211, 110, (int)(255 * ma)));
-        bg->AddCircle({fDotX, fDotY}, 8.0f, IM_COL32(52, 211, 110, (int)(90 * ma)), 16, 1.4f);
-        dl->AddText(ImGui::GetFont(), 14.0f,
-            {fDotX + 16.f, fDotY - 7.0f},
-            col(UITheme::text, ma), "PROTECTION ACTIVE");
-
-        const char* extText = "External";
-        float extW = NS_TextSize(extText, 13.0f).x;
-        float bW = 66.f, bH = 26.f;
-        float bX = wp.x + ws.x - bW - 20.f;
-        float bY = fy + (footerH - bH) * 0.5f;
-
-        dl->AddText(ImGui::GetFont(), 13.0f, {bX - extW - 14.f, fy + (footerH - 13.0f) * 0.5f}, C_TextDim(), extText);
-        bg->AddRectFilled({bX, bY}, {bX + bW, bY + bH}, IM_COL32(20, 60, 35, (int)(230 * ma)), 5.f);
-        bg->AddRect({bX, bY}, {bX + bW, bY + bH}, IM_COL32(52, 211, 110, (int)(180 * ma)), 5.f, 0, 1.2f);
-        float actW = NS_TextSize("ACTIVE", 12.5f).x;
-        dl->AddText(ImGui::GetFont(), 12.5f, {bX + (bW - actW) * 0.5f, bY + (bH - 12.5f) * 0.5f},
-                    IM_COL32(52, 211, 110, (int)(255 * ma)), "ACTIVE");
-
+        // Smooth window relocation drag via header bar
         bool inHeaderCloseBtn = (mp.x >= closeX - 8.f && mp.y <= wp.y + headerH);
-        bool canDragStart = false;
-
-        // 1. Drag by header bar (outside close button)
-        if (!inHeaderCloseBtn && (mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= wp.y && mp.y <= wp.y + headerH)) {
-            canDragStart = true;
-        }
-        // 2. Drag by footer bar
-        if (mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= fy && mp.y <= wp.y + ws.y) {
-            canDragStart = true;
-        }
+        bool canDragStart = (!inHeaderCloseBtn && mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= wp.y && mp.y <= wp.y + headerH);
 
         if (canDragStart && (ImGui::IsMouseClicked(0) || (!drag && ImGui::IsMouseDown(0)))) {
             drag = true;
