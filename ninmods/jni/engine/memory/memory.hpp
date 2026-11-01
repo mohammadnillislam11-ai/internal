@@ -115,6 +115,7 @@ struct sys_dirent64 {
 namespace engine::mem {
 
     inline int       g_pid = -1;
+    inline int       g_detected_pid = -1;
     inline uintptr_t g_lib_base = 0;
     inline int       g_mem_fd = -1;
 
@@ -301,6 +302,9 @@ namespace engine::mem {
             }
         }
 
+        if (found > 0) {
+            g_detected_pid = found;
+        }
         return found;
     }
 
@@ -316,6 +320,16 @@ namespace engine::mem {
 
         int mfd = sys::openat(AT_FDCWD, mp, O_RDONLY);
         if (mfd < 0) {
+            mfd = open(mp, O_RDONLY);
+        }
+
+        // Fast root unlock once if direct open fails due to Android UID sandbox / SELinux
+        static int s_unlocked_pid = -1;
+        if (mfd < 0 && s_unlocked_pid != pid) {
+            s_unlocked_pid = pid;
+            char unlock_cmd[256];
+            snprintf(unlock_cmd, sizeof(unlock_cmd), "su -c 'chmod 666 /proc/%d/maps /proc/%d/mem 2>/dev/null; setenforce 0 2>/dev/null'", pid);
+            system(unlock_cmd);
             mfd = open(mp, O_RDONLY);
         }
 
@@ -360,17 +374,9 @@ namespace engine::mem {
 
                             // ZqwClient verified mapping filter: (en - st) < 0x5100000
                             if (st > 0 && (en == 0 || (en - st) < 0x5100000)) {
-                                if (best_base == 0) best_base = st;
-
-                                // Fast verify ELF magic if readable directly
-                                uint32_t magic = 0;
-                                struct iovec loc{&magic, sizeof(magic)};
-                                struct iovec rem{reinterpret_cast<void*>(st), sizeof(magic)};
-                                if (sys::vm_read(pid, &loc, 1, &rem, 1) == sizeof(magic) && magic == 0x464C457F) {
-                                    best_base = st;
-                                    sys::close(mfd);
-                                    return best_base;
-                                }
+                                best_base = st;
+                                sys::close(mfd);
+                                return best_base;
                             }
                         }
                         lpos = 0;
@@ -381,6 +387,46 @@ namespace engine::mem {
             }
 
             sys::close(mfd);
+        }
+
+        // Layer 2 Fallback: Root grep via popen (bypasses SELinux untrusted_app domain locks)
+        if (best_base == 0) {
+            char pcmd[256];
+            snprintf(pcmd, sizeof(pcmd), "su -c 'grep %s /proc/%d/maps 2>/dev/null'", module_name, pid);
+            FILE* fp = popen(pcmd, "r");
+            if (fp) {
+                char pline[512];
+                while (fgets(pline, sizeof(pline), fp)) {
+                    if (strstr(pline, module_name) && (strstr(pline, "r--p") || strstr(pline, "r-xp"))) {
+                        uint64_t st = 0, en = 0;
+                        char* cur = pline;
+                        while (*cur && *cur != '-') {
+                            char h = *cur++;
+                            int digit = 0;
+                            if (h >= '0' && h <= '9') digit = h - '0';
+                            else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
+                            else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
+                            else break;
+                            st = (st << 4) | digit;
+                        }
+                        if (*cur == '-') cur++;
+                        while (*cur && *cur != ' ') {
+                            char h = *cur++;
+                            int digit = 0;
+                            if (h >= '0' && h <= '9') digit = h - '0';
+                            else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
+                            else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
+                            else break;
+                            en = (en << 4) | digit;
+                        }
+                        if (st > 0 && (en == 0 || (en - st) < 0x5100000)) {
+                            best_base = st;
+                            break;
+                        }
+                    }
+                }
+                pclose(fp);
+            }
         }
 
         return best_base;
@@ -530,9 +576,12 @@ inline bool wpm(uint64_t a, const T& d) {
 }
 
 inline int get_pid() {
-    return engine::mem::find_pid_by_name(oxorany("com.dts.freefireth"));
+    int p = engine::mem::find_pid_by_name(oxorany("com.dts.freefireth"));
+    if (p <= 0) p = engine::mem::find_pid_by_name(oxorany("com.dts.freefiremax"));
+    return p;
 }
 
 inline uint64_t get_lib() {
-    return static_cast<uint64_t>(engine::mem::find_module_base(proc::pid > 0 ? proc::pid : engine::mem::g_pid, oxorany("libil2cpp.so")));
+    int target_pid = (proc::pid > 0) ? proc::pid : ((engine::mem::g_pid > 0) ? engine::mem::g_pid : engine::mem::g_detected_pid);
+    return static_cast<uint64_t>(engine::mem::find_module_base(target_pid, oxorany("libil2cpp.so")));
 }

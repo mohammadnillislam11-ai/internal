@@ -349,7 +349,9 @@ JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_fetchESPData(
 
 JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_getTargetPid(
     JNIEnv* env, jclass clazz) {
-    return (engine::mem::g_pid > 0) ? engine::mem::g_pid : proc::pid;
+    if (engine::mem::g_pid > 0) return engine::mem::g_pid;
+    if (proc::pid > 0) return proc::pid;
+    return engine::mem::g_detected_pid;
 }
 
 }

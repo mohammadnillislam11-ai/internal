@@ -90,7 +90,18 @@ namespace engine {
         proc::pid = -1;
         proc::lib = 0;
 
-        int found_pid = mem::find_pid_by_name(TARGET_PACKAGE);
+        const char* candidate_targets[] = { "com.dts.freefireth", "com.dts.freefiremax" };
+        int found_pid = -1;
+        const char* matched_package = TARGET_PACKAGE;
+        for (const char* t : candidate_targets) {
+            int p = mem::find_pid_by_name(t);
+            if (p > 0 && p != getpid()) {
+                found_pid = p;
+                matched_package = t;
+                break;
+            }
+        }
+
         if (found_pid <= 0 || found_pid == getpid()) {
             static double s_last_fail_log = 0.0;
             double now = (double)time(nullptr);
@@ -101,19 +112,30 @@ namespace engine {
             return false;
         }
 
-        logger::log_info("[+] Process found: %s (PID: %d)", TARGET_PACKAGE, found_pid);
+        mem::g_detected_pid = found_pid;
+
+        static int s_last_logged_pid = -1;
+        if (s_last_logged_pid != found_pid) {
+            s_last_logged_pid = found_pid;
+            logger::log_info("[+] Process found: %s (PID: %d)", matched_package, found_pid);
+        }
 
         // Locate libil2cpp.so module base
         uintptr_t lib_base = mem::find_module_base(found_pid, oxorany("libil2cpp.so"));
         if (lib_base == 0) {
-            logger::log_warn("[*] Process %d active, awaiting libil2cpp.so load...", found_pid);
+            static double s_last_await_log = 0.0;
+            double now = (double)time(nullptr);
+            if (now - s_last_await_log >= 3.0) {
+                s_last_await_log = now;
+                logger::log_warn("[*] Process %d active, awaiting libil2cpp.so load...", found_pid);
+            }
             return false;
         }
 
         // Both process and module base are verified
         mem::g_pid = found_pid;
         mem::g_lib_base = lib_base;
-        snprintf(g_detected_package, sizeof(g_detected_package), "%s", TARGET_PACKAGE);
+        snprintf(g_detected_package, sizeof(g_detected_package), "%s", matched_package);
 
         // Initialize passive security verification
         security::init(mem::g_pid);
