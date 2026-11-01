@@ -10,7 +10,7 @@
 
 namespace engine {
 
-    inline const char* g_active_package = "com.dts.freefireth";
+    inline char g_detected_package[128] = {0};
     constexpr const char* TARGET_PACKAGE = "com.dts.freefireth";
     constexpr const char* TARGET_REGION  = "Global";
 

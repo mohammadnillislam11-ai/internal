@@ -539,10 +539,11 @@ namespace ui::menu {
 
         char buf[128];
         bool isAttached = engine::is_attached();
-        int curPid = (proc::pid > 0) ? proc::pid : engine::get_target_pid();
-        uintptr_t libBase = proc::lib;
-        bool inM = data::in_match();
-        size_t pCount = data::player_count();
+        int curPid = engine::get_target_pid();
+        uintptr_t libBase = isAttached ? (uintptr_t)mem::g_lib_base : 0;
+        const char* targetPkg = engine::get_target_package();
+        bool inM = isAttached ? data::in_match() : false;
+        size_t pCount = isAttached ? data::player_count() : 0;
 
         // LEFT PAGE (বাম পৃষ্ঠা): Live Engine Telemetry & Memory Readings
         ImVec2 pLeft = cp;
@@ -554,25 +555,29 @@ namespace ui::menu {
         // 1. Engine Status with clear color feedback
         if (isAttached) {
             NS_InfoRow(oxorany("Engine Status"), oxorany("ATTACHED & ACTIVE"), C_Success(), pageW - 24.f);
-        } else if (curPid > 0) {
-            NS_InfoRow(oxorany("Engine Status"), oxorany("PID FOUND (RESOLVING)"), IM_COL32(255, 200, 50, (int)(content_alpha * 255)), pageW - 24.f);
         } else {
-            NS_InfoRow(oxorany("Engine Status"), oxorany("SCANNING FOR GAME..."), IM_COL32(255, 120, 50, (int)(content_alpha * 255)), pageW - 24.f);
+            NS_InfoRow(oxorany("Engine Status"), oxorany("STANDBY / SCANNING..."), IM_COL32(255, 120, 50, (int)(content_alpha * 255)), pageW - 24.f);
         }
 
-        // 2. Target Package
-        NS_InfoRow(oxorany("Target Process"), oxorany("com.dts.freefireth"), C_Accent(), pageW - 24.f);
+        // 2. Target Process
+        if (isAttached && targetPkg && targetPkg[0] != '\0') {
+            char pkgBuf[128];
+            snprintf(pkgBuf, sizeof(pkgBuf), "%s (DETECTED)", targetPkg);
+            NS_InfoRow(oxorany("Target Process"), pkgBuf, C_Success(), pageW - 24.f);
+        } else {
+            NS_InfoRow(oxorany("Target Process"), oxorany("NOT DETECTED"), C_TextDim(), pageW - 24.f);
+        }
 
         // 3. Process ID (PID)
-        if (curPid > 0) {
+        if (isAttached && curPid > 0) {
             snprintf(buf, sizeof(buf), "%d (ACTIVE)", curPid);
             NS_InfoRow(oxorany("Process ID (PID)"), buf, C_Success(), pageW - 24.f);
         } else {
-            NS_InfoRow(oxorany("Process ID (PID)"), oxorany("WAITING FOR GAME"), IM_COL32(255, 80, 80, (int)(content_alpha * 255)), pageW - 24.f);
+            NS_InfoRow(oxorany("Process ID (PID)"), oxorany("WAITING FOR GAME"), C_TextDim(), pageW - 24.f);
         }
 
         // 4. libil2cpp Base
-        if (libBase > 0) {
+        if (isAttached && libBase > 0) {
             snprintf(buf, sizeof(buf), "0x%lx", libBase);
             NS_InfoRow(oxorany("libil2cpp Base"), buf, C_Accent(), pageW - 24.f);
         } else {
@@ -597,19 +602,23 @@ namespace ui::menu {
 
         const char* copyBtnLabel = recentlyCopied ? oxorany("Readings Copied to Clipboard!") : oxorany("Copy Live Readings");
         if (NS_Button("copy_telemetry_btn", copyBtnLabel, {pageW - 24.f, 32.f}, recentlyCopied)) {
+            char targetPkgStr[128];
+            if (isAttached && targetPkg && targetPkg[0] != '\0') snprintf(targetPkgStr, sizeof(targetPkgStr), "%s (DETECTED)", targetPkg);
+            else snprintf(targetPkgStr, sizeof(targetPkgStr), "NOT DETECTED");
+
             char pidStr[32];
-            if (curPid > 0) snprintf(pidStr, sizeof(pidStr), "%d (ACTIVE)", curPid);
+            if (isAttached && curPid > 0) snprintf(pidStr, sizeof(pidStr), "%d (ACTIVE)", curPid);
             else snprintf(pidStr, sizeof(pidStr), "WAITING FOR GAME");
 
             char libStr[32];
-            if (libBase > 0) snprintf(libStr, sizeof(libStr), "0x%lx", libBase);
+            if (isAttached && libBase > 0) snprintf(libStr, sizeof(libStr), "0x%lx", libBase);
             else snprintf(libStr, sizeof(libStr), "0x0 (STANDBY)");
 
             char clipBuf[512];
             snprintf(clipBuf, sizeof(clipBuf),
                 "--- NINMODS LIVE ENGINE TELEMETRY ---\n"
                 "Engine Status   : %s\n"
-                "Target Process  : com.dts.freefireth\n"
+                "Target Process  : %s\n"
                 "Process ID (PID): %s\n"
                 "libil2cpp Base  : %s\n"
                 "Match State     : %s\n"
@@ -620,7 +629,8 @@ namespace ui::menu {
                 "Resolution      : %.0f x %.0f\n"
                 "Overlay Type    : Official WindowManager\n"
                 "-------------------------------------",
-                isAttached ? "ATTACHED & ACTIVE" : (curPid > 0 ? "PID FOUND (RESOLVING)" : "SCANNING FOR GAME..."),
+                isAttached ? "ATTACHED & ACTIVE" : "STANDBY / SCANNING...",
+                targetPkgStr,
                 pidStr,
                 libStr,
                 inM ? "IN MATCH (ACTIVE)" : "LOBBY / WAITING",

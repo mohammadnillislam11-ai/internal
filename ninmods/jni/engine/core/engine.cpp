@@ -16,9 +16,12 @@ namespace engine {
 
     static bool g_attached = false;
 
-    /** @return Name of the target game package (Strictly com.dts.freefireth). */
+    /** @return Name of the target game package when detected & attached, or nullptr. */
     const char* get_target_package() {
-        return TARGET_PACKAGE;
+        if (g_attached && mem::g_pid > 0 && g_detected_package[0] != '\0') {
+            return g_detected_package;
+        }
+        return nullptr;
     }
 
     /** @return Region string identifier. */
@@ -28,7 +31,10 @@ namespace engine {
 
     /** @return Currently targeted game process ID, or -1 if unattached. */
     int get_target_pid() {
-        return mem::g_pid;
+        if (g_attached && mem::g_pid > 0 && kill(mem::g_pid, 0) == 0) {
+            return mem::g_pid;
+        }
+        return -1;
     }
 
     bool is_attached() {
@@ -49,21 +55,30 @@ namespace engine {
             close(mem::g_mem_fd);
             mem::g_mem_fd = -1;
         }
+        g_attached = false;
+        mem::g_pid = -1;
+        mem::g_lib_base = 0;
+        g_detected_package[0] = '\0';
+        proc::pid = -1;
+        proc::lib = 0;
 
         int found_pid = mem::find_pid_by_name(TARGET_PACKAGE);
-        if (found_pid <= 0) {
+        if (found_pid <= 0 || found_pid == getpid()) {
             return false;
         }
-
-        g_active_package = TARGET_PACKAGE;
-        mem::g_pid = found_pid;
 
         // Locate libil2cpp.so module base
-        mem::g_lib_base = mem::find_module_base(mem::g_pid, oxorany("libil2cpp.so"));
-        if (mem::g_lib_base == 0) {
-            // Process exists but libil2cpp.so is still initializing (splash screen)
+        uintptr_t lib_base = mem::find_module_base(found_pid, oxorany("libil2cpp.so"));
+        if (lib_base == 0) {
+            // Process exists but libil2cpp.so is still initializing or not yet loaded
+            // Keep state unattached and mem::g_pid as -1 so no false positive is shown
             return false;
         }
+
+        // Both process and module base are verified
+        mem::g_pid = found_pid;
+        mem::g_lib_base = lib_base;
+        snprintf(g_detected_package, sizeof(g_detected_package), "%s", TARGET_PACKAGE);
 
         // Initialize passive security verification
         security::init(mem::g_pid);
@@ -74,7 +89,8 @@ namespace engine {
         data::start_worker();
         aim::init();
 
-        printf("\033[92m[*] Attached: \033[93mcom.dts.freefireth\033[0m (PID: \033[92m%d\033[0m)\033[0m\n", mem::g_pid);
+        printf("\033[92m[*] Attached: \033[93m%s\033[0m (PID: \033[92m%d\033[0m, Base: \033[96m0x%lx\033[0m)\033[0m\n",
+               g_detected_package, mem::g_pid, (unsigned long)mem::g_lib_base);
         return true;
     }
 
@@ -141,6 +157,7 @@ namespace engine {
         g_attached = false;
         mem::g_pid = -1;
         mem::g_lib_base = 0;
+        g_detected_package[0] = '\0';
         if (mem::g_mem_fd >= 0) {
             close(mem::g_mem_fd);
             mem::g_mem_fd = -1;

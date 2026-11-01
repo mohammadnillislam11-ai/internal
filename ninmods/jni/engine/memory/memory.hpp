@@ -134,12 +134,14 @@ namespace engine::mem {
     }
 
     /**
-     * @brief Direct kernel directory enumeration to find the target game PID stealthily.
-     * Features multi-rung fallback: direct getdents64 syscall -> libc opendir -> /proc/<pid>/comm check.
+     * @brief Direct kernel directory enumeration to find the target game PID stealthily and accurately.
+     * Enforces strict package name matching to prevent false positives from other apps or background shells.
      */
     inline int find_pid_by_name(const char* process_name) {
-        if (!process_name) return -1;
+        if (!process_name || process_name[0] == '\0') return -1;
         int found = -1;
+        pid_t my_pid = getpid();
+        size_t plen = strlen(process_name);
 
         int pfd = sys::openat(AT_FDCWD, oxorany("/proc"), O_RDONLY | O_DIRECTORY);
         if (pfd >= 0) {
@@ -164,57 +166,62 @@ namespace engine::mem {
                             int cpid = 0;
                             for (char* c = n; *c; c++) cpid = cpid * 10 + (*c - '0');
 
-                            char cp[256];
-                            int ps = 0;
-                            const char* ps_ = oxorany("/proc/");
-                            while (*ps_) cp[ps++] = *ps_++;
-                            for (char* c = n; *c; c++) cp[ps++] = *c;
-                            int base_len = ps;
+                            if (cpid != my_pid && cpid > 1) {
+                                char cp[256];
+                                int ps = 0;
+                                const char* ps_ = oxorany("/proc/");
+                                while (*ps_) cp[ps++] = *ps_++;
+                                for (char* c = n; *c; c++) cp[ps++] = *c;
+                                int base_len = ps;
 
-                            const char* cs = oxorany("/cmdline");
-                            while (*cs) cp[ps++] = *cs++;
-                            cp[ps] = '\0';
-
-                            int cfd = sys::openat(AT_FDCWD, cp, O_RDONLY);
-                            if (cfd < 0) cfd = open(cp, O_RDONLY);
-
-                            if (cfd >= 0) {
-                                char cmd[256] = {0};
-                                long b = sys::read(cfd, cmd, sizeof(cmd) - 1);
-                                sys::close(cfd);
-
-                                if (b > 0) {
-                                    cmd[b] = '\0';
-                                    if (strstr(cmd, process_name) != nullptr) {
-                                        found = cpid;
-                                    }
-                                }
-                            }
-
-                            // Secondary check: /proc/<pid>/comm
-                            if (found <= 0) {
-                                ps = base_len;
-                                const char* cms = oxorany("/comm");
-                                while (*cms) cp[ps++] = *cms++;
+                                const char* cs = oxorany("/cmdline");
+                                while (*cs) cp[ps++] = *cs++;
                                 cp[ps] = '\0';
 
-                                int cmfd = sys::openat(AT_FDCWD, cp, O_RDONLY);
-                                if (cmfd < 0) cmfd = open(cp, O_RDONLY);
-                                if (cmfd >= 0) {
-                                    char comm_buf[64] = {0};
-                                    long cb = sys::read(cmfd, comm_buf, sizeof(comm_buf) - 1);
-                                    sys::close(cmfd);
-                                    if (cb > 0) {
-                                        comm_buf[cb] = '\0';
-                                        if (strstr(comm_buf, process_name) != nullptr ||
-                                            strstr(process_name, comm_buf) != nullptr) {
+                                int cfd = sys::openat(AT_FDCWD, cp, O_RDONLY);
+                                if (cfd < 0) cfd = open(cp, O_RDONLY);
+
+                                if (cfd >= 0) {
+                                    char cmd[256] = {0};
+                                    long b = sys::read(cfd, cmd, sizeof(cmd) - 1);
+                                    sys::close(cfd);
+
+                                    if (b > 0) {
+                                        cmd[b] = '\0';
+                                        // Strictly match package name (com.dts.freefireth) or sub-process
+                                        if (strcmp(cmd, process_name) == 0 ||
+                                            (strncmp(cmd, process_name, plen) == 0 && (cmd[plen] == '\0' || cmd[plen] == ':' || cmd[plen] == ' '))) {
                                             found = cpid;
                                         }
                                     }
                                 }
+
+                                // Secondary check: /proc/<pid>/comm (Linux truncated 15-char limit)
+                                if (found <= 0) {
+                                    ps = base_len;
+                                    const char* cms = oxorany("/comm");
+                                    while (*cms) cp[ps++] = *cms++;
+                                    cp[ps] = '\0';
+
+                                    int cmfd = sys::openat(AT_FDCWD, cp, O_RDONLY);
+                                    if (cmfd < 0) cmfd = open(cp, O_RDONLY);
+                                    if (cmfd >= 0) {
+                                        char comm_buf[64] = {0};
+                                        long cb = sys::read(cmfd, comm_buf, sizeof(comm_buf) - 1);
+                                        sys::close(cmfd);
+                                        if (cb > 0) {
+                                            comm_buf[cb] = '\0';
+                                            while (cb > 0 && (comm_buf[cb-1] == '\n' || comm_buf[cb-1] == '\r')) comm_buf[--cb] = '\0';
+                                            // Exact comm match only: "com.dts.freefir" or "freefire"
+                                            if (strcmp(comm_buf, "com.dts.freefir") == 0 || strcmp(comm_buf, "freefire") == 0) {
+                                                found = cpid;
+                                            }
+                                        }
+                                    }
+                                }
+                                sys::wipe(cp, sizeof(cp));
+                                if (found > 0) break;
                             }
-                            sys::wipe(cp, sizeof(cp));
-                            if (found > 0) break;
                         }
                     }
                     p += e->d_reclen;
@@ -238,6 +245,9 @@ namespace engine::mem {
                     }
                     if (!is_num) continue;
 
+                    int cpid = atoi(de->d_name);
+                    if (cpid == my_pid || cpid <= 1) continue;
+
                     char cp[256];
                     snprintf(cp, sizeof(cp), "/proc/%s/cmdline", de->d_name);
                     int cfd = open(cp, O_RDONLY);
@@ -247,14 +257,15 @@ namespace engine::mem {
                         close(cfd);
                         if (b > 0) {
                             cmd[b] = '\0';
-                            if (strstr(cmd, process_name) != nullptr) {
-                                found = atoi(de->d_name);
+                            if (strcmp(cmd, process_name) == 0 ||
+                                (strncmp(cmd, process_name, plen) == 0 && (cmd[plen] == '\0' || cmd[plen] == ':' || cmd[plen] == ' '))) {
+                                found = cpid;
                                 break;
                             }
                         }
                     }
 
-                    // Check comm
+                    // Check comm for exact match
                     snprintf(cp, sizeof(cp), "/proc/%s/comm", de->d_name);
                     int cmfd = open(cp, O_RDONLY);
                     if (cmfd >= 0) {
@@ -264,8 +275,8 @@ namespace engine::mem {
                         if (cb > 0) {
                             comm_buf[cb] = '\0';
                             while (cb > 0 && (comm_buf[cb-1] == '\n' || comm_buf[cb-1] == '\r')) comm_buf[--cb] = '\0';
-                            if (strlen(comm_buf) >= 4 && (strstr(comm_buf, "freefire") != nullptr || strstr(process_name, comm_buf) != nullptr)) {
-                                found = atoi(de->d_name);
+                            if (strcmp(comm_buf, "com.dts.freefir") == 0 || strcmp(comm_buf, "freefire") == 0) {
+                                found = cpid;
                                 break;
                             }
                         }
@@ -275,16 +286,16 @@ namespace engine::mem {
             }
         }
 
-        // Rung 3 Fallback for rooted mobile: pidof / pgrep via su
+        // Rung 3 Fallback for rooted mobile: pidof exact name via su (never pgrep -f which matches shell)
         if (found <= 0) {
             char pcmd[128];
-            snprintf(pcmd, sizeof(pcmd), "su -c 'pidof %s 2>/dev/null || pgrep -f %s 2>/dev/null'", process_name, process_name);
+            snprintf(pcmd, sizeof(pcmd), "su -c 'pidof %s 2>/dev/null || pidof com.dts.freefir 2>/dev/null || pgrep -x com.dts.freefir 2>/dev/null'", process_name);
             FILE* fp = popen(pcmd, "r");
             if (fp) {
-                char pbuf[32] = {0};
+                char pbuf[64] = {0};
                 if (fgets(pbuf, sizeof(pbuf), fp)) {
                     int p = atoi(pbuf);
-                    if (p > 0) found = p;
+                    if (p > 0 && p != my_pid) found = p;
                 }
                 pclose(fp);
             }
