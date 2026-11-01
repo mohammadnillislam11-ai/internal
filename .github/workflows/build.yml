@@ -1,4 +1,4 @@
-name: Build NINMODS Client & Gemini Engine APK
+name: Build NINMODS Client
 
 on:
   push:
@@ -7,18 +7,12 @@ on:
 
 jobs:
   build:
-    name: Build Multi-ABI Android Binaries & Official WindowManager APK
+    name: Build Multi-ABI Android Binaries
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -76,63 +70,6 @@ jobs:
             echo "[ERROR] 32-bit armeabi-v7a gemini-cli.sh not found!"
             exit 1
           fi
-
-      - name: Build Fresh gemini_core Daemon Binary
-        run: |
-          set -o pipefail
-          echo "Compiling fresh 64-bit gemini_core root daemon..."
-          cd app/src/main/jni
-          ndk-build -B gemini_core NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk NDK_APPLICATION_MK=Application.mk
-          if [ -f obj/local/arm64-v8a/gemini_core ]; then
-            echo "[OK] Successfully compiled fresh gemini_core!"
-            cp -f obj/local/arm64-v8a/gemini_core ../assets/gemini_core
-            chmod +x ../assets/gemini_core
-            ls -lh ../assets/gemini_core
-          else
-            echo "[ERROR] Failed to compile obj/local/arm64-v8a/gemini_core!"
-            exit 1
-          fi
-          cd ../../..
-
-      - name: Build Official Android Gemini APK
-        run: |
-          set -o pipefail
-          chmod +x gradlew
-          if ! ./gradlew assembleRelease --stacktrace 2>&1 | tee gradle_build.log; then
-            echo "=== GRADLE BUILD FAILURE LOG ==="
-            tail -n 120 gradle_build.log
-            exit 1
-          fi
-
-      - name: Upload Gradle Failure Log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-failure-log
-          path: gradle_build.log
-
-      - name: Verify Gemini APK
-        run: |
-          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk gemini.apk
-            echo "[OK] Gemini Engine APK generated successfully!"
-            ls -lh gemini.apk
-          elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk gemini.apk
-            echo "[OK] Gemini Engine APK (debug) generated successfully!"
-            ls -lh gemini.apk
-          else
-            echo "[ERROR] Gemini APK not found!"
-            find app/build/outputs/ -type f || true
-            exit 1
-          fi
-
-      - name: Upload gemini.apk (Official Android Application)
-        uses: actions/upload-artifact@v4
-        with:
-          name: gemini-apk
-          path: gemini.apk
-          if-no-files-found: error
 
       - name: Upload gemini-cli.sh (64-bit arm64-v8a)
         uses: actions/upload-artifact@v4
