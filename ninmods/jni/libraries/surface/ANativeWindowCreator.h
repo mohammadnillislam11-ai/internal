@@ -132,10 +132,6 @@ namespace android {
             void *(*SurfaceComposerClient__Transaction__SetLayer)(void *thiz, StrongPointer<void> &surfaceControl,
                                                                   int32_t z) = nullptr;
 
-            void *
-            (*SurfaceComposerClient__Transaction__SetTrustedOverlay)(void *thiz, StrongPointer<void> &surfaceControl,
-                                                                     bool isTrustedOverlay) = nullptr;
-
             int32_t (*SurfaceComposerClient__Transaction__Apply)(void *thiz, bool synchronous, bool oneWay) = nullptr;
 
             int32_t (*SurfaceControl__Validate)(void *thiz) = nullptr;
@@ -259,8 +255,6 @@ namespace android {
                               "_ZN7android21SurfaceComposerClient11TransactionC2Ev");
                 ResolveMethod(SurfaceComposerClient__Transaction, SetLayer, libgui,
                               "_ZN7android21SurfaceComposerClient11Transaction8setLayerERKNS_2spINS_14SurfaceControlEEEi");
-                ResolveMethod(SurfaceComposerClient__Transaction, SetTrustedOverlay, libgui,
-                              "_ZN7android21SurfaceComposerClient11Transaction17setTrustedOverlayERKNS_2spINS_14SurfaceControlEEEb");
                 ResolveMethod(SurfaceComposerClient__Transaction, Apply, libgui,
                               "_ZN7android21SurfaceComposerClient11Transaction5applyEbb");
 
@@ -385,15 +379,6 @@ namespace android {
             void *SetLayer(StrongPointer<void> &surfaceControl, int32_t z) {
                 if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer && surfaceControl.get()) {
                     return Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer(data, surfaceControl, z);
-                }
-                return nullptr;
-            }
-
-            void *SetTrustedOverlay(StrongPointer<void> &surfaceControl, bool isTrustedOverlay) {
-                if (Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay && surfaceControl.get()) {
-                    return Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay(data,
-                                                                                                            surfaceControl,
-                                                                                                            isTrustedOverlay);
                 }
                 return nullptr;
             }

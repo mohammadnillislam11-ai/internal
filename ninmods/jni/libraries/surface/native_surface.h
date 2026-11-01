@@ -132,10 +132,6 @@ namespace android {
             void *(*SurfaceComposerClient__Transaction__SetLayer)(void *thiz, StrongPointer<void> &surfaceControl,
                                                                   int32_t z) = nullptr;
 
-            void *
-            (*SurfaceComposerClient__Transaction__SetTrustedOverlay)(void *thiz, StrongPointer<void> &surfaceControl,
-                                                                     bool isTrustedOverlay) = nullptr;
-
             int32_t (*SurfaceComposerClient__Transaction__Apply)(void *thiz, bool synchronous, bool oneWay) = nullptr;
 
             int32_t (*SurfaceControl__Validate)(void *thiz) = nullptr;
@@ -252,8 +248,6 @@ namespace android {
                               "_ZN7android21SurfaceComposerClient11TransactionC2Ev");
                 ResolveMethod(SurfaceComposerClient__Transaction, SetLayer, libgui,
                               "_ZN7android21SurfaceComposerClient11Transaction8setLayerERKNS_2spINS_14SurfaceControlEEEi");
-                ResolveMethod(SurfaceComposerClient__Transaction, SetTrustedOverlay, libgui,
-                              "_ZN7android21SurfaceComposerClient11Transaction17setTrustedOverlayERKNS_2spINS_14SurfaceControlEEEb");
                 ResolveMethod(SurfaceComposerClient__Transaction, Apply, libgui,
                               "_ZN7android21SurfaceComposerClient11Transaction5applyEbb");
 
@@ -369,12 +363,6 @@ namespace android {
                 return Functionals::GetInstance().SurfaceComposerClient__Transaction__SetLayer(data, surfaceControl, z);
             }
 
-            void *SetTrustedOverlay(StrongPointer<void> &surfaceControl, bool isTrustedOverlay) {
-                return Functionals::GetInstance().SurfaceComposerClient__Transaction__SetTrustedOverlay(data,
-                                                                                                        surfaceControl,
-                                                                                                        isTrustedOverlay);
-            }
-
             int32_t Apply(bool synchronous, bool oneWay) {
                 if (12 >= Functionals::GetInstance().systemVersion)
                     return reinterpret_cast<int32_t (*)(void *,
@@ -394,11 +382,7 @@ namespace android {
                 Functionals::GetInstance().RefBase__IncStrong(data, this);
             }
 
-            // ═══════════════════════════════════════════════════════
-            // FIX: `secure` flag & `SetTrustedOverlay` hanya kalau `hide = true`
-            //      Kalau `hide = false` → screenshot NORMAL
-            // ═══════════════════════════════════════════════════════
-            SurfaceControl CreateSurface(const char *name, int32_t width, int32_t height, bool hide, bool secure) {
+            SurfaceControl CreateSurface(const char *name, int32_t width, int32_t height) {
                 void *parentHandle = nullptr;
                 String8 windowName(name);
                 LayerMetadata layerMetadata;
@@ -513,7 +497,7 @@ namespace android {
         }
 
         static ANativeWindow *
-        Create(const char *name, int32_t width = -1, int32_t height = -1, bool hide = false, bool secure = false) {
+        Create(const char *name, int32_t width = -1, int32_t height = -1) {
             auto &surfaceComposerClient = GetComposerInstance();
 
             while (-1 == width || -1 == height) {
@@ -538,7 +522,7 @@ namespace android {
                 break;
             }
 
-            auto surfaceControl = surfaceComposerClient.CreateSurface(name, width, height, hide, secure);
+            auto surfaceControl = surfaceComposerClient.CreateSurface(name, width, height);
             auto nativeWindow = reinterpret_cast<ANativeWindow *>(surfaceControl.GetSurface());
 
             m_cachedSurfaceControl.emplace(nativeWindow, surfaceControl);
