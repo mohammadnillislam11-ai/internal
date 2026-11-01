@@ -44,6 +44,7 @@ namespace engine::shm {
         int32_t  active_pid;
         uint64_t lib_base;
         bool     engine_running;
+        bool     is_attached;
         bool     in_match;
 
         SharedConfig config;
