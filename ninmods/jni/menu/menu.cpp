@@ -8,6 +8,7 @@
 #include "engine/game_data.hpp"
 #include "engine/engine.hpp"
 #include "config_store.h"
+#include "clipboard.h"
 #include "Icon.h"
 #include "libraries/storage/logger.h"
 #include <cmath>
@@ -587,6 +588,50 @@ namespace ui::menu {
 
         // 7. Memory Syscall
         NS_InfoRow(oxorany("Memory Syscall"), oxorany("Kernel Direct (SVC #0)"), C_Success(), pageW - 24.f);
+
+        ImGui::Dummy({0, 4.f});
+
+        // 8. Live Readings Copy Button (Zero disk footprint - purely in-memory snapshot copied to clipboard)
+        static double s_copy_feedback_time = -10.0;
+        bool recentlyCopied = (ImGui::GetTime() - s_copy_feedback_time < 2.5);
+
+        const char* copyBtnLabel = recentlyCopied ? oxorany("Readings Copied to Clipboard!") : oxorany("Copy Live Readings");
+        if (NS_Button("copy_telemetry_btn", copyBtnLabel, {pageW - 24.f, 32.f}, recentlyCopied)) {
+            char pidStr[32];
+            if (curPid > 0) snprintf(pidStr, sizeof(pidStr), "%d (ACTIVE)", curPid);
+            else snprintf(pidStr, sizeof(pidStr), "WAITING FOR GAME");
+
+            char libStr[32];
+            if (libBase > 0) snprintf(libStr, sizeof(libStr), "0x%lx", libBase);
+            else snprintf(libStr, sizeof(libStr), "0x0 (STANDBY)");
+
+            char clipBuf[512];
+            snprintf(clipBuf, sizeof(clipBuf),
+                "--- NINMODS LIVE ENGINE TELEMETRY ---\n"
+                "Engine Status   : %s\n"
+                "Target Process  : com.dts.freefireth\n"
+                "Process ID (PID): %s\n"
+                "libil2cpp Base  : %s\n"
+                "Match State     : %s\n"
+                "Radar Entities  : %zu Players Tracked\n"
+                "Memory Syscall  : Kernel Direct (SVC #0)\n"
+                "Aim Safety      : Reversible (Auto-Restore)\n"
+                "Framerate       : %.1f FPS\n"
+                "Resolution      : %.0f x %.0f\n"
+                "Overlay Type    : Official WindowManager\n"
+                "-------------------------------------",
+                isAttached ? "ATTACHED & ACTIVE" : (curPid > 0 ? "PID FOUND (RESOLVING)" : "SCANNING FOR GAME..."),
+                pidStr,
+                libStr,
+                inM ? "IN MATCH (ACTIVE)" : "LOBBY / WAITING",
+                pCount,
+                ImGui::GetIO().Framerate,
+                g_sw, g_sh
+            );
+            clipboard::set_text(clipBuf);
+            ImGui::SetClipboardText(clipBuf);
+            s_copy_feedback_time = ImGui::GetTime();
+        }
 
         ImGui::EndGroup();
 
