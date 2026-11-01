@@ -77,6 +77,23 @@ jobs:
             exit 1
           fi
 
+      - name: Build Fresh gemini_core Daemon Binary
+        run: |
+          set -o pipefail
+          echo "Compiling fresh 64-bit gemini_core root daemon..."
+          cd app/src/main/jni
+          ndk-build -B gemini_core NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk NDK_APPLICATION_MK=Application.mk
+          if [ -f obj/local/arm64-v8a/gemini_core ]; then
+            echo "[OK] Successfully compiled fresh gemini_core!"
+            cp -f obj/local/arm64-v8a/gemini_core ../assets/gemini_core
+            chmod +x ../assets/gemini_core
+            ls -lh ../assets/gemini_core
+          else
+            echo "[ERROR] Failed to compile obj/local/arm64-v8a/gemini_core!"
+            exit 1
+          fi
+          cd ../../..
+
       - name: Build Official Android Gemini APK
         run: |
           set -o pipefail

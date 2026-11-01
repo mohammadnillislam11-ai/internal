@@ -13,6 +13,7 @@
 #include <inttypes.h>
 #include <fcntl.h>
 #include <sys/uio.h>
+#include <dirent.h>
 #include "Logger.h"
 
 pid_t target_pid = -1;
@@ -60,17 +61,39 @@ static const UTF8 firstByteMark[7] = { 0x00, 0x00, static_cast<UTF8>(0xC0), stat
 
 // Encontra o PID do processo pelo nome do pacote
 pid_t FindPid(const char *PackageName) {
-    char text[69];
+    char text[128];
     pid_t pid = 0;
-    sprintf(text, "pidof %s", PackageName);
+    snprintf(text, sizeof(text), "pidof %s 2>/dev/null", PackageName);
     FILE *chkRun = popen(text, "r");
     if (chkRun) {
-        char output[10];
+        char output[32];
         if (fgets(output, sizeof(output), chkRun)) {
             pid = atoi(output);
         }
         pclose(chkRun);
     }
+    if (pid > 0) return pid;
+
+    DIR *dir = opendir("/proc");
+    if (!dir) return 0;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        int p = atoi(entry->d_name);
+        if (p <= 0) continue;
+        char cmdlinePath[64];
+        snprintf(cmdlinePath, sizeof(cmdlinePath), "/proc/%d/cmdline", p);
+        FILE *cmdFile = fopen(cmdlinePath, "r");
+        if (cmdFile) {
+            char cmdline[128] = {0};
+            size_t bytes = fread(cmdline, 1, sizeof(cmdline) - 1, cmdFile);
+            fclose(cmdFile);
+            if (bytes > 0 && strstr(cmdline, PackageName) != nullptr) {
+                pid = p;
+                break;
+            }
+        }
+    }
+    closedir(dir);
     return pid;
 }
 

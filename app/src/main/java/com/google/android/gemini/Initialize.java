@@ -23,35 +23,40 @@ public class Initialize {
             Log.e(TAG, "Failed to load gemini_client: " + e.getMessage());
         }
 
+        // 1. Instantly display Floater overlay on Main UI thread
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Toast.makeText(context, "NIN ENGEL ACTIVE", Toast.LENGTH_SHORT).show();
+                    new Floater(context);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to launch floater: " + e.getMessage());
+                }
+            }
+        });
+
+        // 2. Launch Root Daemon asynchronously in background
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     String outPath = context.getFilesDir().getPath();
                     String daemonPath = outPath + "/" + DAEMON_EXE;
+                    String tmpDaemonPath = "/data/local/tmp/" + DAEMON_EXE;
 
-                    // 1. Kill any existing daemon to avoid ETXTBSY
-                    try {
-                        Runtime.getRuntime().exec("su -c killall -9 " + DAEMON_EXE).waitFor();
-                    } catch (Exception ignored) {}
-                    Thread.sleep(200);
-
-                    // 2. Copy Daemon from Assets if present
+                    // Copy Daemon from Assets
                     boolean copied = CopyFromAssets(context, outPath, DAEMON_EXE);
                     if (copied) {
-                        Runtime.getRuntime().exec("su -c chmod 755 " + daemonPath).waitFor();
-                        Runtime.getRuntime().exec("su -c " + daemonPath + " &");
+                        // Kill any running daemon instance
+                        com.topjohnwu.superuser.Shell.cmd(
+                                "kill $(pidof " + DAEMON_EXE + ") 2>/dev/null",
+                                "cp -f " + daemonPath + " " + tmpDaemonPath,
+                                "chmod 755 " + daemonPath,
+                                "chmod 755 " + tmpDaemonPath,
+                                tmpDaemonPath + " >/dev/null 2>&1 &"
+                        ).exec();
                     }
-
-                    // 3. Post Floater UI onto Main Thread
-                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                        @Override
-                        public void run() {
-                            Toast.makeText(context, "Gemini Engine Active", Toast.LENGTH_SHORT).show();
-                            new Floater(context);
-                        }
-                    });
-
                 } catch (Exception e) {
                     Log.e(TAG, "Error in daemon init: " + e.getMessage());
                 }

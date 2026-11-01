@@ -14,25 +14,13 @@
 #include <sys/stat.h>
 #include <mutex>
 #include <chrono>
-
-/////// RJ PROFESSOR ROOT INJECTOR PROJECT LEKA///////
-
-
-////// RJ PROFESSOR SABKA PAPA HAI ///////
-
-
-////// ENJOY MY KIDS PROJECT///////
-
-
-
-
-
-
+#include <signal.h>
+#include <vector>
 
 // Global log file and mutex
 std::mutex log_mutex;
 FILE* g_logFile = nullptr;
-bool g_debugEnabled = true;
+bool g_debugEnabled = false;
 
 void WriteLog(const char* format, ...) {
     if (!g_debugEnabled || !g_logFile) return;
@@ -67,7 +55,11 @@ bool is_elf_header(uintptr_t addr) {
     return (magic[0] == 0x7F && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F');
 }
 
+static uintptr_t s_working_facade_offset = 0;
+
 uintptr_t FindCorrectLibBase() {
+    if (target_pid <= 0 || mem_fd <= 0) return 0;
+
     char mapsPath[64];
     snprintf(mapsPath, sizeof(mapsPath), "/proc/%d/maps", target_pid);
     
@@ -75,32 +67,40 @@ uintptr_t FindCorrectLibBase() {
     if (!maps) return 0;
     
     char line[512];
-    uintptr_t elf1 = 0, elf2 = 0, elf3 = 0;
+    std::vector<uintptr_t> elfBases;
     
     while (fgets(line, sizeof(line), maps)) {
         if (strstr(line, "libil2cpp.so")) {
             uintptr_t start = 0;
             sscanf(line, "%lx", &start);
             if (is_elf_header(start)) {
-                if (elf1 == 0) elf1 = start;
-                else if (elf2 == 0) elf2 = start;
-                else if (elf3 == 0) elf3 = start;
+                elfBases.push_back(start);
             }
         }
     }
     fclose(maps);
     
-    uintptr_t testOffsets[] = {elf1, elf2, elf3};
-    for (int i = 0; i < 3; i++) {
-        if (testOffsets[i] == 0) continue;
-        
-        uintptr_t gameFacade = Read<uintptr_t>(testOffsets[i] + 0xA986B7C);
-        if (gameFacade > 0x100000000) {
-            return testOffsets[i];
+    if (elfBases.empty()) return 0;
+
+    static const uintptr_t candidates[] = {
+        0xB4C41A0, // Free Fire MAX
+        0xA72E4E0, // Free Fire Standard
+        0xA986B7C, // Free Fire MAX alternate
+        0xA7384E0,
+        0xA8E44E0
+    };
+
+    for (uintptr_t base : elfBases) {
+        for (uintptr_t cand : candidates) {
+            uintptr_t gameFacade = Read<uintptr_t>(base + cand);
+            if (gameFacade > 0x100000000) {
+                s_working_facade_offset = cand;
+                return base;
+            }
         }
     }
     
-    return elf2;
+    return elfBases.size() > 1 ? elfBases[1] : elfBases[0];
 }
 
 uintptr_t currentBestTargetObj = 0;
@@ -222,7 +222,7 @@ void CreateDataList(Response& SendResponse) {
         Vector3 bestTargetPos = Vector3::Zero();
         SendResponse.PlayerCount = 0;
         
-        uintptr_t gameFacadeOffset = 0xB4C41A0;
+        uintptr_t gameFacadeOffset = s_working_facade_offset != 0 ? s_working_facade_offset : 0xB4C41A0;
         auto GameFacade_c = Read<uintptr_t>(libAddress + gameFacadeOffset);
         
         if (GameFacade_c) {
@@ -376,77 +376,109 @@ void CreateDataList(Response& SendResponse) {
     }
 }
 
-__attribute__ ((visibility ("hidden")))
-int main(int argc, char*argv[]){
-    g_logFile = fopen("/data/local/tmp/freefire_hack.log", "a");
-    
-    if (InitServer() == (0)) {
-        if (server.Accept()) {
-            target_pid = FindPid("com.dts.freefiremax");
-            
-            if (target_pid > 0) {
-                mem_fd = my_open_mem(target_pid);
-                if (mem_fd <= 0) return 1;
-            } else {
-                exit(1);
+void CheckGamePid() {
+    if (target_pid > 0) {
+        if (kill(target_pid, 0) != 0) {
+            if (mem_fd > 0) {
+                close(mem_fd);
+                mem_fd = 0;
             }
-            
-            libAddress = FindCorrectLibBase();
+            target_pid = 0;
+            libAddress = 0;
+        }
+    }
 
-            Request request{};
-            while (server.receive((void*)&request) > (0)) {
-                Response SendResponse{};
-                
-                if (request.Mode == Mode::InitMode) {
-                    SendResponse.Success = true;
-                } else if (request.Mode == Mode::HackMode) {
-                    SendResponse.Success = true;
-                } else if (request.Mode == Mode::EspMode) {
-                    g_screenWidth = request.ScreenWidth;
-                    g_screenHeight = request.ScreenHeight;
-                    CreateDataList(SendResponse);
-                    SendResponse.Success = true;
-                } else if (request.Mode == 3) {
-                    Actived.activar = request.m_IsOn;
-                    SendResponse.Success = true;
-                } else if(request.Mode == 5){
-                    pPlayer.aimbot = request.m_IsOn;
-                    SendResponse.Success = true;
-                } else if(request.Mode == 22){
-                    pPlayer.fovawm = request.m_IsOn;
-                    SendResponse.Success = true;
-                } else if(request.Mode == 54){
-                    pPlayer.aimbotlock = request.m_IsOn;
-                    SendResponse.Success = true;
-                } else if(request.Mode == 55){
-                    pPlayer.silen4a = request.m_IsOn;
-                    silen4a = request.m_IsOn;
-                    
-                    if (!silen4a) {
-                        keepAiming = false;
-                        if (aimThread.joinable())  
-                            aimThread.join();
-                        currentBestTargetPos = Vector3::Zero();
-                    }
-                    SendResponse.Success = true;
-                } else if(request.Mode == 56){
-                    pPlayer.PlayerToMe = request.m_IsOn;
-                    SendResponse.Success = true;
-                } else if(request.Mode == 58){
-                    pPlayer.AimFov = (float)request.value;
-                    SendResponse.Success = true;
-                } else if(request.Mode == 59){
-                    pPlayer.AimDistance = (float)request.value;
-                    SendResponse.Success = true;
-                } else if(request.Mode == 60){
-                    pPlayer.aimbotType = request.value;
-                    SendResponse.Success = true;
-                }
-                server.send((void*)& SendResponse, sizeof(SendResponse));
+    if (target_pid <= 0 || mem_fd <= 0) {
+        target_pid = FindPid("com.dts.freefiremax");
+        if (target_pid <= 0) {
+            target_pid = FindPid("com.dts.freefireth");
+        }
+        if (target_pid > 0) {
+            mem_fd = my_open_mem(target_pid);
+            if (mem_fd > 0) {
+                libAddress = FindCorrectLibBase();
             }
         }
     }
+}
+
+__attribute__ ((visibility ("hidden")))
+int main(int argc, char* argv[]) {
+    signal(SIGPIPE, SIG_IGN);
     
-    if (g_logFile) fclose(g_logFile);
+    if (InitServer() != 0) {
+        return 1;
+    }
+
+    while (true) {
+        if (!server.Accept()) {
+            usleep(200000);
+            continue;
+        }
+
+        Request request{};
+        while (server.receive((void*)&request) > 0) {
+            Response SendResponse{};
+            CheckGamePid();
+
+            if (request.Mode == Mode::InitMode) {
+                SendResponse.Success = true;
+            } else if (request.Mode == Mode::HackMode) {
+                SendResponse.Success = true;
+            } else if (request.Mode == Mode::EspMode) {
+                g_screenWidth = request.ScreenWidth;
+                g_screenHeight = request.ScreenHeight;
+                if (target_pid > 0 && mem_fd > 0 && libAddress > 0) {
+                    CreateDataList(SendResponse);
+                } else {
+                    SendResponse.PlayerCount = 0;
+                }
+                SendResponse.Success = true;
+            } else if (request.Mode == 3) {
+                Actived.activar = request.m_IsOn;
+                SendResponse.Success = true;
+            } else if (request.Mode == 5) {
+                pPlayer.aimbot = request.m_IsOn;
+                SendResponse.Success = true;
+            } else if (request.Mode == 22) {
+                pPlayer.fovawm = request.m_IsOn;
+                SendResponse.Success = true;
+            } else if (request.Mode == 54) {
+                pPlayer.aimbotlock = request.m_IsOn;
+                SendResponse.Success = true;
+            } else if (request.Mode == 55 || request.Mode == 57) {
+                pPlayer.silen4a = request.m_IsOn;
+                silen4a = request.m_IsOn;
+                if (!silen4a) {
+                    keepAiming = false;
+                    if (aimThread.joinable())  
+                        aimThread.join();
+                    currentBestTargetPos = Vector3::Zero();
+                }
+                SendResponse.Success = true;
+            } else if (request.Mode == 56) {
+                pPlayer.PlayerToMe = request.m_IsOn;
+                SendResponse.Success = true;
+            } else if (request.Mode == 58) {
+                pPlayer.AimFov = (float)request.value;
+                SendResponse.Success = true;
+            } else if (request.Mode == 59) {
+                pPlayer.AimDistance = (float)request.value;
+                SendResponse.Success = true;
+            } else if (request.Mode == 60) {
+                pPlayer.aimbotType = request.value;
+                SendResponse.Success = true;
+            } else {
+                SendResponse.Success = true;
+            }
+            server.send((void*)&SendResponse, sizeof(SendResponse));
+        }
+
+        keepAiming = false;
+        if (aimThread.joinable()) {
+            aimThread.join();
+        }
+    }
+
     return 0;
 }

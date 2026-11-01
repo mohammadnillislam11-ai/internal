@@ -150,7 +150,24 @@ void DrawESP(ESP esp) {
     auto screenHeight = esp.getHeight();
     auto screenWidth = esp.getWidth();
     
-    if (!isConnected()) return;
+    if (!isConnected()) {
+        static uint64_t lastConnectAttempt = 0;
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        uint64_t now = (uint64_t)ts.tv_sec * 1000 + (uint64_t)(ts.tv_nsec / 1000000);
+        if (now - lastConnectAttempt > 1000) {
+            lastConnectAttempt = now;
+            client = SocketClient();
+            if (client.Create()) {
+                if (client.Connect()) {
+                    initServer();
+                } else {
+                    client.Close();
+                }
+            }
+        }
+        return;
+    }
 
     if (Actived.activar && pPlayer.aimbot && g_showFOVCircle && pPlayer.AimFov > 0) {
         DrawFOVCircle(esp, pPlayer.AimFov, pEspPlayer.espColor, screenWidth, screenHeight);
