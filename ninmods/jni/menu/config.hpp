@@ -40,6 +40,7 @@ namespace cfg {
         inline int   target_bone    = 0;     // 0 = Head, 1 = Neck, 2 = Chest, 3 = Pelvis
         inline int   trigger_type   = 0;     // 0 = On Fire, 1 = On Scope, 2 = Always
         inline bool  draw_fov       = false; // Circle Aim (FOV) strictly OFF by default
+        inline bool  zero_recoil    = false;
 
         // Sliders
         inline float fov            = 120.0f; // Circle Aim Radius (px)
