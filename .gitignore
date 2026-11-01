@@ -29,4 +29,10 @@ ninmodpro/
 Imgui Portifolio #16/
 
 # Reference Projects
-refer/
+refer/*
+!refer/NEXOMODSROOT/
+refer/NEXOMODSROOT/.gradle/
+refer/NEXOMODSROOT/.androidide/
+refer/NEXOMODSROOT/local.properties
+refer/NEXOMODSROOT/**/build/
+refer/NEXOMODSROOT/**/.cxx/
