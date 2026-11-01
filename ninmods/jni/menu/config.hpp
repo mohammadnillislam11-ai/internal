@@ -25,9 +25,9 @@ namespace cfg {
         inline float box_thickness  = 1.8f;
         inline float bracket_frac   = 0.28f;
 
-        // Color Themes
-        inline ImVec4 box_col       = ImVec4(0.0f, 0.90f, 1.0f, 1.0f); // Bright Cyan
-        inline ImVec4 box_visible   = ImVec4(0.30f, 1.00f, 0.55f, 1.0f); // Neon Green (Visible)
+        // Color Themes (3 selectable colors: Blue, Red, Pink)
+        inline ImVec4 box_col       = ImVec4(0.10f, 0.65f, 1.00f, 1.0f); // Blue
+        inline ImVec4 box_visible   = ImVec4(1.00f, 0.22f, 0.25f, 1.0f); // Red
     }
 
     namespace aim {
