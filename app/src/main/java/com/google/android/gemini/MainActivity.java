@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
         root.setPadding(40, 60, 40, 60);
 
         TextView title = new TextView(this);
-        title.setText("GEMINI ENGINE");
+        title.setText("NIN ENGEL");
         title.setTextSize(26);
         title.setTextColor(Color.parseColor("#00E5FF"));
         title.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));

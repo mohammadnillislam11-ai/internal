@@ -253,7 +253,7 @@ public class Floater {
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         textParams.setMargins(0, convertDP(16), 0, 0);
         loadingText.setLayoutParams(textParams);
-        loadingText.setText("GEMINI ENGINE INITIALIZING...");
+        loadingText.setText("NIN ENGEL INITIALIZING...");
         loadingText.setTextColor(PrimaryColor);
         loadingText.setTextSize(11);
         loadingText.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
@@ -283,7 +283,7 @@ public class Floater {
         titleLayout.setLayoutParams(titleLayoutParams);
 
         tituloText = new TextView(context);
-        tituloText.setText("GEMINI ENGINE");
+        tituloText.setText("NIN ENGEL");
         tituloText.setTextColor(Color.parseColor("#0C0F17"));
         tituloText.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
         tituloText.setTextSize(14);
