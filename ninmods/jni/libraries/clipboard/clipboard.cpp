@@ -188,7 +188,9 @@ std::string get_text() {
     return s_clipboard_cache;
 }
 
-extern "C" void native_copy_to_clipboard(const std::string& text);
+__attribute__((weak)) extern "C" void native_copy_to_clipboard(const std::string& text) {
+    // Weak default for CLI executable
+}
 
 void set_text(const std::string& text) {
     s_clipboard_cache = text;
