@@ -13,6 +13,8 @@
 #include "imgui_impl_android.h"
 
 #include "Font.h"
+#include "Icon.h"
+#include "Iconcpp.h"
 #include "font_data.hpp"
 #include "clipboard.h"
 
