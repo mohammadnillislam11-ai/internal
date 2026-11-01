@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <cstdio>
 #include <cstdlib>
+#include <dirent.h>
 #include <sys/syscall.h>
 #include "oxorany.h"
 #include "KittyMemory.hpp"
@@ -134,67 +135,146 @@ namespace engine::mem {
 
     /**
      * @brief Direct kernel directory enumeration to find the target game PID stealthily.
+     * Features multi-rung fallback: direct getdents64 syscall -> libc opendir -> /proc/<pid>/comm check.
      */
     inline int find_pid_by_name(const char* process_name) {
-        int pfd = sys::openat(AT_FDCWD, oxorany("/proc"), O_RDONLY | O_DIRECTORY);
-        if (pfd < 0) return -1;
-
-        char buf[4096];
+        if (!process_name) return -1;
         int found = -1;
 
-        while (true) {
-            long nr = sys::getdents64(pfd, buf, sizeof(buf));
-            if (nr <= 0) break;
+        int pfd = sys::openat(AT_FDCWD, oxorany("/proc"), O_RDONLY | O_DIRECTORY);
+        if (pfd >= 0) {
+            char buf[4096];
+            while (true) {
+                long nr = sys::getdents64(pfd, buf, sizeof(buf));
+                if (nr <= 0) break;
 
-            char* p = buf;
-            while (p < buf + nr) {
-                auto* e = reinterpret_cast<sys_dirent64*>(p);
+                char* p = buf;
+                while (p < buf + nr) {
+                    auto* e = reinterpret_cast<sys_dirent64*>(p);
 
-                if (e->d_type == 4) {
-                    char* n = e->d_name;
-                    bool in = true;
-                    for (char* c = n; *c; c++) {
-                        if (*c < '0' || *c > '9') { in = false; break; }
-                    }
-
-                    if (in && *n != '\0') {
-                        int cpid = 0;
-                        for (char* c = n; *c; c++) cpid = cpid * 10 + (*c - '0');
-
-                        char cp[256];
-                        int ps = 0;
-                        const char* ps_ = oxorany("/proc/");
-                        while (*ps_) cp[ps++] = *ps_++;
-                        for (char* c = n; *c; c++) cp[ps++] = *c;
-                        const char* cs = oxorany("/cmdline");
-                        while (*cs) cp[ps++] = *cs++;
-                        cp[ps] = '\0';
-
-                        int cfd = sys::openat(AT_FDCWD, cp, O_RDONLY);
-                        sys::wipe(cp, sizeof(cp));
-                        if (cfd >= 0) {
-                            char cmd[256] = {0};
-                            long b = sys::read(cfd, cmd, sizeof(cmd) - 1);
-                            sys::close(cfd);
-
-                            if (b > 0) {
-                                cmd[b] = '\0';
-                                if (process_name && strstr(cmd, process_name) != nullptr) {
-                                    found = cpid;
-                                }
-                                sys::wipe(cmd, sizeof(cmd));
-                            }
+                    // Allow DT_DIR (4) or DT_UNKNOWN (0) for procfs compatibility
+                    if (e->d_type == 4 || e->d_type == 0) {
+                        char* n = e->d_name;
+                        bool in = true;
+                        for (char* c = n; *c; c++) {
+                            if (*c < '0' || *c > '9') { in = false; break; }
                         }
-                        if (found > 0) break;
+
+                        if (in && *n != '\0') {
+                            int cpid = 0;
+                            for (char* c = n; *c; c++) cpid = cpid * 10 + (*c - '0');
+
+                            char cp[256];
+                            int ps = 0;
+                            const char* ps_ = oxorany("/proc/");
+                            while (*ps_) cp[ps++] = *ps_++;
+                            for (char* c = n; *c; c++) cp[ps++] = *c;
+                            int base_len = ps;
+
+                            const char* cs = oxorany("/cmdline");
+                            while (*cs) cp[ps++] = *cs++;
+                            cp[ps] = '\0';
+
+                            int cfd = sys::openat(AT_FDCWD, cp, O_RDONLY);
+                            if (cfd < 0) cfd = open(cp, O_RDONLY);
+
+                            if (cfd >= 0) {
+                                char cmd[256] = {0};
+                                long b = sys::read(cfd, cmd, sizeof(cmd) - 1);
+                                sys::close(cfd);
+
+                                if (b > 0) {
+                                    cmd[b] = '\0';
+                                    if (strstr(cmd, process_name) != nullptr) {
+                                        found = cpid;
+                                    }
+                                }
+                            }
+
+                            // Secondary check: /proc/<pid>/comm
+                            if (found <= 0) {
+                                ps = base_len;
+                                const char* cms = oxorany("/comm");
+                                while (*cms) cp[ps++] = *cms++;
+                                cp[ps] = '\0';
+
+                                int cmfd = sys::openat(AT_FDCWD, cp, O_RDONLY);
+                                if (cmfd < 0) cmfd = open(cp, O_RDONLY);
+                                if (cmfd >= 0) {
+                                    char comm_buf[64] = {0};
+                                    long cb = sys::read(cmfd, comm_buf, sizeof(comm_buf) - 1);
+                                    sys::close(cmfd);
+                                    if (cb > 0) {
+                                        comm_buf[cb] = '\0';
+                                        if (strstr(comm_buf, process_name) != nullptr ||
+                                            strstr(process_name, comm_buf) != nullptr) {
+                                            found = cpid;
+                                        }
+                                    }
+                                }
+                            }
+                            sys::wipe(cp, sizeof(cp));
+                            if (found > 0) break;
+                        }
                     }
+                    p += e->d_reclen;
                 }
-                p += e->d_reclen;
+                if (found > 0) break;
             }
-            if (found > 0) break;
+            sys::close(pfd);
+            sys::wipe(buf, sizeof(buf));
         }
 
-        sys::close(pfd);
-        sys::wipe(buf, sizeof(buf));
+        // Rung 2 Fallback: Libc opendir("/proc")
+        if (found <= 0) {
+            DIR* d = opendir("/proc");
+            if (d) {
+                struct dirent* de;
+                while ((de = readdir(d)) != nullptr) {
+                    if (de->d_name[0] < '0' || de->d_name[0] > '9') continue;
+                    bool is_num = true;
+                    for (char* c = de->d_name; *c; c++) {
+                        if (*c < '0' || *c > '9') { is_num = false; break; }
+                    }
+                    if (!is_num) continue;
+
+                    char cp[256];
+                    snprintf(cp, sizeof(cp), "/proc/%s/cmdline", de->d_name);
+                    int cfd = open(cp, O_RDONLY);
+                    if (cfd >= 0) {
+                        char cmd[256] = {0};
+                        ssize_t b = read(cfd, cmd, sizeof(cmd) - 1);
+                        close(cfd);
+                        if (b > 0) {
+                            cmd[b] = '\0';
+                            if (strstr(cmd, process_name) != nullptr) {
+                                found = atoi(de->d_name);
+                                break;
+                            }
+                        }
+                    }
+
+                    // Check comm
+                    snprintf(cp, sizeof(cp), "/proc/%s/comm", de->d_name);
+                    int cmfd = open(cp, O_RDONLY);
+                    if (cmfd >= 0) {
+                        char comm_buf[64] = {0};
+                        ssize_t cb = read(cmfd, comm_buf, sizeof(comm_buf) - 1);
+                        close(cmfd);
+                        if (cb > 0) {
+                            comm_buf[cb] = '\0';
+                            while (cb > 0 && (comm_buf[cb-1] == '\n' || comm_buf[cb-1] == '\r')) comm_buf[--cb] = '\0';
+                            if (strlen(comm_buf) >= 4 && (strstr(comm_buf, "freefire") != nullptr || strstr(process_name, comm_buf) != nullptr)) {
+                                found = atoi(de->d_name);
+                                break;
+                            }
+                        }
+                    }
+                }
+                closedir(d);
+            }
+        }
+
         return found;
     }
 
@@ -220,6 +300,9 @@ namespace engine::mem {
         mp[ps] = '\0';
 
         int mfd = sys::openat(AT_FDCWD, mp, O_RDONLY);
+        if (mfd < 0) {
+            mfd = open(mp, O_RDONLY);
+        }
         sys::wipe(mp,  sizeof(mp));
         sys::wipe(pds, sizeof(pds));
         if (mfd < 0) return 0;
@@ -291,6 +374,9 @@ namespace engine::mem {
             char mem_path[64];
             snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", target_pid);
             g_mem_fd = open(mem_path, O_RDWR);
+            if (g_mem_fd < 0) {
+                g_mem_fd = open(mem_path, O_RDONLY);
+            }
         }
 
         if (g_mem_fd >= 0) {
@@ -325,6 +411,9 @@ namespace engine::mem {
             char mem_path[64];
             snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", target_pid);
             g_mem_fd = open(mem_path, O_RDWR);
+            if (g_mem_fd < 0) {
+                g_mem_fd = open(mem_path, O_RDONLY);
+            }
         }
 
         if (g_mem_fd >= 0) {

@@ -6,6 +6,7 @@
 #include "styles/styles.h"
 #include "cfg.hpp"
 #include "engine/game_data.hpp"
+#include "engine/engine.hpp"
 #include "config_store.h"
 #include "Icon.h"
 #include "libraries/storage/logger.h"
@@ -435,6 +436,7 @@ namespace ui::menu {
 
     /**
      * @brief Tab 2: Settings - Book Layout (Two balanced pages side by side).
+     * Features full live Engine Telemetry & Readings as previously displayed in shell terminal.
      */
     static void tab_settings(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -444,45 +446,100 @@ namespace ui::menu {
 
         float gap = 12.f;
         float pageW = (cw - gap) * 0.5f;
-        float pageH = ImMax(305.f, ch - 4.f);
+        float pageH = ImMax(320.f, ch - 4.f);
 
-        char buf[64];
+        char buf[128];
+        bool isAttached = engine::is_attached();
+        int curPid = (proc::pid > 0) ? proc::pid : engine::get_target_pid();
+        uintptr_t libBase = proc::lib;
+        bool inM = data::in_match();
+        size_t pCount = data::player_count();
 
-        // LEFT PAGE (বাম পৃষ্ঠা): Display Engine & Process Target
+        // LEFT PAGE (বাম পৃষ্ঠা): Live Engine Telemetry & Memory Readings
         ImVec2 pLeft = cp;
         NS_CardBegin(dl, pLeft, pageW, pageH);
-        NS_CardTitle(dl, {pLeft.x + 12.f, pLeft.y + 12.f}, oxorany("Display & Process"), "Left Page", pageW);
-        ImGui::SetCursorScreenPos({pLeft.x + 12.f, pLeft.y + 38.f});
+        NS_CardTitle(dl, {pLeft.x + 12.f, pLeft.y + 12.f}, oxorany("Live Engine Readings"), "Telemetry", pageW);
+        ImGui::SetCursorScreenPos({pLeft.x + 12.f, pLeft.y + 36.f});
         ImGui::BeginGroup();
-        snprintf(buf, sizeof(buf), "%.0f x %.0f", g_sw, g_sh);
-        NS_InfoRow(oxorany("Resolution"), buf, 0, pageW - 24.f);
-        snprintf(buf, sizeof(buf), "%.1f FPS", ImGui::GetIO().Framerate);
-        NS_InfoRow(oxorany("Framerate"), buf, C_Success(), pageW - 24.f);
-        snprintf(buf, sizeof(buf), "%d", proc::pid);
-        NS_InfoRow(oxorany("Process ID"), buf, 0, pageW - 24.f);
-        snprintf(buf, sizeof(buf), "0x%lx", proc::lib);
-        NS_InfoRow(oxorany("libil2cpp Base"), buf, C_Accent(), pageW - 24.f);
-        NS_InfoRow(oxorany("Memory Bus"), oxorany("Kernel Direct"), 0, pageW - 24.f);
+
+        // 1. Engine Status with clear color feedback
+        if (isAttached) {
+            NS_InfoRow(oxorany("Engine Status"), oxorany("ATTACHED & ACTIVE"), C_Success(), pageW - 24.f);
+        } else if (curPid > 0) {
+            NS_InfoRow(oxorany("Engine Status"), oxorany("PID FOUND (RESOLVING)"), IM_COL32(255, 200, 50, (int)(content_alpha * 255)), pageW - 24.f);
+        } else {
+            NS_InfoRow(oxorany("Engine Status"), oxorany("SCANNING FOR GAME..."), IM_COL32(255, 120, 50, (int)(content_alpha * 255)), pageW - 24.f);
+        }
+
+        // 2. Target Package
+        NS_InfoRow(oxorany("Target Process"), oxorany("com.dts.freefireth"), C_Accent(), pageW - 24.f);
+
+        // 3. Process ID (PID)
+        if (curPid > 0) {
+            snprintf(buf, sizeof(buf), "%d (ACTIVE)", curPid);
+            NS_InfoRow(oxorany("Process ID (PID)"), buf, C_Success(), pageW - 24.f);
+        } else {
+            NS_InfoRow(oxorany("Process ID (PID)"), oxorany("WAITING FOR GAME"), IM_COL32(255, 80, 80, (int)(content_alpha * 255)), pageW - 24.f);
+        }
+
+        // 4. libil2cpp Base
+        if (libBase > 0) {
+            snprintf(buf, sizeof(buf), "0x%lx", libBase);
+            NS_InfoRow(oxorany("libil2cpp Base"), buf, C_Accent(), pageW - 24.f);
+        } else {
+            NS_InfoRow(oxorany("libil2cpp Base"), oxorany("0x0 (STANDBY)"), C_TextDim(), pageW - 24.f);
+        }
+
+        // 5. Match State
+        NS_InfoRow(oxorany("Match State"), inM ? oxorany("IN MATCH (ACTIVE)") : oxorany("LOBBY / WAITING"), inM ? C_Success() : C_TextDim(), pageW - 24.f);
+
+        // 6. Entities in Memory
+        snprintf(buf, sizeof(buf), "%zu Players Tracked", pCount);
+        NS_InfoRow(oxorany("Radar Entities"), buf, (pCount > 0) ? C_Accent() : C_TextDim(), pageW - 24.f);
+
+        // 7. Memory Syscall
+        NS_InfoRow(oxorany("Memory Syscall"), oxorany("Kernel Direct (SVC #0)"), C_Success(), pageW - 24.f);
+
         ImGui::EndGroup();
 
-        // RIGHT PAGE (ডান পৃষ্ঠা): System Security & Client Controls
+        // RIGHT PAGE (ডান পৃষ্ঠা): System Controls & Hardware Status
         ImVec2 pRight = {cp.x + pageW + gap, cp.y};
         NS_CardBegin(dl, pRight, pageW, pageH);
-        NS_CardTitle(dl, {pRight.x + 12.f, pRight.y + 12.f}, oxorany("System & Controls"), "Right Page", pageW);
-        ImGui::SetCursorScreenPos({pRight.x + 12.f, pRight.y + 38.f});
+        NS_CardTitle(dl, {pRight.x + 12.f, pRight.y + 12.f}, oxorany("System & Controls"), "Controls", pageW);
+        ImGui::SetCursorScreenPos({pRight.x + 12.f, pRight.y + 36.f});
         ImGui::BeginGroup();
-        NS_InfoRow(oxorany("Protection Layer"), oxorany("NativeShield Active"), C_Success(), pageW - 24.f);
-        NS_InfoRow(oxorany("Overlay Mode"), oxorany("Official WindowManager"), C_Accent(), pageW - 24.f);
-        NS_InfoRow(oxorany("Layout Mode"), oxorany("Two-Page Book"), 0, pageW - 24.f);
 
-        ImGui::Dummy({0, 6.f});
-        if (NS_Button("save_cfg", oxorany("Save Configuration"), {pageW - 24.f, 36.f}, true)) {
+        // Hardware & Display Info
+        snprintf(buf, sizeof(buf), "%.1f FPS", ImGui::GetIO().Framerate);
+        NS_InfoRow(oxorany("Framerate"), buf, C_Success(), pageW - 24.f);
+
+        snprintf(buf, sizeof(buf), "%.0f x %.0f", g_sw, g_sh);
+        NS_InfoRow(oxorany("Resolution"), buf, 0, pageW - 24.f);
+
+        NS_InfoRow(oxorany("Aim Safety"), oxorany("REVERSIBLE (AUTO-RESTORE)"), C_Success(), pageW - 24.f);
+        NS_InfoRow(oxorany("Overlay Type"), oxorany("Official WindowManager"), C_Accent(), pageW - 24.f);
+
+        ImGui::Dummy({0, 4.f});
+
+        // Instant Re-Scan / Attach button
+        if (NS_Button("rescan_btn", oxorany("Re-Scan / Attach Engine"), {pageW - 24.f, 32.f}, false)) {
+            engine::init();
+        }
+
+        ImGui::Dummy({0, 2.f});
+
+        // Save Configuration
+        if (NS_Button("save_cfg", oxorany("Save Configuration"), {pageW - 24.f, 32.f}, true)) {
             storage::save_config();
         }
-        ImGui::Dummy({0, 4.f});
-        if (NS_Button("unload_btn", oxorany("Exit & Unload Overlay"), {pageW - 24.f, 36.f}, false)) {
+
+        ImGui::Dummy({0, 2.f});
+
+        // Exit & Unload
+        if (NS_Button("unload_btn", oxorany("Exit & Unload Overlay"), {pageW - 24.f, 32.f}, false)) {
             exit(0);
         }
+
         ImGui::EndGroup();
     }
 
