@@ -605,12 +605,19 @@ namespace ui::menu {
 
         ImGui::Dummy({0, S(4.f)});
 
-        // 8. Live Readings Copy Button (Zero disk footprint - purely in-memory snapshot copied to clipboard)
+        // 8. Re-Scan Engine Button & Live Readings Copy Button
+        ImGui::Dummy({0, S(4.f)});
+        if (NS_Button("rescan_btn", oxorany("Re-Scan / Attach Engine"), {pageW - S(24.f), S(30.f)}, false)) {
+            logger::log_terminal("[CLI] Manual re-scan requested by user.");
+            engine::init();
+        }
+
+        ImGui::Dummy({0, S(2.f)});
         static double s_copy_feedback_time = -10.0;
         bool recentlyCopied = (ImGui::GetTime() - s_copy_feedback_time < 2.5);
 
         const char* copyBtnLabel = recentlyCopied ? oxorany("Readings Copied to Clipboard!") : oxorany("Copy Live Readings");
-        if (NS_Button("copy_telemetry_btn", copyBtnLabel, {pageW - S(24.f), S(34.f)}, recentlyCopied)) {
+        if (NS_Button("copy_telemetry_btn", copyBtnLabel, {pageW - S(24.f), S(30.f)}, recentlyCopied)) {
             char targetPkgStr[128];
             if (isAttached && targetPkg && targetPkg[0] != '\0') snprintf(targetPkgStr, sizeof(targetPkgStr), "%s (DETECTED)", targetPkg);
             else snprintf(targetPkgStr, sizeof(targetPkgStr), "NOT DETECTED");
@@ -654,43 +661,74 @@ namespace ui::menu {
 
         ImGui::EndGroup();
 
-        // RIGHT PAGE (ডান পৃষ্ঠা): System Controls & Hardware Status
+        // RIGHT PAGE (ডান পৃষ্ঠা): Engine Terminal & Live Reports
         ImVec2 pRight = {cp.x + pageW + gap, cp.y};
         NS_CardBegin(dl, pRight, pageW, pageH);
-        NS_CardTitle(dl, {pRight.x + S(12.f), pRight.y + S(12.f)}, oxorany("System & Controls"), "Controls", pageW);
-        ImGui::SetCursorScreenPos({pRight.x + S(12.f), pRight.y + S(36.f)});
-        ImGui::BeginGroup();
+        NS_CardTitle(dl, {pRight.x + S(12.f), pRight.y + S(12.f)}, oxorany("Engine Terminal"), "Live Reports", pageW);
 
-        // Hardware & Display Info
-        snprintf(buf, sizeof(buf), "%.1f FPS", ImGui::GetIO().Framerate);
-        NS_InfoRow(oxorany("Framerate"), buf, C_Success(), pageW - S(24.f));
+        // Terminal Inner Window (Dark shell box with scrolling live logs)
+        float termX = pRight.x + S(10.f);
+        float termY = pRight.y + S(34.f);
+        float termW = pageW - S(20.f);
+        float termH = pageH - S(76.f);
 
-        snprintf(buf, sizeof(buf), "%.0f x %.0f", g_sw, g_sh);
-        NS_InfoRow(oxorany("Resolution"), buf, 0, pageW - S(24.f));
+        // Terminal frame background & subtle border
+        dl->AddRectFilled({termX, termY}, {termX + termW, termY + termH},
+                          IM_COL32(10, 8, 18, (int)(250 * content_alpha)), S(6.f));
+        dl->AddRect({termX, termY}, {termX + termW, termY + termH},
+                    IM_COL32(65, 45, 95, (int)(180 * content_alpha)), S(6.f), 0, 1.2f);
 
-        NS_InfoRow(oxorany("Aim Safety"), oxorany("REVERSIBLE (AUTO-RESTORE)"), C_Success(), pageW - S(24.f));
-        NS_InfoRow(oxorany("Overlay Type"), oxorany("Official WindowManager"), C_Accent(), pageW - S(24.f));
+        ImGui::SetCursorScreenPos({termX + S(6.f), termY + S(6.f)});
+        ImGui::BeginChild("terminal_scroll_area", {termW - S(12.f), termH - S(12.f)}, false,
+                          ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
-        ImGui::Dummy({0, S(4.f)});
+        std::vector<logger::LogEntry> entries;
+        logger::get_terminal_entries(entries);
 
-        // Instant Re-Scan / Attach button
-        if (NS_Button("rescan_btn", oxorany("Re-Scan / Attach Engine"), {pageW - S(24.f), S(34.f)}, false)) {
-            engine::init();
+        if (entries.empty()) {
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 0.7f), "[System Ready. Waiting for engine reports...]");
+        } else {
+            for (const auto& e : entries) {
+                const char* t = e.time_str.c_str();
+                if (e.time_str.length() > 11) t = e.time_str.c_str() + 11;
+                ImVec4 c = ImGui::ColorConvertU32ToFloat4(e.color);
+                ImGui::TextColored(ImVec4(0.55f, 0.50f, 0.70f, 0.85f), "[%s]", t);
+                ImGui::SameLine();
+                ImGui::TextColored(c, "%s", e.msg.c_str());
+            }
         }
 
-        ImGui::Dummy({0, S(2.f)});
-
-        // Zero Disk Persistence (Pure Live Memory Operation)
-        NS_InfoRow(oxorany("Storage"), oxorany("100% LIVE IN-MEMORY"), C_Success(), pageW - S(24.f));
-
-        ImGui::Dummy({0, S(2.f)});
-
-        // Exit & Unload
-        if (NS_Button("unload_btn", oxorany("Exit & Unload Overlay"), {pageW - S(24.f), S(34.f)}, false)) {
-            exit(0);
+        // Auto-scroll to bottom on new entries
+        static size_t s_last_entry_count = 0;
+        if (entries.size() != s_last_entry_count) {
+            s_last_entry_count = entries.size();
+            ImGui::SetScrollHereY(1.0f);
         }
 
-        ImGui::EndGroup();
+        ImGui::EndChild();
+
+        // Terminal Action Buttons: [ Copy Terminal Logs ] (large) and [ Clear ] (small)
+        float btnY = termY + termH + S(6.f);
+        float clearW = S(60.f);
+        float copyW = termW - clearW - S(8.f);
+
+        static double s_copy_log_feedback = -10.0;
+        bool logCopied = (ImGui::GetTime() - s_copy_log_feedback < 2.5);
+        const char* copyLogLbl = logCopied ? oxorany("Copied!") : oxorany("Copy Terminal Logs");
+
+        ImGui::SetCursorScreenPos({termX, btnY});
+        if (NS_Button("copy_term_logs", copyLogLbl, {copyW, S(30.f)}, logCopied)) {
+            std::string allLogs = logger::get_all_terminal_text();
+            if (allLogs.empty()) allLogs = "[NINMODS] No terminal logs recorded yet.\n";
+            clipboard::set_text(allLogs.c_str());
+            ImGui::SetClipboardText(allLogs.c_str());
+            s_copy_log_feedback = ImGui::GetTime();
+        }
+
+        ImGui::SetCursorScreenPos({termX + copyW + S(8.f), btnY});
+        if (NS_Button("clear_term_logs", oxorany("Clear"), {clearW, S(30.f)}, false)) {
+            logger::clear_terminal();
+        }
     }
 
     /**

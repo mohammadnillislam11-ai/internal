@@ -7,10 +7,12 @@
 #include "offsets.hpp"
 #include "menu/config.hpp"
 #include "menu/menu.hpp"
+#include "libraries/storage/logger.h"
 #include "oxorany.h"
 #include <cstdio>
 #include <unistd.h>
 #include <signal.h>
+#include <ctime>
 
 namespace engine {
 
@@ -47,6 +49,13 @@ namespace engine {
      * @return true if successfully attached, false if game is not running or still launching.
      */
     bool init() {
+        static bool s_first_run = true;
+        if (s_first_run) {
+            s_first_run = false;
+            logger::log_info("[ENGINE] Memory subsystem initialized. Targeting: %s", TARGET_PACKAGE);
+            logger::log_info("[MEM] Syscall driver: Direct Kernel Assembly (SVC #0)");
+        }
+
         if (g_attached && mem::g_pid > 0 && kill(mem::g_pid, 0) == 0 && mem::g_lib_base > 0) {
             return true;
         }
@@ -64,14 +73,21 @@ namespace engine {
 
         int found_pid = mem::find_pid_by_name(TARGET_PACKAGE);
         if (found_pid <= 0 || found_pid == getpid()) {
+            static double s_last_fail_log = 0.0;
+            double now = (double)time(nullptr);
+            if (now - s_last_fail_log >= 8.0) {
+                s_last_fail_log = now;
+                logger::log_warn("[SCAN] Target '%s' not detected. Standby...", TARGET_PACKAGE);
+            }
             return false;
         }
+
+        logger::log_info("[+] Process found: %s (PID: %d)", TARGET_PACKAGE, found_pid);
 
         // Locate libil2cpp.so module base
         uintptr_t lib_base = mem::find_module_base(found_pid, oxorany("libil2cpp.so"));
         if (lib_base == 0) {
-            // Process exists but libil2cpp.so is still initializing or not yet loaded
-            // Keep state unattached and mem::g_pid as -1 so no false positive is shown
+            logger::log_warn("[*] Process %d active, awaiting libil2cpp.so load...", found_pid);
             return false;
         }
 
@@ -89,8 +105,10 @@ namespace engine {
         data::start_worker();
         aim::init();
 
-        printf("\033[92m[*] Attached: \033[93m%s\033[0m (PID: \033[92m%d\033[0m, Base: \033[96m0x%lx\033[0m)\033[0m\n",
-               g_detected_package, mem::g_pid, (unsigned long)mem::g_lib_base);
+        logger::log_success("[+] ATTACHED: %s", g_detected_package);
+        logger::log_success("[+] PID: %d | Base: 0x%lx", mem::g_pid, (unsigned long)mem::g_lib_base);
+        logger::log_success("[+] Direct Kernel SVC #0 active. Telemetry linked.");
+
         return true;
     }
 
@@ -152,6 +170,9 @@ namespace engine {
 
     /** @brief Safely shuts down worker thread and resets all memory handles. */
     void shutdown() {
+        if (g_attached) {
+            logger::log_warn("[!] Target process stopped or exited. Detaching engine.");
+        }
         aim::restore_state();
         data::stop_worker();
         g_attached = false;

@@ -1,11 +1,20 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <cstdint>
 
 /**
  * @file logger.h
- * @brief Thread-safe logging subsystem supporting terminal ANSI colors, disk file, and Android Logcat.
+ * @brief Thread-safe logging subsystem supporting in-memory terminal console, ANSI colors, and clipboard export.
  */
 namespace logger {
+    struct LogEntry {
+        std::string time_str;
+        std::string level;
+        std::string msg;
+        uint32_t color;
+    };
+
     void init(const char* custom_log_path = nullptr);
     void log_info(const char* fmt, ...);
     void log_success(const char* fmt, ...);
@@ -14,4 +23,9 @@ namespace logger {
     void log_terminal(const char* fmt, ...);
     void close();
     const std::string& get_log_path();
+
+    // In-memory live terminal methods (zero disk footprint)
+    void get_terminal_entries(std::vector<LogEntry>& out);
+    std::string get_all_terminal_text();
+    void clear_terminal();
 }
