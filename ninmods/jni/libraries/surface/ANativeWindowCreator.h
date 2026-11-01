@@ -409,9 +409,7 @@ namespace android {
                 Functionals::GetInstance().RefBase__IncStrong(data, this);
             }
 
-            // ═══════════════════════════════════════════════════════
-                        //      Kalau `hide = false` → screenshot NORMAL
-            // ═══════════════════════════════════════════════════════
+            // Standard transparent overlay surface (unblocked screen recording & screenshot)
             SurfaceControl CreateSurface(const char *name, int32_t width, int32_t height) {
                 void *parentHandle = nullptr;
                 String8 windowName(name);
