@@ -540,7 +540,7 @@ namespace ui::menu {
         char buf[128];
         bool isAttached = engine::is_attached();
         int curPid = engine::get_target_pid();
-        uintptr_t libBase = isAttached ? (uintptr_t)mem::g_lib_base : 0;
+        uintptr_t libBase = isAttached ? (uintptr_t)engine::mem::g_lib_base : 0;
         const char* targetPkg = engine::get_target_package();
         bool inM = isAttached ? data::in_match() : false;
         size_t pCount = isAttached ? data::player_count() : 0;
