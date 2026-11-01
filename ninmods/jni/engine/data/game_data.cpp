@@ -4,6 +4,7 @@
 #include "memory.hpp"
 #include "menu/config.hpp"
 #include "display_metrics.h"
+#include "libraries/storage/logger.h"
 #include "oxorany.h"
 #include <thread>
 #include <chrono>
@@ -236,6 +237,74 @@ namespace engine::data {
 
 
 
+    static inline uint64_t test_facade_candidate(uint64_t cls) {
+        if (!engine::mem::addr_valid(cls)) return 0;
+        uint64_t sf = rpm<uint64_t>(cls + offsets::GameFacade_P2); // 0xB8
+        if (!engine::mem::addr_valid(sf)) return 0;
+
+        // Try +0x0 (STORM_MODS CurrentGame)
+        uint64_t bg0 = rpm<uint64_t>(sf + 0x0);
+        if (engine::mem::addr_valid(bg0)) {
+            uint64_t m = rpm<uint64_t>(bg0 + offsets::BaseGame_Match);
+            uint64_t d = rpm<uint64_t>(bg0 + offsets::Match_PlayerDict);
+            if (engine::mem::addr_valid(m) || engine::mem::addr_valid(d)) return bg0;
+        }
+
+        // Try +0x8 (ZqwClient BaseGame)
+        uint64_t bg8 = rpm<uint64_t>(sf + 0x8);
+        if (engine::mem::addr_valid(bg8)) {
+            uint64_t m = rpm<uint64_t>(bg8 + offsets::BaseGame_Match);
+            uint64_t d = rpm<uint64_t>(bg8 + offsets::Match_PlayerDict);
+            if (engine::mem::addr_valid(m) || engine::mem::addr_valid(d)) return bg8;
+        }
+
+        if (engine::mem::addr_valid(bg0)) return bg0;
+        if (engine::mem::addr_valid(bg8)) return bg8;
+        return 0;
+    }
+
+    static uintptr_t scan_for_facade_offset(uintptr_t lib) {
+        static bool s_scanned = false;
+        if (s_scanned) return 0;
+        s_scanned = true;
+
+        logger::log_info("[SCAN] Searching memory for GameFacade signature...");
+        const uintptr_t scan_start = lib + 0xA000000;
+        const uintptr_t scan_end   = lib + 0xB600000;
+        constexpr size_t CHUNK_SIZE = 4096;
+        uint64_t chunk[CHUNK_SIZE / sizeof(uint64_t)];
+
+        for (uintptr_t cur = scan_start; cur < scan_end; cur += CHUNK_SIZE) {
+            if (!engine::mem::read_raw(cur, chunk, sizeof(chunk))) continue;
+
+            for (size_t i = 0; i < (CHUNK_SIZE / sizeof(uint64_t)); i++) {
+                uint64_t val = chunk[i];
+                if (!engine::mem::addr_valid(val)) continue;
+
+                // Check direct
+                uint64_t bg = test_facade_candidate(val);
+                if (bg) {
+                    uintptr_t found_off = (cur + i * 8) - lib;
+                    logger::log_success("[SCAN] Discovered GameFacade at offset 0x%lx!", (unsigned long)found_off);
+                    return found_off;
+                }
+
+                // Check indirect
+                uint64_t val2 = rpm<uint64_t>(val);
+                if (engine::mem::addr_valid(val2)) {
+                    uint64_t bg2 = test_facade_candidate(val2);
+                    if (bg2) {
+                        uintptr_t found_off = (cur + i * 8) - lib;
+                        logger::log_success("[SCAN] Discovered GameFacade (indirect) at offset 0x%lx!", (unsigned long)found_off);
+                        return found_off;
+                    }
+                }
+            }
+        }
+        logger::log_warn("[SCAN] Signature scan complete.");
+        return 0;
+    }
+
     /**
      * @brief One full entity scan cycle.
      */
@@ -255,14 +324,12 @@ namespace engine::data {
         uint64_t base_game = 0;
 
         if (s_working_facade_offset != 0) {
-            auto gf_cell = rpm<uint64_t>(lib + s_working_facade_offset);
-            if (gf_cell) {
-                auto gf_class = rpm<uint64_t>(gf_cell);
-                if (gf_class) {
-                    auto static_fields = rpm<uint64_t>(gf_class + offsets::GameFacade_P2);
-                    if (static_fields) {
-                        base_game = rpm<uint64_t>(static_fields + 0x8);
-                    }
+            uint64_t ptr1 = rpm<uint64_t>(lib + s_working_facade_offset);
+            if (engine::mem::addr_valid(ptr1)) {
+                base_game = test_facade_candidate(ptr1);
+                if (!base_game) {
+                    uint64_t ptr2 = rpm<uint64_t>(ptr1);
+                    if (engine::mem::addr_valid(ptr2)) base_game = test_facade_candidate(ptr2);
                 }
             }
             if (!base_game) s_working_facade_offset = 0;
@@ -270,44 +337,72 @@ namespace engine::data {
 
         if (!base_game) {
             static const uintptr_t candidates[] = {
-                offsets::GameFacade, // 0xA72E4E0 (Free Fire Standard)
-                0xB4C41A0,           // Free Fire MAX (NEXOMODS)
-                0xA986B7C,           // Free Fire MAX alternative
+                0xA72E4E0, // ZqwClient FF Normal OB55 / 1.132.1
+                0xAD6DC18, // STORM_MODS FF MAX
+                0xAD68E18, // STORM_MODS FF MAX Ind
+                0xB4C41A0, // NEXOMODS FF MAX
+                0xA986B7C, // NEXOMODS FF MAX alt
                 0xA7384E0,
-                0xA8E44E0
+                0xA8E44E0,
+                0xAD74BB0,
+                0xAD6FDA8,
+                0xAB74BB0,
+                0xA62E4E0,
+                0xA82E4E0,
+                0xA92E4E0
             };
             for (uintptr_t cand : candidates) {
-                auto gf_cell = rpm<uint64_t>(lib + cand);
-                if (!gf_cell) continue;
-                auto gf_class = rpm<uint64_t>(gf_cell);
-                if (!gf_class) continue;
-                auto static_fields = rpm<uint64_t>(gf_class + offsets::GameFacade_P2);
-                if (!static_fields) continue;
-                auto bg = rpm<uint64_t>(static_fields + 0x8);
-                if (bg && engine::mem::addr_valid(bg)) {
+                uint64_t ptr1 = rpm<uint64_t>(lib + cand);
+                if (!engine::mem::addr_valid(ptr1)) continue;
+
+                uint64_t bg = test_facade_candidate(ptr1);
+                if (bg) {
                     s_working_facade_offset = cand;
                     base_game = bg;
+                    logger::log_success("[DATA] Linked GameFacade at 0x%lx (BaseGame: 0x%lx)", (unsigned long)cand, (unsigned long)bg);
                     break;
+                }
+
+                uint64_t ptr2 = rpm<uint64_t>(ptr1);
+                if (engine::mem::addr_valid(ptr2)) {
+                    bg = test_facade_candidate(ptr2);
+                    if (bg) {
+                        s_working_facade_offset = cand;
+                        base_game = bg;
+                        logger::log_success("[DATA] Linked GameFacade (indirect) at 0x%lx (BaseGame: 0x%lx)", (unsigned long)cand, (unsigned long)bg);
+                        break;
+                    }
+                }
+            }
+
+            if (!base_game) {
+                uintptr_t scanned_off = scan_for_facade_offset(lib);
+                if (scanned_off != 0) {
+                    s_working_facade_offset = scanned_off;
+                    uint64_t ptr1 = rpm<uint64_t>(lib + scanned_off);
+                    if (engine::mem::addr_valid(ptr1)) {
+                        base_game = test_facade_candidate(ptr1);
+                        if (!base_game) {
+                            uint64_t ptr2 = rpm<uint64_t>(ptr1);
+                            if (engine::mem::addr_valid(ptr2)) base_game = test_facade_candidate(ptr2);
+                        }
+                    }
                 }
             }
         }
 
         if (!base_game) return;
 
-        auto match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
-        auto local_player = match ? rpm<uint64_t>(match + offsets::Match_LocalPlayer) : 0;
+        uint64_t match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
+        uint64_t local_player = match ? rpm<uint64_t>(match + offsets::Match_LocalPlayer) : 0;
+        if (!local_player) {
+            local_player = rpm<uint64_t>(base_game + offsets::Match_LocalPlayer);
+        }
 
         bool match_active = false;
-        if (match && engine::mem::addr_valid(match)) {
-            int mir = rpm<int>(match + offsets::MatchIsRunning);
-            if (mir == 1 || mir == 2 || mir == 3 || rpm<bool>(base_game + offsets::MatchIsRunning)) {
-                match_active = true;
-            }
-        }
-        if (!match_active && (match && engine::mem::addr_valid(match))) {
+        if (local_player && engine::mem::addr_valid(local_player)) {
             match_active = true;
-        }
-        if (!match_active && (local_player && engine::mem::addr_valid(local_player))) {
+        } else if (match && engine::mem::addr_valid(match)) {
             match_active = true;
         }
         g_in_match.store(match_active);
@@ -362,6 +457,9 @@ namespace engine::data {
 
         // Player Dictionary Scan
         uint64_t dict_addr = rpm<uint64_t>(base_game + offsets::Match_PlayerDict);
+        if (!dict_addr && match) {
+            dict_addr = rpm<uint64_t>(match + offsets::Match_PlayerDict);
+        }
         if (!dict_addr) {
             std::lock_guard<std::mutex> lk(g_players_mutex);
             g_players.clear();
@@ -479,6 +577,9 @@ namespace engine::data {
         {
             std::lock_guard<std::mutex> lk(g_players_mutex);
             g_players.swap(tmp_players);
+        }
+        if (!g_players.empty()) {
+            g_in_match.store(true);
         }
     }
 
