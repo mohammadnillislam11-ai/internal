@@ -34,8 +34,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     public static boolean isServiceRunning = false;
 
     private WindowManager windowManager;
+    private ESPView espView;
     private SurfaceView surfaceView;
     private WindowManager.LayoutParams params;
+    private WindowManager.LayoutParams espParams;
 
     private static final String CHANNEL_ID = "NINMODS_SURFACE_CHANNEL";
 
@@ -77,16 +79,17 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         screenHeight = dm.heightPixels;
         float density = dm.density;
 
-        // Auto-scale comfortably for high-DPI mobile devices as well as emulators
-        float scale = Math.max(density / 1.65f, 1.30f);
-        puckW = (int) (140 * scale);
-        puckH = (int) (52 * scale);
+        // Balanced scaling for crisp, comfortable mobile and emulator view
+        float scale = Math.max(density / 1.70f, 1.20f);
+        puckW = (int) (130 * scale);
+        puckH = (int) (48 * scale);
 
         int maxDim = Math.max(screenWidth, screenHeight);
         int minDim = Math.min(screenWidth, screenHeight);
-        menuW = (int) Math.min(maxDim * 0.88f, 750 * scale);
-        menuH = (int) Math.min(minDim * 0.90f, 430 * scale);
-        headerHeightPx = (int) (50 * scale);
+        // Compact 2-page book dimensions (won't overwhelm screen or get stuck)
+        menuW = (int) Math.min(maxDim * 0.65f, 580 * scale);
+        menuH = (int) Math.min(minDim * 0.82f, 380 * scale);
+        headerHeightPx = (int) (48 * scale);
     }
 
     @Override
@@ -96,8 +99,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         if (params != null && surfaceView != null && surfaceView.isAttachedToWindow()) {
             params.width = isMenuOpen ? menuW : puckW;
             params.height = isMenuOpen ? menuH : puckH;
-            params.x = Math.max(0, Math.min(screenWidth - params.width, params.x));
-            params.y = Math.max(0, Math.min(screenHeight - params.height, params.y));
+            int maxX = screenWidth - (int) (80 * getResources().getDisplayMetrics().density);
+            int maxY = screenHeight - (int) (60 * getResources().getDisplayMetrics().density);
+            params.x = Math.max(0, Math.min(maxX, params.x));
+            params.y = Math.max(0, Math.min(maxY, params.y));
             windowManager.updateViewLayout(surfaceView, params);
         }
     }
@@ -124,7 +129,28 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
-        // Strictly bounded window: allows movement across entire physical screen including cutouts
+        // 1. OFFICIAL FULL-SCREEN ESP PASSTHROUGH LAYER (FLAG_NOT_TOUCHABLE)
+        // Zero touch interference guaranteed - passes 100% of touches directly to the game underneath.
+        espView = new ESPView(this);
+        espParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                overlayFlag,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                PixelFormat.TRANSLUCENT
+        );
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            espParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+        espParams.gravity = Gravity.TOP | Gravity.START;
+        espParams.x = 0;
+        espParams.y = 0;
+        windowManager.addView(espView, espParams);
+
+        // 2. FLOATING PUCK & BOOK MENU (Bounded Interactive Surface)
         params = new WindowManager.LayoutParams(
                 puckW,
                 puckH,
@@ -155,10 +181,14 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         isMenuOpen = true;
         updateScreenDimensions();
 
+        float density = getResources().getDisplayMetrics().density;
+        int maxX = screenWidth - (int) (80 * density);
+        int maxY = screenHeight - (int) (60 * density);
+
         params.width = menuW;
         params.height = menuH;
-        params.x = Math.max(0, Math.min(screenWidth - menuW, lastPosX));
-        params.y = Math.max(0, Math.min(screenHeight - menuH, lastPosY));
+        params.x = Math.max(0, Math.min(maxX, lastPosX));
+        params.y = Math.max(0, Math.min(maxY, lastPosY));
         lastPosX = params.x;
         lastPosY = params.y;
 
@@ -171,10 +201,14 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         isMenuOpen = false;
         updateScreenDimensions();
 
+        float density = getResources().getDisplayMetrics().density;
+        int maxX = screenWidth - (int) (40 * density);
+        int maxY = screenHeight - (int) (40 * density);
+
         params.width = puckW;
         params.height = puckH;
-        params.x = Math.max(0, Math.min(screenWidth - puckW, lastPosX));
-        params.y = Math.max(0, Math.min(screenHeight - puckH, lastPosY));
+        params.x = Math.max(0, Math.min(maxX, lastPosX));
+        params.y = Math.max(0, Math.min(maxY, lastPosY));
         lastPosX = params.x;
         lastPosY = params.y;
 
@@ -283,8 +317,11 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 }
 
                 if (isDragging) {
-                    params.x = (int) Math.max(0, Math.min(screenWidth - params.width, initialX + dx));
-                    params.y = (int) Math.max(0, Math.min(screenHeight - params.height, initialY + dy));
+                    float density = getResources().getDisplayMetrics().density;
+                    int maxX = screenWidth - (int) (80 * density);
+                    int maxY = screenHeight - (int) (60 * density);
+                    params.x = (int) Math.max(0, Math.min(maxX, initialX + dx));
+                    params.y = (int) Math.max(0, Math.min(maxY, initialY + dy));
                     windowManager.updateViewLayout(surfaceView, params);
                     lastPosX = params.x;
                     lastPosY = params.y;
@@ -322,6 +359,14 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         isServiceRunning = false;
 
         NativeBridge.stopEngine();
+
+        if (espView != null) {
+            espView.stop();
+            if (espView.isAttachedToWindow()) {
+                windowManager.removeView(espView);
+            }
+            espView = null;
+        }
 
         if (surfaceView != null && surfaceView.isAttachedToWindow()) {
             windowManager.removeView(surfaceView);
