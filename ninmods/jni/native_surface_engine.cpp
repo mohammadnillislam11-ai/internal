@@ -30,6 +30,7 @@
 #include "logger.h"
 
 namespace {
+    JavaVM* g_jvm = nullptr;
     ANativeWindow* g_window = nullptr;
     EGLDisplay g_display = EGL_NO_DISPLAY;
     EGLSurface g_surface = EGL_NO_SURFACE;
@@ -205,9 +206,37 @@ namespace {
 
 extern "C" {
 
+void native_copy_to_clipboard(const std::string& text) {
+    if (!g_jvm) return;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    jint res = g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+    if (res == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            attached = true;
+        }
+    }
+    if (env) {
+        jclass clazz = env->FindClass("com/google/android/gemini/NativeBridge");
+        if (clazz) {
+            jmethodID mid = env->GetStaticMethodID(clazz, "copyToClipboard", "(Ljava/lang/String;)V");
+            if (mid) {
+                jstring jstr = env->NewStringUTF(text.c_str());
+                env->CallStaticVoidMethod(clazz, mid, jstr);
+                env->DeleteLocalRef(jstr);
+            }
+            env->DeleteLocalRef(clazz);
+        }
+        if (attached) {
+            g_jvm->DetachCurrentThread();
+        }
+    }
+}
+
 JNIEXPORT void JNICALL Java_com_google_android_gemini_NativeBridge_initSurface(
     JNIEnv* env, jclass clazz, jobject surface, jint width, jint height) {
     
+    if (env && !g_jvm) env->GetJavaVM(&g_jvm);
     std::lock_guard<std::mutex> lock(g_window_mutex);
     g_screen_w = width;
     g_screen_h = height;
@@ -251,6 +280,7 @@ JNIEXPORT void JNICALL Java_com_google_android_gemini_NativeBridge_surfaceDestro
 
 JNIEXPORT void JNICALL Java_com_google_android_gemini_NativeBridge_onTouch(
     JNIEnv* env, jclass clazz, jint action, jfloat x, jfloat y) {
+    if (env && !g_jvm) env->GetJavaVM(&g_jvm);
     
     ImGuiIO& io = ImGui::GetIO();
     io.AddMousePosEvent(x, y);
@@ -301,6 +331,7 @@ JNIEXPORT void JNICALL Java_com_google_android_gemini_NativeBridge_stopEngine(
 
 JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_fetchESPData(
     JNIEnv* env, jclass clazz, jfloatArray outBuffer) {
+    if (env && !g_jvm) env->GetJavaVM(&g_jvm);
     if (!outBuffer) return 0;
     jsize len = env->GetArrayLength(outBuffer);
     if (len < 5) return 0;

@@ -65,6 +65,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        NativeBridge.setContext(this);
 
         prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
         isRooted = prefs.getBoolean(KEY_ROOT_GRANTED, false);

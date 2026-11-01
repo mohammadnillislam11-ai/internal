@@ -135,6 +135,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     public void onCreate() {
         super.onCreate();
         isServiceRunning = true;
+        NativeBridge.setContext(this);
 
         startForegroundNotification();
 

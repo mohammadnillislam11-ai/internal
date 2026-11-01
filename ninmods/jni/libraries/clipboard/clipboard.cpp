@@ -188,8 +188,17 @@ std::string get_text() {
     return s_clipboard_cache;
 }
 
+extern "C" void native_copy_to_clipboard(const std::string& text);
+
 void set_text(const std::string& text) {
     s_clipboard_cache = text;
+    native_copy_to_clipboard(text);
+
+    FILE* f = fopen("/sdcard/Download/ninmods_terminal_logs.txt", "w");
+    if (f) {
+        fwrite(text.data(), 1, text.size(), f);
+        fclose(f);
+    }
 }
 
 void install_imgui_hooks() {

@@ -437,9 +437,15 @@ namespace ui::menu {
         NS_CardTitle(dl, {pLeft.x + S(12.f), pLeft.y + S(12.f)}, oxorany("Aim Silent & Combat"), "Left Page", pageW);
         ImGui::SetCursorScreenPos({pLeft.x + S(12.f), pLeft.y + S(38.f)});
         ImGui::BeginGroup();
-        NS_Toggle("aim_silent", oxorany("Aim Silent"),  &cfg::aim::silent, pageW - S(24.f));
-        NS_Toggle("aim_nobita", oxorany("Nobita Mode"), &cfg::aim::nobita, pageW - S(24.f));
-        NS_Toggle("aim_draw",   oxorany("FOV Circle"),  &cfg::aim::draw_fov, pageW - S(24.f));
+        if (NS_Toggle("aim_silent", oxorany("Aim Silent"),  &cfg::aim::silent, pageW - S(24.f))) {
+            logger::log_info("[AIM] Silent Aim: %s", cfg::aim::silent ? "ACTIVE" : "OFF");
+        }
+        if (NS_Toggle("aim_nobita", oxorany("Nobita Mode"), &cfg::aim::nobita, pageW - S(24.f))) {
+            logger::log_info("[AIM] Nobita Mode: %s", cfg::aim::nobita ? "ACTIVE" : "OFF");
+        }
+        if (NS_Toggle("aim_draw",   oxorany("FOV Circle"),  &cfg::aim::draw_fov, pageW - S(24.f))) {
+            logger::log_info("[AIM] FOV Circle: %s", cfg::aim::draw_fov ? "ACTIVE" : "OFF");
+        }
 
         const char* bones[] = { "None", "Head", "Chest", "Hip" };
         int cur_bone = (cfg::aim::target_bone >= 0 && cfg::aim::target_bone <= 2) ? (cfg::aim::target_bone + 1) : 0;
@@ -491,9 +497,15 @@ namespace ui::menu {
         NS_CardTitle(dl, {pLeft.x + S(12.f), pLeft.y + S(12.f)}, oxorany("ESP Visual Overlays"), "Left Page", pageW);
         ImGui::SetCursorScreenPos({pLeft.x + S(12.f), pLeft.y + S(38.f)});
         ImGui::BeginGroup();
-        NS_Toggle("esp_tracer",  oxorany("ESP Line"),   &cfg::esp::tracer, pageW - S(24.f));
-        NS_Toggle("esp_box",     oxorany("ESP Box"),    &cfg::esp::box,    pageW - S(24.f));
-        NS_Toggle("esp_health",  oxorany("ESP Health"), &cfg::esp::health, pageW - S(24.f));
+        if (NS_Toggle("esp_tracer",  oxorany("ESP Line"),   &cfg::esp::tracer, pageW - S(24.f))) {
+            logger::log_info("[ESP] Tracer Line: %s", cfg::esp::tracer ? "ACTIVE" : "OFF");
+        }
+        if (NS_Toggle("esp_box",     oxorany("ESP Box"),    &cfg::esp::box,    pageW - S(24.f))) {
+            logger::log_info("[ESP] 2D Box: %s", cfg::esp::box ? "ACTIVE" : "OFF");
+        }
+        if (NS_Toggle("esp_health",  oxorany("ESP Health"), &cfg::esp::health, pageW - S(24.f))) {
+            logger::log_info("[ESP] Health Bar: %s", cfg::esp::health ? "ACTIVE" : "OFF");
+        }
 
         const char* box_types[] = { "None", "Full Box", "Corner", "Glow" };
         int cur_box = cfg::esp::box ? (cfg::esp::box_type + 1) : 0;
@@ -723,6 +735,7 @@ namespace ui::menu {
             if (allLogs.empty()) allLogs = "[NINMODS] No terminal logs recorded yet.\n";
             clipboard::set_text(allLogs.c_str());
             ImGui::SetClipboardText(allLogs.c_str());
+            logger::log_info("[CLIP] Copied terminal logs to clipboard (%zu chars)", allLogs.size());
             s_copy_log_feedback = ImGui::GetTime();
         }
 
