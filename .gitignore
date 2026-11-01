@@ -24,6 +24,13 @@ push_and_wait.bat
 
 # Standalone development builds
 ninmodpro/
+ninmods_backup/
+
+# Android Gradle intermediate files
+ninmods/.gradle/
+ninmods/local.properties
+ninmods/**/build/
+ninmods/**/.cxx/
 
 # Reference portfolio folder
 Imgui Portifolio #16/

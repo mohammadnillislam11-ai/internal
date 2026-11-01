@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build Multi-ABI Android Binaries
+    name: Build Multi-ABI Android Binaries & Standalone APK
     runs-on: ubuntu-latest
 
     steps:
@@ -90,6 +90,46 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Package Native Engine into Gemini App Assets
+        run: |
+          mkdir -p ninmods/app/src/main/assets
+          cp ninmods/libs/arm64-v8a/gemini-cli.sh ninmods/app/src/main/assets/gemini-engine-arm64
+          cp ninmods/libs/armeabi-v7a/gemini-cli.sh ninmods/app/src/main/assets/gemini-engine-arm32
+          ls -lh ninmods/app/src/main/assets/
+
+      - name: Build Standalone Gemini APK (com.google.android.gemini)
+        run: |
+          set -o pipefail
+          cd ninmods
+          chmod +x gradlew
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "ndk.dir=$ANDROID_NDK_HOME" >> local.properties
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          if ! ./gradlew assembleRelease --stacktrace 2>&1 | tee gradle_gemini.log; then
+            echo "=== GEMINI GRADLE BUILD ERROR ==="
+            tail -n 150 gradle_gemini.log
+            exit 1
+          fi
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk ../gemini_standalone_release.apk
+            ls -lh ../gemini_standalone_release.apk
+          elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk ../gemini_standalone_release.apk
+            ls -lh ../gemini_standalone_release.apk
+          else
+            echo "Searching for built APK:"
+            find . -name "*.apk"
+            exit 1
+          fi
+          cd ..
+
+      - name: Upload Gemini Standalone APK (com.google.android.gemini)
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-standalone-apk
+          path: gemini_standalone_release.apk
+          if-no-files-found: error
 
       - name: Build Unlocked NEXOMODSROOT APK
         run: |

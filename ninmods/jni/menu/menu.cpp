@@ -624,7 +624,11 @@ namespace ui::menu {
             int da = (int)(60 * ma * bar::game_alpha());
             ImGui::GetBackgroundDrawList()->AddRectFilled({0,0},{g_sw,g_sh},IM_COL32(0,0,0,da));
         }
-        if (ma < 0.01f) return;
+        if (ma < 0.01f) {
+            g_menu_x = -1.f;
+            g_menu_y = -1.f;
+            return;
+        }
 
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ma);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, R);
@@ -666,6 +670,10 @@ namespace ui::menu {
 
         ImVec2 wp = ImGui::GetWindowPos();
         ImVec2 ws = ImGui::GetWindowSize();
+        g_menu_x = wp.x;
+        g_menu_y = wp.y;
+        g_menu_w = ws.x;
+        g_menu_h = ws.y;
         ImVec2 mp = ImGui::GetMousePos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImDrawList* bg = ImGui::GetWindowDrawList();

@@ -1,6 +1,7 @@
 #include "touch_input.h"
 #include "imgui.h"
 #include "menu/bar.hpp"
+#include "menu/menu.hpp"
 
 #include <sys/prctl.h>
 #include <sys/ioctl.h>
@@ -263,7 +264,7 @@ namespace touch {
                                 bool hit = false;
                                 if (ui::bar::g_open) {
                                     // When menu is open, capture interactions with UI
-                                    hit = true;
+                                    hit = ui::menu::is_inside(sx, sy) || (sx >= (ui::bar::g_puck_x - 24.0f) && sx <= (ui::bar::g_puck_x + ui::bar::g_puck_w + 24.0f) && sy >= (ui::bar::g_puck_y - 24.0f) && sy <= (ui::bar::g_puck_y + ui::bar::g_puck_h + 24.0f));
                                 } else {
                                     // When menu is closed, only capture touch on the floating puck
                                     hit = (sx >= (ui::bar::g_puck_x - 24.0f) &&
