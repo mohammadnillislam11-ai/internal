@@ -79,23 +79,25 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         screenHeight = dm.heightPixels;
         float density = dm.density;
 
-        float puckScale = Math.max(1.0f, density / 1.7f);
-        puckW = (int) (130 * puckScale);
-        puckH = (int) (48 * puckScale);
+        // Comfortable standard high-DPI sizing for floating logo puck
+        float puckDpW = 148.0f;
+        float puckDpH = 56.0f;
+        puckW = (int) Math.max(140, puckDpW * density);
+        puckH = (int) Math.max(52, puckDpH * density);
 
         if (screenWidth < screenHeight) {
             // PORTRAIT (Phone Vertical / Home Screen)
-            // Occupy 94% of screen width so the 2-page book layout is wide, large and legible
-            menuW = (int) (screenWidth * 0.94f);
-            menuH = (int) Math.min(screenHeight * 0.58f, 540 * density);
+            // Occupy 96% of screen width so the 2-page book layout is wide, large and legible
+            menuW = (int) (screenWidth * 0.96f);
+            menuH = (int) Math.min(screenHeight * 0.65f, 580 * density);
         } else {
             // LANDSCAPE (In-Game / Free Fire mode)
-            // Occupy 68% of screen width, 85% of screen height
-            menuW = (int) Math.min(screenWidth * 0.70f, 760 * density);
-            menuH = (int) Math.min(screenHeight * 0.86f, 480 * density);
+            // Occupy 76% of screen width, 90% of screen height
+            menuW = (int) Math.min(screenWidth * 0.76f, 850 * density);
+            menuH = (int) Math.min(screenHeight * 0.90f, 520 * density);
         }
 
-        headerHeightPx = (int) (64 * density);
+        headerHeightPx = (int) (72 * density);
     }
 
     @Override
@@ -189,9 +191,9 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         updateScreenDimensions();
 
         float density = getResources().getDisplayMetrics().density;
-        int minX = -(menuW - (int) (80 * density));
-        int maxX = screenWidth - (int) (80 * density);
-        int maxY = Math.max(0, screenHeight - (int) (60 * density));
+        int minX = -(menuW - (int) (100 * density));
+        int maxX = screenWidth - (int) (100 * density);
+        int maxY = Math.max(0, screenHeight - (int) (80 * density));
 
         params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
@@ -330,13 +332,14 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 // Header drag moves the whole menu window
                 if (!isDragging && event.getY() <= headerHeightPx && (dx * dx + dy * dy > touchSlop * touchSlop)) {
                     isDragging = true;
+                    NativeBridge.onTouch(MotionEvent.ACTION_CANCEL, event.getX(), event.getY());
                 }
 
                 if (isDragging) {
                     float density = getResources().getDisplayMetrics().density;
-                    int minX = -(params.width - (int) (80 * density));
-                    int maxX = screenWidth - (int) (80 * density);
-                    int maxY = Math.max(0, screenHeight - (int) (60 * density));
+                    int minX = -(params.width - (int) (100 * density));
+                    int maxX = screenWidth - (int) (100 * density);
+                    int maxY = Math.max(0, screenHeight - (int) (80 * density));
                     params.x = (int) Math.max(minX, Math.min(maxX, initialX + dx));
                     params.y = (int) Math.max(0, Math.min(maxY, initialY + dy));
                     windowManager.updateViewLayout(surfaceView, params);
@@ -356,7 +359,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                         closeMenu();
                     }
                 } else {
-                    NativeBridge.onTouch(action, event.getX(), event.getY());
+                    NativeBridge.onTouch(MotionEvent.ACTION_CANCEL, event.getX(), event.getY());
                 }
                 isDragging = false;
                 return true;

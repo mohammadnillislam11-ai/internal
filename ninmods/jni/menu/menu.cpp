@@ -321,15 +321,18 @@ namespace ui::menu {
         ImVec4(1.00f, 0.35f, 0.80f, 1.0f)  // 2: Pink (পিং)
     };
 
-    static const char* kEspColorNames[3] = {
-        oxorany("Blue"),
-        oxorany("Red"),
-        oxorany("Pink")
-    };
+    static inline const char* GetEspColorName(int idx) {
+        switch (idx) {
+            case 0: return "Blue";
+            case 1: return "Red";
+            case 2: return "Pink";
+            default: return "Blue";
+        }
+    }
 
     /**
      * @brief Specialized Color Skip Bar (কালার স্কিপ বার) with 3 selectable colors: Blue, Red, Pink.
-     * Can be increased or decreased smoothly via left/right buttons, step dots, and touch drag.
+     * Clean full-width track with 3 color dots and thumb knob. No arrow buttons.
      */
     static bool NS_ColorStepSlider(const char* id, const char* label, ImVec4* color, int* cur_idx, float width = 0.0f) {
         if (!color || !cur_idx) return false;
@@ -341,16 +344,23 @@ namespace ui::menu {
         if (*cur_idx < 0) *cur_idx = 0;
         if (*cur_idx > 2) *cur_idx = 2;
 
-        const char* curName = kEspColorNames[*cur_idx];
+        const char* curName = GetEspColorName(*cur_idx);
         ImVec4 activeVec = kEspColors[*cur_idx];
         ImU32 activeCol = ImGui::ColorConvertFloat4ToU32(activeVec);
-        bool changed = false;
+
+        float trackX = pos.x;
+        float trackW = w;
+        float trackY = pos.y + S(22.f);
+
+        float maxV = 2.0f; // 3 steps: 0, 1, 2
+        float rawPct = (float)(*cur_idx) / maxV;
+        float pct = NS_Anim(std::string(id) + "#col_pct", rawPct, 22.f);
 
         if (dl) {
             // Label on the left
             dl->AddText(ImGui::GetFont(), S(14.0f), {pos.x, pos.y}, C_TextSec(), label);
 
-            // Right side: Active color circle swatch + color name
+            // Right side: Active color circle swatch + clean color name (No corrupted symbols!)
             float nameW = NS_TextSize(curName, S(13.5f)).x;
             float pillW = S(12.f);
             float pillGap = S(6.f);
@@ -360,36 +370,7 @@ namespace ui::menu {
             dl->AddCircleFilled({pillPos.x + pillW * 0.5f, pillPos.y + pillW * 0.5f}, pillW * 0.5f, activeCol);
             dl->AddCircle({pillPos.x + pillW * 0.5f, pillPos.y + pillW * 0.5f}, pillW * 0.5f, IM_COL32(255, 255, 255, 180), 12, 1.0f);
             dl->AddText(ImGui::GetFont(), S(13.5f), {pillPos.x + pillW + pillGap, pos.y}, activeCol, curName);
-        }
 
-        // Second row: [ < ]  --- Track with 3 color dots ---  [ > ]
-        float rowY = pos.y + S(22.f);
-        float btnW = S(28.f);
-        float btnH = S(24.f);
-
-        // Decrement button [ < ]
-        ImGui::SetCursorScreenPos({pos.x, rowY});
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 30, 60, (int)(content_alpha * 220)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(65, 45, 95, (int)(content_alpha * 255)));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeCol);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, S(4.0f));
-        if (ImGui::Button("<", ImVec2(btnW, btnH))) {
-            if (*cur_idx > 0) {
-                (*cur_idx)--;
-                changed = true;
-            }
-        }
-
-        // Track in middle between [ < ] and [ > ]
-        float trackX = pos.x + btnW + S(8.f);
-        float trackW = w - (btnW * 2.f + S(16.f));
-        float trackY = rowY + (btnH - S(5.0f)) * 0.5f;
-
-        float maxV = 2.0f; // 3 steps: 0, 1, 2
-        float rawPct = (float)(*cur_idx) / maxV;
-        float pct = NS_Anim(std::string(id) + "#col_pct", rawPct, 22.f);
-
-        if (dl) {
             // Track background
             dl->AddRectFilled({trackX, trackY}, {trackX + trackW, trackY + S(5.0f)},
                 IM_COL32(38, 28, 55, (int)(content_alpha * 255)), S(2.5f));
@@ -397,11 +378,11 @@ namespace ui::menu {
             // Active Track Fill
             dl->AddRectFilled({trackX, trackY}, {trackX + trackW * pct, trackY + S(5.0f)}, activeCol, S(2.5f));
 
-            // 3 Color dots along the skip bar track (Blue dot at 0, Red dot at 1, Pink dot at 2)
+            // 3 Color dots along the track: 0=Blue, 1=Red, 2=Pink
             for (int s = 0; s < 3; s++) {
                 float sx = trackX + (trackW * ((float)s / maxV));
                 ImU32 dotCol = ImGui::ColorConvertFloat4ToU32(kEspColors[s]);
-                float dotRadius = (s == *cur_idx) ? S(4.5f) : S(3.0f);
+                float dotRadius = (s == *cur_idx) ? S(5.0f) : S(3.5f);
                 dl->AddCircleFilled({sx, trackY + S(2.5f)}, dotRadius, dotCol);
                 if (s == *cur_idx) {
                     dl->AddCircle({sx, trackY + S(2.5f)}, dotRadius + S(1.5f), IM_COL32(255, 255, 255, 230), 12, 1.2f);
@@ -410,42 +391,28 @@ namespace ui::menu {
 
             // Thumb knob centered on active percentage
             float thumbX = trackX + trackW * pct;
-            dl->AddCircleFilled({thumbX, trackY + S(2.5f)}, S(7.5f), IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
-            dl->AddCircleFilled({thumbX, trackY + S(2.5f)}, S(5.0f), activeCol);
-            dl->AddCircle({thumbX, trackY + S(2.5f)}, S(7.5f), IM_COL32(255, 255, 255, 220), 16, 1.4f);
+            dl->AddCircleFilled({thumbX, trackY + S(2.5f)}, S(8.0f), IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
+            dl->AddCircleFilled({thumbX, trackY + S(2.5f)}, S(5.5f), activeCol);
+            dl->AddCircle({thumbX, trackY + S(2.5f)}, S(8.0f), IM_COL32(255, 255, 255, 220), 16, 1.4f);
         }
 
-        // Invisible slider over track for touch drag & tap
-        ImGui::SetCursorScreenPos({trackX, rowY - S(2.f)});
+        // Clean full-width touch slider over the track (Smooth tap & drag across the 3 colors)
+        ImGui::SetCursorScreenPos({trackX, trackY - S(6.f)});
         ImGui::SetNextItemWidth(trackW);
         ImGui::PushStyleColor(ImGuiCol_FrameBg,          IM_COL32(0,0,0,0));
         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,   IM_COL32(0,0,0,0));
         ImGui::PushStyleColor(ImGuiCol_FrameBgActive,    IM_COL32(0,0,0,0));
         ImGui::PushStyleColor(ImGuiCol_SliderGrab,       IM_COL32(0,0,0,0));
         ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, IM_COL32(0,0,0,0));
-        if (ImGui::SliderInt("##col_step", cur_idx, 0, 2, "")) {
-            changed = true;
-        }
+        bool changed = ImGui::SliderInt("##col_step", cur_idx, 0, 2, "");
         ImGui::PopStyleColor(5);
-
-        // Increment button [ > ]
-        ImGui::SetCursorScreenPos({pos.x + w - btnW, rowY});
-        if (ImGui::Button(">", ImVec2(btnW, btnH))) {
-            if (*cur_idx < 2) {
-                (*cur_idx)++;
-                changed = true;
-            }
-        }
-        ImGui::PopStyleVar();    // Pop FrameRounding
-        ImGui::PopStyleColor(3);  // Pop Button colors
 
         if (changed) {
             *cur_idx = ImClamp(*cur_idx, 0, 2);
             *color = kEspColors[*cur_idx];
         }
 
-        ImGui::SetCursorScreenPos({pos.x, rowY + btnH + S(6.f)});
-        ImGui::Dummy(ImVec2(0, S(4.f)));
+        ImGui::Dummy(ImVec2(0, S(10.f)));
         ImGui::PopID();
         return changed;
     }

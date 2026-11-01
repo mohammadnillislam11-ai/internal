@@ -66,55 +66,20 @@ static void get_fps_pos(float w, float h) {
  * @param alpha Global opacity multiplier.
  */
 static void render_fps_icon(float alpha) {
-  const float w = (g_sw > 0.f && g_sw <= 250.f) ? g_sw : 146.f;
-  const float h = (g_sh > 0.f && g_sh <= 120.f) ? g_sh : 54.f;
+  const float w = g_sw > 10.f ? g_sw : 150.f;
+  const float h = g_sh > 10.f ? g_sh : 56.f;
 
-  if (g_sw > 250.f) {
-    get_fps_pos(w, h);
-  } else {
-    g_fps_x = 0.f;
-    g_fps_y = 0.f;
-    g_puck_x = 0.f;
-    g_puck_y = 0.f;
-    g_puck_w = w;
-    g_puck_h = h;
-  }
+  g_fps_x = 0.f;
+  g_fps_y = 0.f;
+  g_puck_x = 0.f;
+  g_puck_y = 0.f;
+  g_puck_w = w;
+  g_puck_h = h;
 
   ImDrawList *dl = ImGui::GetForegroundDrawList();
-  ImVec2 mp = ImGui::GetMousePos();
-  bool hov = (mp.x >= g_fps_x && mp.x <= g_fps_x + w && mp.y >= g_fps_y &&
-              mp.y <= g_fps_y + h);
-
-  if (hov && (ImGui::IsMouseClicked(0) || (!g_fps_potential && ImGui::IsMouseDown(0)))) {
-    g_fps_potential = true;
-    g_fps_down = mp;
-    g_fps_off = ImVec2(mp.x - g_fps_x, mp.y - g_fps_y);
-  }
-
-  if (g_fps_potential && ImGui::IsMouseDown(0)) {
-    float dx = mp.x - g_fps_down.x;
-    float dy = mp.y - g_fps_down.y;
-    if (g_fps_drag ||
-        (dx * dx + dy * dy) > (FPS_DRAG_THRESHOLD * FPS_DRAG_THRESHOLD)) {
-      g_fps_drag = true;
-      g_fps_x = mp.x - g_fps_off.x;
-      g_fps_y = mp.y - g_fps_off.y;
-      get_fps_pos(w, h);
-    }
-  }
-
-  if (ImGui::IsMouseReleased(0)) {
-    if (g_fps_drag) {
-      logger::log_info("[PUCK] Floating logo moved to: (X: %.1f, Y: %.1f)", g_fps_x, g_fps_y);
-    }
-    g_fps_potential = false;
-    g_fps_drag = false;
-  }
-
   float fps = ImGui::GetIO().Framerate;
   ImU32 bg_col = IM_COL32(22, 16, 36, static_cast<int>(245 * alpha));
-  ImU32 border_col = g_fps_drag ? col(UITheme::border_light, alpha)
-                                : col(UITheme::border, alpha);
+  ImU32 border_col = col(UITheme::border, alpha);
 
   float pillR = h * 0.5f;
   dl->AddRectFilled(
@@ -123,25 +88,28 @@ static void render_fps_icon(float alpha) {
   dl->AddRectFilled({g_fps_x, g_fps_y}, {g_fps_x + w, g_fps_y + h}, bg_col,
                     pillR);
   dl->AddRect({g_fps_x, g_fps_y}, {g_fps_x + w, g_fps_y + h}, border_col, pillR,
-              0, g_fps_drag ? 2.4f : 1.6f);
+              0, 2.0f);
 
   // Top & bottom accent notches styled with signature border color
-  dl->AddRectFilled({g_fps_x + 60.f, g_fps_y - 2.0f},
-                    {g_fps_x + 86.f, g_fps_y + 1.5f},
+  float notchW = w * 0.22f;
+  float notchX = w * 0.44f;
+  dl->AddRectFilled({g_fps_x + notchX, g_fps_y - 2.0f},
+                    {g_fps_x + notchX + notchW, g_fps_y + 1.5f},
                     col(UITheme::border_light, alpha), 1.5f);
-  dl->AddRectFilled({g_fps_x + 60.f, g_fps_y + h - 1.5f},
-                    {g_fps_x + 86.f, g_fps_y + h + 2.0f},
+  dl->AddRectFilled({g_fps_x + notchX, g_fps_y + h - 1.5f},
+                    {g_fps_x + notchX + notchW, g_fps_y + h + 2.0f},
                     col(UITheme::border_light, alpha), 1.5f);
 
-  float cx = g_fps_x + 28.f, cy = g_fps_y + h * 0.5f, radius = 19.f;
+  float cx = g_fps_x + h * 0.52f, cy = g_fps_y + h * 0.5f, radius = h * 0.36f;
   dl->AddCircleFilled({cx, cy}, radius,
                       IM_COL32(36, 26, 56, static_cast<int>(255 * alpha)));
-  dl->AddCircle({cx, cy}, radius, col(UITheme::border_light, alpha), 32, 2.0f);
+  dl->AddCircle({cx, cy}, radius, col(UITheme::border_light, alpha), 32, 2.2f);
 
   ImFont *font = ImGui::GetFont();
   if (font) {
-    float nw = font->CalcTextSizeA(19.f, FLT_MAX, 0.f, "N").x;
-    dl->AddText(font, 19.f, {cx - nw * 0.5f, cy - 9.5f},
+    float nSize = h * 0.38f;
+    float nw = font->CalcTextSizeA(nSize, FLT_MAX, 0.f, "N").x;
+    dl->AddText(font, nSize, {cx - nw * 0.5f, cy - nSize * 0.5f},
                 IM_COL32(255, 255, 255, static_cast<int>(255 * alpha)), "N");
 
     int fpsInt = static_cast<int>(fps + 0.5f);
@@ -150,7 +118,9 @@ static void render_fps_icon(float alpha) {
     ImU32 text_col = fps >= 45.f   ? IM_COL32(52, 211, 110, 255)
                      : fps >= 28.f ? IM_COL32(255, 180, 40, 255)
                                    : IM_COL32(255, 69, 58, 255);
-    dl->AddText(font, 18.5f, {g_fps_x + 58.f, g_fps_y + (h - 18.5f) * 0.5f},
+    float fpsSize = h * 0.34f;
+    float textX = cx + radius + h * 0.20f;
+    dl->AddText(font, fpsSize, {textX, g_fps_y + (h - fpsSize) * 0.5f},
                 text_col, buf);
   }
 }
