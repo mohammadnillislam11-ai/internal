@@ -435,17 +435,30 @@ namespace engine::mem {
                 g_mem_fd = open(mem_path, O_RDONLY);
             }
             if (g_mem_fd < 0) {
-                char ucmd[80];
-                snprintf(ucmd, sizeof(ucmd), "su -c 'chmod 666 %s 2>/dev/null'", mem_path);
-                system(ucmd);
-                g_mem_fd = open(mem_path, O_RDWR);
-                if (g_mem_fd < 0) g_mem_fd = open(mem_path, O_RDONLY);
+                // Try known su binary locations on Android Magisk / KernelSU / APatch
+                const char* su_bins[] = {
+                    "/data/adb/ksu/bin/su", "/data/adb/ap/bin/su", "/data/adb/magisk/su",
+                    "/system/xbin/su", "/system/bin/su", "/sbin/su", "su"
+                };
+                for (const char* su_bin : su_bins) {
+                    char ucmd[160];
+                    snprintf(ucmd, sizeof(ucmd), "%s -c 'setenforce 0; echo 0 > /proc/sys/kernel/yama/ptrace_scope; chmod 666 %s 2>/dev/null'", su_bin, mem_path);
+                    system(ucmd);
+                    g_mem_fd = open(mem_path, O_RDWR);
+                    if (g_mem_fd < 0) g_mem_fd = open(mem_path, O_RDONLY);
+                    if (g_mem_fd >= 0) break;
+                }
             }
         }
 
         if (g_mem_fd >= 0) {
-            if (pread64(g_mem_fd, buffer, size, address) == static_cast<ssize_t>(size)) {
+            ssize_t pr = pread64(g_mem_fd, buffer, size, address);
+            if (pr == static_cast<ssize_t>(size)) {
                 return true;
+            }
+            if (pr < 0 && (errno == EBADF || errno == EIO || errno == EACCES)) {
+                close(g_mem_fd);
+                g_mem_fd = -1;
             }
         }
 

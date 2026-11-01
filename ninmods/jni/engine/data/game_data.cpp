@@ -560,20 +560,17 @@ namespace engine::data {
                 tmp_players.size(), tmp_players[0].Head.x, tmp_players[0].Head.y, tmp_players[0].distance);
         }
 
-        std::lock_guard<std::mutex> lk(g_players_mutex);
-        g_players = std::move(tmp_players);
+        {
+            std::lock_guard<std::mutex> lk(g_players_mutex);
+            g_players = std::move(tmp_players);
+            if (!g_players.empty()) {
+                g_in_match.store(true);
+            }
+        }
 
         if (g_vis_stable.size() > 200) {
             g_vis_stable.clear();
             g_vis_counter.clear();
-        }
-
-        {
-            std::lock_guard<std::mutex> lk(g_players_mutex);
-            g_players.swap(tmp_players);
-        }
-        if (!g_players.empty()) {
-            g_in_match.store(true);
         }
     }
 

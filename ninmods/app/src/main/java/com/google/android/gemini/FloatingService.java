@@ -63,6 +63,30 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     private boolean isDragging = false;
     private int touchSlop = 12;
     private int headerHeightPx = 50;
+    private int lastUnlockedPid = -1;
+
+    private void ensureRootPermissions(final int pid) {
+        new Thread(() -> {
+            try {
+                Process su = Runtime.getRuntime().exec("su");
+                java.io.OutputStream os = su.getOutputStream();
+                String script =
+                        "setenforce 0 2>/dev/null\n" +
+                        "echo 0 > /proc/sys/kernel/yama/ptrace_scope 2>/dev/null\n" +
+                        "chmod 666 /proc/" + pid + "/mem 2>/dev/null\n" +
+                        "chmod 666 /proc/" + pid + "/maps 2>/dev/null\n" +
+                        "chmod 666 /proc/" + pid + "/cmdline 2>/dev/null\n" +
+                        "chmod 755 /proc/" + pid + " 2>/dev/null\n" +
+                        "magiskpolicy --live \"allow untrusted_app * * *\" 2>/dev/null\n" +
+                        "magiskpolicy --live \"permissive untrusted_app\" 2>/dev/null\n" +
+                        "exit\n";
+                os.write(script.getBytes());
+                os.flush();
+                os.close();
+                su.waitFor();
+            } catch (Throwable ignored) {}
+        }).start();
+    }
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable menuWatchdog = new Runnable() {
@@ -72,6 +96,14 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 String clip = NativeBridge.popClipboardRequest();
                 if (clip != null && !clip.isEmpty()) {
                     NativeBridge.copyToClipboard(clip);
+                }
+            } catch (Throwable ignored) {}
+
+            try {
+                int targetPid = NativeBridge.getTargetPid();
+                if (targetPid > 0 && targetPid != lastUnlockedPid) {
+                    lastUnlockedPid = targetPid;
+                    ensureRootPermissions(targetPid);
                 }
             } catch (Throwable ignored) {}
 

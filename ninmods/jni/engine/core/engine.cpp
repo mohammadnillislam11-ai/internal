@@ -29,7 +29,9 @@ namespace engine {
         errno = 0;
         int res = kill(pid, 0);
         if (res == 0) return true;
-        if (errno == EPERM) return true;
+        // On Linux / Android, ESRCH strictly means the PID does not exist.
+        // Any permission error (EPERM, EACCES) confirms the process is alive.
+        if (errno != ESRCH) return true;
         char path[32];
         snprintf(path, sizeof(path), "/proc/%d", pid);
         return (access(path, F_OK) == 0);
