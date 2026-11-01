@@ -11,7 +11,9 @@ import android.content.pm.ServiceInfo;
 import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -61,6 +63,19 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     private boolean isDragging = false;
     private int touchSlop = 12;
     private int headerHeightPx = 50;
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable menuWatchdog = new Runnable() {
+        @Override
+        public void run() {
+            if (isMenuOpen && !NativeBridge.isMenuOpen()) {
+                closeMenu();
+            }
+            if (isServiceRunning) {
+                mainHandler.postDelayed(this, 80);
+            }
+        }
+    };
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -122,6 +137,8 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         isServiceRunning = true;
 
         startForegroundNotification();
+
+        mainHandler.post(menuWatchdog);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         updateScreenDimensions();
@@ -354,10 +371,15 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
             case MotionEvent.ACTION_UP:
                 if (!isDragging) {
                     NativeBridge.onTouch(action, event.getX(), event.getY());
-                    // Check if close button was tapped in C++
-                    if (!NativeBridge.isMenuOpen()) {
-                        closeMenu();
-                    }
+                    // Allow C++ render thread to process touch frame, then synchronize window state
+                    mainHandler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isMenuOpen && !NativeBridge.isMenuOpen()) {
+                                closeMenu();
+                            }
+                        }
+                    }, 40);
                 } else {
                     NativeBridge.onTouch(MotionEvent.ACTION_CANCEL, event.getX(), event.getY());
                 }
@@ -377,6 +399,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     public void onDestroy() {
         super.onDestroy();
         isServiceRunning = false;
+        mainHandler.removeCallbacks(menuWatchdog);
 
         NativeBridge.stopEngine();
 

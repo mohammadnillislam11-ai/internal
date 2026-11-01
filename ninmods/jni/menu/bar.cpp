@@ -66,8 +66,18 @@ static void get_fps_pos(float w, float h) {
  * @param alpha Global opacity multiplier.
  */
 static void render_fps_icon(float alpha) {
-  const float w = g_sw > 10.f ? g_sw : 150.f;
-  const float h = g_sh > 10.f ? g_sh : 56.f;
+  // Compact floating puck: Strictly clamped to puck window proportions (~135 x 46 dp)
+  // Prevents the puck from ballooning to the full menu window dimensions (g_sw, g_sh)
+  float scale = 1.0f;
+  if (ImGui::GetCurrentContext()) {
+    float fbScale = ImGui::GetIO().DisplayFramebufferScale.y;
+    if (fbScale >= 1.0f && fbScale <= 4.0f) scale = fbScale;
+  }
+  float maxW = 160.0f * scale;
+  float maxH = 56.0f * scale;
+
+  const float w = (g_sw > 10.f && g_sw <= maxW) ? g_sw : (135.f * scale);
+  const float h = (g_sh > 10.f && g_sh <= maxH) ? g_sh : (46.f * scale);
 
   g_fps_x = 0.f;
   g_fps_y = 0.f;
