@@ -41,7 +41,6 @@ public class Auth extends AsyncTask<String, Void, String> {
     protected String doInBackground(String... params) {
         return "NEXO_LOGIN_SUCCESS"; // Always valid
     }
-    }
 
     // 🔥 FIXED: Robust parser - handles both Array and individual objects
     private boolean validateKeyWithServer(String key) {
