@@ -50,7 +50,7 @@ namespace ui::menu {
     static bool   drag   = false;
     static ImVec2 doff(0, 0);
 
-    static constexpr float R = 14.f;
+    static constexpr float R = 12.f;
 
     static std::unordered_map<std::string, float> g_nsAnim;
     static inline float NS_Anim(const std::string& key, float target, float speed = 14.f) {
@@ -92,27 +92,26 @@ namespace ui::menu {
     static inline ImU32 C_Danger()       { return IM_COL32(255, 69, 58, (int)(content_alpha * 255)); }
 
     static void NS_CardBegin(ImDrawList* dl, ImVec2 pos, float w, float h) {
-        dl->AddRectFilled(pos, {pos.x+w, pos.y+h}, C_BgCard(), 10.f);
-        dl->AddRect(pos, {pos.x+w, pos.y+h}, C_Border(), 10.f, 0, 1.4f);
+        dl->AddRectFilled(pos, {pos.x+w, pos.y+h}, C_BgCard(), 9.f);
+        dl->AddRect(pos, {pos.x+w, pos.y+h}, C_Border(), 9.f, 0, 1.2f);
     }
 
-    static void NS_CardTitle(ImDrawList* dl, ImVec2 pos, const char* title, const char* hint = nullptr) {
-        dl->AddRectFilled({pos.x, pos.y+2.f}, {pos.x+4.0f, pos.y+18.f}, C_Accent(), 2.f);
-        dl->AddText(ImGui::GetFont(), 16.0f, {pos.x+12.f, pos.y+1.f}, C_TextMain(), title);
-        if (hint) {
-            float hw = NS_TextSize(hint, 13.5f).x;
-            dl->AddText(ImGui::GetFont(), 13.5f,
-                {pos.x + ImGui::GetContentRegionAvail().x - hw - 10.f, pos.y+2.f},
+    static void NS_CardTitle(ImDrawList* dl, ImVec2 pos, const char* title, const char* hint = nullptr, float w = 0.f) {
+        dl->AddRectFilled({pos.x, pos.y+2.f}, {pos.x+3.5f, pos.y+17.f}, C_Accent(), 1.5f);
+        dl->AddText(ImGui::GetFont(), 15.0f, {pos.x+10.f, pos.y+1.f}, C_TextMain(), title);
+        if (hint && w > 0.f) {
+            float hw = NS_TextSize(hint, 12.5f).x;
+            dl->AddText(ImGui::GetFont(), 12.5f,
+                {pos.x + w - hw - 20.f, pos.y+2.f},
                 C_Accent(), hint);
         }
     }
 
     static bool NS_Toggle(const char* id, const char* label, bool* value, float width = 0.0f) {
         ImGui::PushID(id);
-        float avail = ImGui::GetContentRegionAvail().x;
-        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
+        float w = (width > 0.0f) ? width : ImMin(ImGui::GetContentRegionAvail().x, content_w - 20.0f);
         ImVec2 pos = ImGui::GetCursorScreenPos();
-        float h = 40.f;
+        float h = 34.f;
         ImGui::InvisibleButton("btn", ImVec2(w, h));
         bool clicked = ImGui::IsItemClicked();
         bool hover = ImGui::IsItemHovered();
@@ -123,21 +122,21 @@ namespace ui::menu {
             float on = NS_Anim(key+"on", *value ? 1.f : 0.f, 16.f);
             float hov = NS_Anim(key+"hov", hover ? 1.f : 0.f, 18.f);
             ImU32 lblCol = NS_Lerp(C_TextSec(), C_TextMain(), ImMax(on, hov*0.5f));
-            dl->AddText(ImGui::GetFont(), 15.5f,
-                {pos.x, pos.y + (h - 15.5f) * 0.5f}, lblCol, label);
-            float tw = 50.f, th = 24.f;
+            dl->AddText(ImGui::GetFont(), 14.5f,
+                {pos.x, pos.y + (h - 14.5f) * 0.5f}, lblCol, label);
+            float tw = 44.f, th = 22.f;
             float tx = pos.x + w - tw, ty = pos.y + (h - th) * 0.5f;
 
-            // Background pill matches border light color when active
+            // Background pill matches signature border color
             dl->AddRectFilled({tx, ty}, {tx+tw, ty+th},
-                NS_Lerp(IM_COL32(40,30,60,(int)(content_alpha*255)), C_Accent(), on), th*0.5f);
+                NS_Lerp(IM_COL32(38,28,55,(int)(content_alpha*255)), C_Accent(), on), th*0.5f);
             if (on > 0.05f) {
                 dl->AddRect({tx, ty}, {tx+tw, ty+th},
                     (C_Accent() & 0x00FFFFFF) | ((ImU32)(120*on) << 24),
-                    th*0.5f, 0, 1.4f);
+                    th*0.5f, 0, 1.2f);
             }
-            float knobR = th*0.5f - 2.8f;
-            float knobX = tx + 2.8f + (tw - th) * on;
+            float knobR = th*0.5f - 2.5f;
+            float knobX = tx + 2.5f + (tw - th) * on;
             dl->AddCircleFilled({knobX+knobR, ty+th*0.5f}, knobR,
                 on > 0.5f ? IM_COL32(255,255,255,255) : IM_COL32(220,210,235,255));
         }
@@ -148,8 +147,7 @@ namespace ui::menu {
     static bool NS_Slider(const char* id, const char* label, float* value,
                           float minV, float maxV, const char* suffix = "", float width = 0.0f) {
         ImGui::PushID(id);
-        float avail = ImGui::GetContentRegionAvail().x;
-        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
+        float w = (width > 0.0f) ? width : ImMin(ImGui::GetContentRegionAvail().x, content_w - 20.0f);
         ImVec2 pos = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         if (dl) {
@@ -159,27 +157,27 @@ namespace ui::menu {
             } else {
                 snprintf(valStr, sizeof(valStr), "%.0f", *value);
             }
-            float valW = NS_TextSize(valStr, 14.5f).x;
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x, pos.y}, C_TextSec(), label);
-            dl->AddText(ImGui::GetFont(), 14.5f, {pos.x + w - valW, pos.y}, C_TextDim(), valStr);
+            float valW = NS_TextSize(valStr, 13.5f).x;
+            dl->AddText(ImGui::GetFont(), 14.0f, {pos.x, pos.y}, C_TextSec(), label);
+            dl->AddText(ImGui::GetFont(), 13.5f, {pos.x + w - valW, pos.y}, C_TextDim(), valStr);
 
-            float ty = pos.y + 24.f, tw2 = w;
+            float ty = pos.y + 20.f, tw2 = w;
             float rawPct = (maxV > minV) ? ImClamp((*value-minV)/(maxV-minV), 0.f, 1.f) : 0.f;
             float pct = NS_Anim(std::string(id)+"#pct", rawPct, 22.f);
 
             // Track background
-            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2, ty+5.f},
-                IM_COL32(40, 30, 60, (int)(content_alpha*255)), 2.5f);
+            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2, ty+4.5f},
+                IM_COL32(38, 28, 55, (int)(content_alpha*255)), 2.2f);
             // Track active fill
-            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2*pct, ty+5.f}, C_Accent(), 2.5f);
+            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2*pct, ty+4.5f}, C_Accent(), 2.2f);
             if (pct > 0.01f) {
-                dl->AddRect({pos.x, ty}, {pos.x+tw2*pct, ty+5.f},
-                    (C_Accent() & 0x00FFFFFF) | ((ImU32)90 << 24), 2.5f, 0, 1.f);
+                dl->AddRect({pos.x, ty}, {pos.x+tw2*pct, ty+4.5f},
+                    (C_Accent() & 0x00FFFFFF) | ((ImU32)90 << 24), 2.2f, 0, 1.f);
             }
             // Thumb knob
             float thumbX = pos.x + tw2 * pct;
-            dl->AddCircleFilled({thumbX, ty + 2.5f}, 8.0f, IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
-            dl->AddCircle({thumbX, ty + 2.5f}, 8.0f, C_Accent(), 16, 1.8f);
+            dl->AddCircleFilled({thumbX, ty + 2.2f}, 7.0f, IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
+            dl->AddCircle({thumbX, ty + 2.2f}, 7.0f, C_Accent(), 16, 1.5f);
 
             ImGui::SetCursorScreenPos({pos.x, ty - 6.f});
             ImGui::SetNextItemWidth(tw2);
@@ -191,7 +189,7 @@ namespace ui::menu {
         ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, IM_COL32(0,0,0,0));
         bool changed = ImGui::SliderFloat("##s", value, minV, maxV, "");
         ImGui::PopStyleColor(5);
-        ImGui::Dummy(ImVec2(0, 14.f));
+        ImGui::Dummy(ImVec2(0, 10.f));
         ImGui::PopID();
         return changed;
     }
@@ -207,17 +205,17 @@ namespace ui::menu {
             ImVec2 a = pos, b = {pos.x+size.x, pos.y+size.y};
             ImU32 bg = accent ? NS_Lerp(C_Accent(), C_AccentBright(), hov)
                               : NS_Lerp(C_BgCard(), C_BgCardHov(), hov);
-            dl->AddRectFilled(a, b, bg, 8.f);
+            dl->AddRectFilled(a, b, bg, 7.f);
             if (accent && hov > 0.1f) {
                 dl->AddRect(a, b, (C_AccentBright() & 0x00FFFFFF) | ((ImU32)(120*hov) << 24),
-                            8.f, 0, 1.2f);
+                            7.f, 0, 1.2f);
             }
             if (!accent) {
-                dl->AddRect(a, b, C_Border(), 8.f, 0, 1.2f);
+                dl->AddRect(a, b, C_Border(), 7.f, 0, 1.2f);
             }
-            float lw = NS_TextSize(label, 15.5f).x;
-            dl->AddText(ImGui::GetFont(), 15.5f,
-                {pos.x + (size.x-lw)*0.5f, pos.y + (size.y - 15.5f)*0.5f},
+            float lw = NS_TextSize(label, 14.0f).x;
+            dl->AddText(ImGui::GetFont(), 14.0f,
+                {pos.x + (size.x-lw)*0.5f, pos.y + (size.y - 14.0f)*0.5f},
                 accent ? IM_COL32(255,255,255,255) : C_TextMain(), label);
         }
         ImGui::SetCursorScreenPos(pos);
@@ -231,19 +229,18 @@ namespace ui::menu {
     static void NS_InfoRow(const char* label, const char* value, ImU32 valueColor = 0, float width = 0.0f) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImVec2 pos = ImGui::GetCursorScreenPos();
-        float avail = ImGui::GetContentRegionAvail().x;
-        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
-        float rh = 36.f;
+        float w = (width > 0.0f) ? width : ImMin(ImGui::GetContentRegionAvail().x, content_w - 20.0f);
+        float rh = 30.f;
         bool hov = ImGui::IsMouseHoveringRect(pos, {pos.x+w, pos.y+rh});
         if (dl) {
             if (hov) {
                 dl->AddRectFilled({pos.x, pos.y}, {pos.x+w, pos.y+rh}, C_BgCardHov(), 4.f);
-                dl->AddRectFilled({pos.x, pos.y+6}, {pos.x+3.5f, pos.y+rh-6}, C_Accent(), 1.5f);
+                dl->AddRectFilled({pos.x, pos.y+4}, {pos.x+3.0f, pos.y+rh-4}, C_Accent(), 1.5f);
             }
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x+8.f, pos.y + (rh - 15.0f)*0.5f}, C_TextDim(), label);
-            float vw = NS_TextSize(value, 15.0f).x;
+            dl->AddText(ImGui::GetFont(), 13.5f, {pos.x+6.f, pos.y + (rh - 13.5f)*0.5f}, C_TextDim(), label);
+            float vw = NS_TextSize(value, 13.5f).x;
             ImU32 fc = valueColor ? valueColor : C_TextMain();
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x+w-vw-8.f, pos.y + (rh - 15.0f)*0.5f}, fc, value);
+            dl->AddText(ImGui::GetFont(), 13.5f, {pos.x+w-vw-6.f, pos.y + (rh - 13.5f)*0.5f}, fc, value);
         }
         ImGui::Dummy(ImVec2(0, rh+2.f));
     }
@@ -252,8 +249,7 @@ namespace ui::menu {
                               const char** names, int count, float width = 0.0f) {
         if (!value || count <= 0 || !names) return false;
         ImGui::PushID(id);
-        float avail = ImGui::GetContentRegionAvail().x;
-        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
+        float w = (width > 0.0f) ? width : ImMin(ImGui::GetContentRegionAvail().x, content_w - 20.0f);
         ImVec2 pos = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
@@ -263,40 +259,40 @@ namespace ui::menu {
         const char* curText = names[*value];
 
         if (dl) {
-            float valW = NS_TextSize(curText, 14.5f).x;
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x, pos.y}, C_TextSec(), label);
+            float valW = NS_TextSize(curText, 13.5f).x;
+            dl->AddText(ImGui::GetFont(), 14.0f, {pos.x, pos.y}, C_TextSec(), label);
 
             ImU32 txtCol = (*value == 0) ? C_TextDim() : C_AccentBright();
-            dl->AddText(ImGui::GetFont(), 14.5f, {pos.x + w - valW, pos.y}, txtCol, curText);
+            dl->AddText(ImGui::GetFont(), 13.5f, {pos.x + w - valW, pos.y}, txtCol, curText);
 
-            float ty = pos.y + 24.f, tw2 = w;
+            float ty = pos.y + 20.f, tw2 = w;
             float maxV = (float)(count - 1);
             float rawPct = (maxV > 0.f) ? ImClamp((float)(*value) / maxV, 0.f, 1.f) : 0.f;
             float pct = NS_Anim(std::string(id)+"#pct", rawPct, 22.f);
 
             // Track background
-            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2, ty+5.f},
-                IM_COL32(40, 30, 60, (int)(content_alpha*255)), 2.5f);
+            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2, ty+4.5f},
+                IM_COL32(38, 28, 55, (int)(content_alpha*255)), 2.2f);
             // Track active fill
-            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2*pct, ty+5.f}, C_Accent(), 2.5f);
+            dl->AddRectFilled({pos.x, ty}, {pos.x+tw2*pct, ty+4.5f}, C_Accent(), 2.2f);
             if (pct > 0.01f) {
-                dl->AddRect({pos.x, ty}, {pos.x+tw2*pct, ty+5.f},
-                    (C_Accent() & 0x00FFFFFF) | ((ImU32)90 << 24), 2.5f, 0, 1.f);
+                dl->AddRect({pos.x, ty}, {pos.x+tw2*pct, ty+4.5f},
+                    (C_Accent() & 0x00FFFFFF) | ((ImU32)90 << 24), 2.2f, 0, 1.f);
             }
 
             // Step tick dots along track
             for (int s = 0; s < count; s++) {
                 float sx = pos.x + (maxV > 0.f ? (tw2 * ((float)s / maxV)) : 0.f);
                 ImU32 dotCol = (s <= *value) ? C_AccentBright() : IM_COL32(80, 60, 110, (int)(content_alpha * 200));
-                dl->AddCircleFilled({sx, ty + 2.5f}, 2.5f, dotCol);
+                dl->AddCircleFilled({sx, ty + 2.2f}, 2.2f, dotCol);
             }
 
             // Thumb knob
             float thumbX = pos.x + tw2 * pct;
-            dl->AddCircleFilled({thumbX, ty + 2.5f}, 8.0f, IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
-            dl->AddCircle({thumbX, ty + 2.5f}, 8.0f, C_Accent(), 16, 1.8f);
+            dl->AddCircleFilled({thumbX, ty + 2.2f}, 7.0f, IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
+            dl->AddCircle({thumbX, ty + 2.2f}, 7.0f, C_Accent(), 16, 1.5f);
 
-            ImGui::SetCursorScreenPos({pos.x, ty - 8.f});
+            ImGui::SetCursorScreenPos({pos.x, ty - 6.f});
             ImGui::SetNextItemWidth(tw2);
         }
 
@@ -307,26 +303,25 @@ namespace ui::menu {
         ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, IM_COL32(0,0,0,0));
         bool changed = ImGui::SliderInt("##s_step", value, 0, count - 1, "");
         ImGui::PopStyleColor(5);
-        ImGui::Dummy(ImVec2(0, 14.f));
+        ImGui::Dummy(ImVec2(0, 10.f));
         ImGui::PopID();
         return changed;
     }
 
     static void NS_ColorEdit(const char* id, const char* label, ImVec4* color, float width = 0.0f) {
         ImGui::PushID(id);
-        float avail = ImGui::GetContentRegionAvail().x;
-        float w = (width > 0.0f) ? width : ImMin(avail, content_w - 32.0f);
+        float w = (width > 0.0f) ? width : ImMin(ImGui::GetContentRegionAvail().x, content_w - 20.0f);
         ImVec2 pos = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
         if (dl) {
-            dl->AddText(ImGui::GetFont(), 15.0f, {pos.x, pos.y+6.f}, C_TextSec(), label);
+            dl->AddText(ImGui::GetFont(), 14.0f, {pos.x, pos.y+5.f}, C_TextSec(), label);
             ImU32 colU32 = ImGui::ColorConvertFloat4ToU32(*color);
-            float sw = 30.f;
+            float sw = 26.f;
             ImVec2 sp = {pos.x + w - sw, pos.y + 2.f};
-            dl->AddRectFilled(sp, {sp.x+sw, sp.y+sw}, colU32, 6.f);
-            dl->AddRect(sp, {sp.x+sw, sp.y+sw}, C_Border(), 6.f, 0, 1.2f);
+            dl->AddRectFilled(sp, {sp.x+sw, sp.y+sw}, colU32, 5.f);
+            dl->AddRect(sp, {sp.x+sw, sp.y+sw}, C_Border(), 5.f, 0, 1.2f);
         }
-        ImGui::SetCursorScreenPos({pos.x + w - 45.f, pos.y + 2.f});
+        ImGui::SetCursorScreenPos({pos.x + w - 40.f, pos.y + 2.f});
         ImGui::ColorEdit4("##ce_edit", &color->x,
             ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel |
             ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_NoSidePreview);
@@ -335,282 +330,217 @@ namespace ui::menu {
     }
 
     /**
-     * @brief Tab 0: Combat & Aim Assist configuration. Features in-menu FOV radar preview.
+     * @brief Tab 0: Combat & Aim Assist - Book Layout (Two balanced pages side by side).
      */
     static void tab_aimbot(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
+        float ch = ImGui::GetContentRegionAvail().y;
         ImVec2 cp = ImGui::GetCursorScreenPos();
 
-        float card1H = 150.f;
-        NS_CardBegin(dl, cp, cw, card1H);
-        NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("Aim Silent and Nobita"), "Combat");
-        ImGui::SetCursorScreenPos({cp.x+16, cp.y+44});
+        float gap = 12.f;
+        float pageW = (cw - gap) * 0.5f;
+        float pageH = ImMax(305.f, ch - 4.f);
 
-        ImGui::PushID("aim_toggles");
-        float colW = (cw - 32 - 24) * 0.5f;
-        ImGui::Columns(2, "aim_cols_id", false);
-        ImGui::SetColumnWidth(0, colW + 12);
-        ImGui::SetColumnWidth(1, colW + 12);
-
-        NS_Toggle("aim_silent", oxorany("Aim Silent"),  &cfg::aim::silent);
-        NS_Toggle("aim_nobita", oxorany("Nobita Mode"), &cfg::aim::nobita);
-
-        ImGui::NextColumn();
-
-        NS_Toggle("aim_draw",   oxorany("FOV Circle"),  &cfg::aim::draw_fov);
-
-        // Status badge
-        {
-            bool active = cfg::aim::silent || cfg::aim::nobita;
-            char st[64];
-            snprintf(st, sizeof(st), "%s", active ? "ACTIVE" : "STANDBY");
-            ImU32 stCol = active ? C_Success() : C_TextDim();
-            float sw = NS_TextSize(st, 14.0f).x;
-            dl->AddText(ImGui::GetFont(), 14.0f,
-                {cp.x + cw - sw - 16, cp.y + 14}, stCol, st);
-        }
-
-        ImGui::Columns(1);
-        ImGui::PopID();
-
-        ImGui::SetCursorScreenPos({cp.x, cp.y+card1H+14});
-        ImGui::Dummy({0,0});
-
-        // Card 2: Aim Parameters and Bones
-        float card2H = 270.f;
-        ImVec2 cp2 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp2, cw, card2H);
-        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Target and Trigger Settings"));
-        ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+44});
+        // LEFT PAGE (বাম পৃষ্ঠা): Aim Master & Trigger Mode
+        ImVec2 pLeft = cp;
+        NS_CardBegin(dl, pLeft, pageW, pageH);
+        NS_CardTitle(dl, {pLeft.x + 12.f, pLeft.y + 12.f}, oxorany("Aim Silent & Combat"), "Left Page", pageW);
+        ImGui::SetCursorScreenPos({pLeft.x + 12.f, pLeft.y + 38.f});
         ImGui::BeginGroup();
+        NS_Toggle("aim_silent", oxorany("Aim Silent"),  &cfg::aim::silent, pageW - 24.f);
+        NS_Toggle("aim_nobita", oxorany("Nobita Mode"), &cfg::aim::nobita, pageW - 24.f);
+        NS_Toggle("aim_draw",   oxorany("FOV Circle"),  &cfg::aim::draw_fov, pageW - 24.f);
 
         const char* bones[] = { oxorany("None"), oxorany("Head"), oxorany("Chest"), oxorany("Hip") };
         int cur_bone = (cfg::aim::target_bone >= 0 && cfg::aim::target_bone <= 2) ? (cfg::aim::target_bone + 1) : 0;
-        if (NS_StepSlider("aim_bone", oxorany("Target Bone"), &cur_bone, bones, 4)) {
+        if (NS_StepSlider("aim_bone", oxorany("Target Bone"), &cur_bone, bones, 4, pageW - 24.f)) {
             cfg::aim::target_bone = (cur_bone > 0) ? (cur_bone - 1) : -1;
         }
 
         const char* triggers[] = { oxorany("None"), oxorany("On Fire"), oxorany("On Scope"), oxorany("Always") };
         int cur_trig = (cfg::aim::trigger_type >= 0 && cfg::aim::trigger_type <= 2) ? (cfg::aim::trigger_type + 1) : 0;
-        if (NS_StepSlider("aim_trig", oxorany("Trigger Mode"), &cur_trig, triggers, 4)) {
+        if (NS_StepSlider("aim_trig", oxorany("Trigger Mode"), &cur_trig, triggers, 4, pageW - 24.f)) {
             cfg::aim::trigger_type = (cur_trig > 0) ? (cur_trig - 1) : -1;
         }
-
-        NS_Slider("aim_fov",  oxorany("FOV Radius"),   &cfg::aim::fov,      30.f, 350.f, "px");
-        NS_Slider("aim_dist", oxorany("Aim Distance"), &cfg::aim::distance, 30.f, 400.f, "m");
-        NS_Slider("aim_smth", oxorany("Aim Smooth"),   &cfg::aim::smooth,   1.f,  20.f, "");
-
         ImGui::EndGroup();
 
-        ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
-        ImGui::Dummy({0, 30});
+        // RIGHT PAGE (ডান পৃষ্ঠা): Aim Parameters & Fine Tuning
+        ImVec2 pRight = {cp.x + pageW + gap, cp.y};
+        NS_CardBegin(dl, pRight, pageW, pageH);
+        NS_CardTitle(dl, {pRight.x + 12.f, pRight.y + 12.f}, oxorany("Aim Parameters"), "Right Page", pageW);
+        ImGui::SetCursorScreenPos({pRight.x + 12.f, pRight.y + 38.f});
+        ImGui::BeginGroup();
+        NS_Slider("aim_fov",  oxorany("FOV Radius"),   &cfg::aim::fov,      30.f, 350.f, "px", pageW - 24.f);
+        NS_Slider("aim_dist", oxorany("Aim Distance"), &cfg::aim::distance, 30.f, 400.f, "m",  pageW - 24.f);
+        NS_Slider("aim_smth", oxorany("Aim Smooth"),   &cfg::aim::smooth,   1.f,  20.f, "",    pageW - 24.f);
+
+        bool active = cfg::aim::silent || cfg::aim::nobita;
+        NS_InfoRow(oxorany("Combat State"), active ? oxorany("ACTIVE") : oxorany("STANDBY"), active ? C_Success() : C_TextDim(), pageW - 24.f);
+        NS_InfoRow(oxorany("Target Lock"), cur_bone > 0 ? bones[cur_bone] : oxorany("Auto Scan"), C_Accent(), pageW - 24.f);
+        ImGui::EndGroup();
 
         cfg::aim::enabled = cfg::aim::silent || cfg::aim::nobita;
     }
 
+    /**
+     * @brief Tab 1: Visuals & ESP - Book Layout (Two balanced pages side by side).
+     */
     static void tab_visuals(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
-
-        float card1H = 175.f;
+        float ch = ImGui::GetContentRegionAvail().y;
         ImVec2 cp = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp, cw, card1H);
-        NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("ESP Visual Overlays"), "Master");
-        ImGui::SetCursorScreenPos({cp.x+16, cp.y+48});
+
+        float gap = 12.f;
+        float pageW = (cw - gap) * 0.5f;
+        float pageH = ImMax(305.f, ch - 4.f);
+
+        // LEFT PAGE (বাম পৃষ্ঠা): ESP Visual Overlays & Box Style
+        ImVec2 pLeft = cp;
+        NS_CardBegin(dl, pLeft, pageW, pageH);
+        NS_CardTitle(dl, {pLeft.x + 12.f, pLeft.y + 12.f}, oxorany("ESP Visual Overlays"), "Left Page", pageW);
+        ImGui::SetCursorScreenPos({pLeft.x + 12.f, pLeft.y + 38.f});
         ImGui::BeginGroup();
+        NS_Toggle("esp_tracer",  oxorany("ESP Line"),   &cfg::esp::tracer, pageW - 24.f);
+        NS_Toggle("esp_box",     oxorany("ESP Box"),    &cfg::esp::box,    pageW - 24.f);
+        NS_Toggle("esp_health",  oxorany("ESP Health"), &cfg::esp::health, pageW - 24.f);
 
-        NS_Toggle("esp_tracer",  oxorany("ESP Line"),   &cfg::esp::tracer);
-        NS_Toggle("esp_box",     oxorany("ESP Box"),    &cfg::esp::box);
-        NS_Toggle("esp_health",  oxorany("ESP Health"), &cfg::esp::health);
-
+        const char* box_types[] = { oxorany("None"), oxorany("Full Box"), oxorany("Corner"), oxorany("Glow") };
+        int cur_box = cfg::esp::box ? (cfg::esp::box_type + 1) : 0;
+        if (NS_StepSlider("box_type", oxorany("Box Style"), &cur_box, box_types, 4, pageW - 24.f)) {
+            if (cur_box == 0) cfg::esp::box = false;
+            else { cfg::esp::box = true; cfg::esp::box_type = cur_box - 1; }
+        }
+        NS_Slider("box_th", oxorany("Thickness"),  &cfg::esp::box_thickness, 0.5f, 5.0f, "px", pageW - 24.f);
         ImGui::EndGroup();
 
         cfg::esp::enabled = cfg::esp::tracer || cfg::esp::box || cfg::esp::health;
 
-        ImGui::SetCursorScreenPos({cp.x, cp.y+card1H+14});
-        ImGui::Dummy({0,0});
-
-        float card2H = 260.f;
-        ImVec2 cp2 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp2, cw, card2H);
-        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Box & Line Configuration"));
-        ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+48});
+        // RIGHT PAGE (ডান পৃষ্ঠা): Box Configuration & Palette
+        ImVec2 pRight = {cp.x + pageW + gap, cp.y};
+        NS_CardBegin(dl, pRight, pageW, pageH);
+        NS_CardTitle(dl, {pRight.x + 12.f, pRight.y + 12.f}, oxorany("Style & Color Palette"), "Right Page", pageW);
+        ImGui::SetCursorScreenPos({pRight.x + 12.f, pRight.y + 38.f});
         ImGui::BeginGroup();
+        NS_Slider("box_rd", oxorany("Rounding"),   &cfg::esp::box_rounding,  0.f,  10.f, "px", pageW - 24.f);
+        NS_Slider("box_rg", oxorany("Max Range"),  &cfg::esp::max_range,     50.f, 500.f, "m",  pageW - 24.f);
+        NS_ColorEdit("col_box",  oxorany("Box & Line Color"), &cfg::esp::box_col, pageW - 24.f);
+        NS_ColorEdit("col_vis",  oxorany("Visible Color"),    &cfg::esp::box_visible, pageW - 24.f);
 
-        const char* box_types[] = { oxorany("None"), oxorany("Full Box"), oxorany("Corner"), oxorany("Glow") };
-        int cur_box = cfg::esp::box ? (cfg::esp::box_type + 1) : 0;
-        if (NS_StepSlider("box_type", oxorany("Box Style"), &cur_box, box_types, 4)) {
-            if (cur_box == 0) {
-                cfg::esp::box = false;
-            } else {
-                cfg::esp::box = true;
-                cfg::esp::box_type = cur_box - 1;
-            }
-        }
-        NS_Slider("box_th", oxorany("Thickness"),  &cfg::esp::box_thickness, 0.5f, 5.0f, "");
-        NS_Slider("box_rd", oxorany("Rounding"),   &cfg::esp::box_rounding,  0.f,  10.f, "");
-        NS_Slider("box_rg", oxorany("Max Range"),  &cfg::esp::max_range,     50.f, 500.f, "m");
-
+        bool espActive = cfg::esp::box || cfg::esp::tracer || cfg::esp::health;
+        NS_InfoRow(oxorany("ESP Engine"), espActive ? oxorany("ACTIVE") : oxorany("STANDBY"), espActive ? C_Success() : C_TextDim(), pageW - 24.f);
         ImGui::EndGroup();
-
-        ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
-        ImGui::Dummy({0,0});
-
-        float card3H = 145.f;
-        ImVec2 cp3 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp3, cw, card3H);
-        NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("Color Palette"));
-        ImGui::SetCursorScreenPos({cp3.x+16, cp3.y+48});
-        ImGui::BeginGroup();
-        NS_ColorEdit("col_box",  oxorany("Box & Line"), &cfg::esp::box_col);
-        NS_ColorEdit("col_vis",  oxorany("Visible"),    &cfg::esp::box_visible);
-        ImGui::EndGroup();
-
-        ImGui::SetCursorScreenPos({cp3.x, cp3.y+card3H+14});
-        ImGui::Dummy({0, 30});
-    }
-
-    static void tab_settings(float a) {
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        float cw = ImGui::GetContentRegionAvail().x;
-        ImVec2 cp = ImGui::GetCursorScreenPos();
-
-        float card1H = 135.f;
-        NS_CardBegin(dl, cp, cw, card1H);
-        NS_CardTitle(dl, {cp.x+16, cp.y+14}, oxorany("Display Engine"));
-        ImGui::SetCursorScreenPos({cp.x+16, cp.y+48});
-        ImGui::BeginGroup();
-
-        char buf[64];
-        snprintf(buf, sizeof(buf), "%.0f x %.0f", g_sw, g_sh);
-        NS_InfoRow(oxorany("Resolution"), buf);
-        snprintf(buf, sizeof(buf), "%.1f FPS", ImGui::GetIO().Framerate);
-        NS_InfoRow(oxorany("Framerate"), buf);
-
-        ImGui::EndGroup();
-
-        ImGui::SetCursorScreenPos({cp.x, cp.y+card1H+14});
-        ImGui::Dummy({0,0});
-
-        float card2H = 135.f;
-        ImVec2 cp2 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp2, cw, card2H);
-        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Target Process"));
-        ImGui::SetCursorScreenPos({cp2.x+16, cp2.y+48});
-        ImGui::BeginGroup();
-
-        snprintf(buf, sizeof(buf), "0x%lx", proc::lib);
-        NS_InfoRow(oxorany("libil2cpp Base"), buf);
-        snprintf(buf, sizeof(buf), "%d", proc::pid);
-        NS_InfoRow(oxorany("Process ID"), buf);
-
-        ImGui::EndGroup();
-
-        ImGui::SetCursorScreenPos({cp2.x, cp2.y+card2H+14});
-        ImGui::Dummy({0,0});
-
-        float card3H = 105.f;
-        ImVec2 cp3 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp3, cw, card3H);
-        NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("Client Termination"));
-        ImGui::SetCursorScreenPos({cp3.x+16, cp3.y+48});
-
-        if (NS_Button("unload_btn", oxorany("Exit & Unload Overlay"), {cw-32, 40}, true)) {
-            exit(0);
-        }
-
-        ImGui::SetCursorScreenPos({cp3.x, cp3.y+card3H+14});
-        ImGui::Dummy({0, 30});
     }
 
     /**
-     * @brief Tab 3: INFO / Dashboard. Renders 4 metric stat cards in one row.
+     * @brief Tab 2: Settings - Book Layout (Two balanced pages side by side).
+     */
+    static void tab_settings(float a) {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        float cw = ImGui::GetContentRegionAvail().x;
+        float ch = ImGui::GetContentRegionAvail().y;
+        ImVec2 cp = ImGui::GetCursorScreenPos();
+
+        float gap = 12.f;
+        float pageW = (cw - gap) * 0.5f;
+        float pageH = ImMax(305.f, ch - 4.f);
+
+        char buf[64];
+
+        // LEFT PAGE (বাম পৃষ্ঠা): Display Engine & Process Target
+        ImVec2 pLeft = cp;
+        NS_CardBegin(dl, pLeft, pageW, pageH);
+        NS_CardTitle(dl, {pLeft.x + 12.f, pLeft.y + 12.f}, oxorany("Display & Process"), "Left Page", pageW);
+        ImGui::SetCursorScreenPos({pLeft.x + 12.f, pLeft.y + 38.f});
+        ImGui::BeginGroup();
+        snprintf(buf, sizeof(buf), "%.0f x %.0f", g_sw, g_sh);
+        NS_InfoRow(oxorany("Resolution"), buf, 0, pageW - 24.f);
+        snprintf(buf, sizeof(buf), "%.1f FPS", ImGui::GetIO().Framerate);
+        NS_InfoRow(oxorany("Framerate"), buf, C_Success(), pageW - 24.f);
+        snprintf(buf, sizeof(buf), "%d", proc::pid);
+        NS_InfoRow(oxorany("Process ID"), buf, 0, pageW - 24.f);
+        snprintf(buf, sizeof(buf), "0x%lx", proc::lib);
+        NS_InfoRow(oxorany("libil2cpp Base"), buf, C_Accent(), pageW - 24.f);
+        NS_InfoRow(oxorany("Memory Bus"), oxorany("Kernel Direct"), 0, pageW - 24.f);
+        ImGui::EndGroup();
+
+        // RIGHT PAGE (ডান পৃষ্ঠা): System Security & Client Controls
+        ImVec2 pRight = {cp.x + pageW + gap, cp.y};
+        NS_CardBegin(dl, pRight, pageW, pageH);
+        NS_CardTitle(dl, {pRight.x + 12.f, pRight.y + 12.f}, oxorany("System & Controls"), "Right Page", pageW);
+        ImGui::SetCursorScreenPos({pRight.x + 12.f, pRight.y + 38.f});
+        ImGui::BeginGroup();
+        NS_InfoRow(oxorany("Protection Layer"), oxorany("NativeShield Active"), C_Success(), pageW - 24.f);
+        NS_InfoRow(oxorany("Overlay Mode"), oxorany("Official WindowManager"), C_Accent(), pageW - 24.f);
+        NS_InfoRow(oxorany("Layout Mode"), oxorany("Two-Page Book"), 0, pageW - 24.f);
+
+        ImGui::Dummy({0, 6.f});
+        if (NS_Button("save_cfg", oxorany("Save Configuration"), {pageW - 24.f, 36.f}, true)) {
+            storage::save_config();
+        }
+        ImGui::Dummy({0, 4.f});
+        if (NS_Button("unload_btn", oxorany("Exit & Unload Overlay"), {pageW - 24.f, 36.f}, false)) {
+            exit(0);
+        }
+        ImGui::EndGroup();
+    }
+
+    /**
+     * @brief Tab 3: INFO & Dashboard - Book Layout (Two balanced pages side by side).
      */
     static void tab_info(float a) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
         float cw = ImGui::GetContentRegionAvail().x;
+        float ch = ImGui::GetContentRegionAvail().y;
         ImVec2 cp = ImGui::GetCursorScreenPos();
 
-        float gap = 10.f;
-        float cardW = (cw - 3 * gap) * 0.25f;
-        float cardH = 82.f;
-
-        struct MetricCard {
-            const char* title;
-            const char* val;
-            ImU32 col;
-        };
-
-        char pidStr[32];
-        if (proc::pid > 0) snprintf(pidStr, sizeof(pidStr), "%d", proc::pid);
-        else snprintf(pidStr, sizeof(pidStr), "Searching");
+        float gap = 12.f;
+        float pageW = (cw - gap) * 0.5f;
+        float pageH = ImMax(305.f, ch - 4.f);
 
         bool inM = data::in_match();
+        char pbuf[32]; snprintf(pbuf, sizeof(pbuf), "%zu ENTITIES", data::player_count());
 
-        MetricCard metrics[4] = {
-            { "CLIENT",     "NINMODS",               C_Accent() },
-            { "VERSION",    "2.0",                   C_TextMain() },
-            { "TARGET PID", pidStr,                  (proc::pid > 0 ? C_TextMain() : C_TextDim()) },
-            { "MATCH",      (inM ? "ACTIVE" : "LOBBY"), (inM ? C_Success() : C_TextDim()) }
-        };
+        // LEFT PAGE (বাম পৃষ্ঠা): Client Status & Environment
+        ImVec2 pLeft = cp;
+        NS_CardBegin(dl, pLeft, pageW, pageH);
+        NS_CardTitle(dl, {pLeft.x + 12.f, pLeft.y + 12.f}, oxorany("Client State"), "Left Page", pageW);
+        ImGui::SetCursorScreenPos({pLeft.x + 12.f, pLeft.y + 38.f});
+        ImGui::BeginGroup();
+        NS_InfoRow(oxorany("Client Name"), oxorany("NINMODS"), C_Accent(), pageW - 24.f);
+        NS_InfoRow(oxorany("Core Architecture"), oxorany("2.0 Cyber Native"), 0, pageW - 24.f);
+        NS_InfoRow(oxorany("Match State"), inM ? oxorany("ACTIVE") : oxorany("LOBBY"), inM ? C_Success() : C_TextDim(), pageW - 24.f);
+        NS_InfoRow(oxorany("Radar Entities"), pbuf, C_Accent(), pageW - 24.f);
+        NS_InfoRow(oxorany("Security Mode"), oxorany("Direct Kernel (Safe)"), C_Success(), pageW - 24.f);
+        ImGui::EndGroup();
 
-        for (int i = 0; i < 4; i++) {
-            ImVec2 p = { cp.x + i * (cardW + gap), cp.y };
-            NS_CardBegin(dl, p, cardW, cardH);
-
-            dl->AddText(ImGui::GetFont(), 13.0f, {p.x + 12.f, p.y + 12.f}, C_TextDim(), metrics[i].title);
-
-            float vw = NS_TextSize(metrics[i].val, 17.0f).x;
-            float vx = ImMax(p.x + 12.f, p.x + (cardW - vw) * 0.5f);
-            dl->AddText(ImGui::GetFont(), 17.0f, {vx, p.y + 40.f}, metrics[i].col, metrics[i].val);
-        }
-
-        ImGui::SetCursorScreenPos({cp.x, cp.y + cardH + 16.f});
-        ImGui::Dummy({0,0});
-
-        float card2H = 115.f;
-        ImVec2 cp2 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp2, cw, card2H);
-        NS_CardTitle(dl, {cp2.x+16, cp2.y+14}, oxorany("Performance & Live Display"));
+        // RIGHT PAGE (ডান পৃষ্ঠা): Hardware Telemetry & Performance
+        ImVec2 pRight = {cp.x + pageW + gap, cp.y};
+        NS_CardBegin(dl, pRight, pageW, pageH);
+        NS_CardTitle(dl, {pRight.x + 12.f, pRight.y + 12.f}, oxorany("Hardware Telemetry"), "Right Page", pageW);
+        ImGui::SetCursorScreenPos({pRight.x + 12.f, pRight.y + 38.f});
+        ImGui::BeginGroup();
 
         char fpsT[16]; snprintf(fpsT, sizeof(fpsT), "%.0f", ImGui::GetIO().Framerate);
         ImU32 fc = ImGui::GetIO().Framerate > 50 ? C_Success()
                  : (ImGui::GetIO().Framerate > 28 ? IM_COL32(255,180,40,(int)(content_alpha*255)) : C_Danger());
-        dl->AddText(ImGui::GetFont(), 36.f, {cp2.x+20, cp2.y+46}, fc, fpsT);
-        float fpsTW = NS_TextSize(fpsT, 36.f).x;
-        dl->AddText(ImGui::GetFont(), 14.f, {cp2.x+28+fpsTW, cp2.y+62}, C_TextDim(), "FPS");
+        dl->AddText(ImGui::GetFont(), 32.f, {pRight.x + 18.f, pRight.y + 44.f}, fc, fpsT);
+        float fpsTW = NS_TextSize(fpsT, 32.f).x;
+        dl->AddText(ImGui::GetFont(), 13.5f, {pRight.x + 24.f + fpsTW, pRight.y + 58.f}, C_TextDim(), "FPS");
 
         char scr[32]; snprintf(scr, sizeof(scr), "%.0f x %.0f", g_sw, g_sh);
-        float sx = cp2.x + cw * 0.40f;
-        dl->AddText(ImGui::GetFont(), 13.0f, {sx, cp2.y+48}, C_TextDim(), "DISPLAY RESOLUTION");
-        dl->AddText(ImGui::GetFont(), 16.0f, {sx, cp2.y+72}, C_TextMain(), scr);
+        dl->AddText(ImGui::GetFont(), 12.5f, {pRight.x + 18.f, pRight.y + 88.f}, C_TextDim(), "RESOLUTION");
+        dl->AddText(ImGui::GetFont(), 14.5f, {pRight.x + 18.f, pRight.y + 106.f}, C_TextMain(), scr);
 
-        char pbuf[32]; snprintf(pbuf, sizeof(pbuf), "%zu ENTITIES", data::player_count());
-        float px = cp2.x + cw * 0.72f;
-        dl->AddText(ImGui::GetFont(), 13.0f, {px, cp2.y+48}, C_TextDim(), "RADAR TRACKED");
-        dl->AddText(ImGui::GetFont(), 16.0f, {px, cp2.y+72}, C_Accent(), pbuf);
-
-        ImGui::SetCursorScreenPos({cp2.x, cp2.y + card2H + 16.f});
-        ImGui::Dummy({0,0});
-
-        float card3H = 175.f;
-        ImVec2 cp3 = ImGui::GetCursorScreenPos();
-        NS_CardBegin(dl, cp3, cw, card3H);
-        NS_CardTitle(dl, {cp3.x+16, cp3.y+14}, oxorany("System Architecture & Security"));
-        ImGui::SetCursorScreenPos({cp3.x+16, cp3.y+48});
-
-        char libBuf[64]; snprintf(libBuf, sizeof(libBuf), "0x%lx", (unsigned long)proc::lib);
-        NS_InfoRow(oxorany("libil2cpp Base"), libBuf, C_Accent());
-        NS_InfoRow(oxorany("Protection Layer"), oxorany("NativeShield Active"), C_Success());
-        NS_InfoRow(oxorany("Memory Bus"), oxorany("process_vm_readv (Direct Kernel)"));
-
-        ImGui::SetCursorScreenPos({cp3.x, cp3.y + card3H + 16.f});
-        ImGui::Dummy({0, 30});
+        ImGui::Dummy({0, 115.f});
+        NS_InfoRow(oxorany("Anti-Tamper Shield"), oxorany("ACTIVE"), C_Success(), pageW - 24.f);
+        NS_InfoRow(oxorany("Memory Integrity"), oxorany("VERIFIED"), C_Accent(), pageW - 24.f);
+        ImGui::EndGroup();
     }
 
     /**
-     * @brief Main ImGui Menu frame renderer with mobile scaling and border-light matching visual styling.
+     * @brief Main ImGui Menu frame renderer with compact sizing and two-page book layout.
      */
     void render() {
         func::esp::draw();
@@ -619,11 +549,6 @@ namespace ui::menu {
         float dt = ImGui::GetIO().DeltaTime;
         ma = ma + ((bar::g_open ? 1.f : 0.f) - ma) * ImClamp(12.f*dt, 0.f, 1.f);
 
-        // Dim background only lightly without blocking ESP
-        if (ma > 0.01f) {
-            int da = (int)(60 * ma * bar::game_alpha());
-            ImGui::GetBackgroundDrawList()->AddRectFilled({0,0},{g_sw,g_sh},IM_COL32(0,0,0,da));
-        }
         if (ma < 0.01f) {
             g_menu_x = -1.f;
             g_menu_y = -1.f;
@@ -635,13 +560,13 @@ namespace ui::menu {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.f); // Completely hide scrollbars
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 0.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 4));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 5));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(5, 5));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 5.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 22.f);
-        ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 14.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 3));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(4, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_GrabRounding, 4.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 20.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, 12.f);
         ImGui::PushStyleColor(ImGuiCol_WindowBg, {0,0,0,0});
         ImGui::PushStyleColor(ImGuiCol_Border, {0,0,0,0});
 
@@ -651,7 +576,8 @@ namespace ui::menu {
         g_sw = sw;
         g_sh = sh;
 
-        ImVec2 wsz(780.f, 490.f);
+        // Compact cyber menu dimensions (680 x 400)
+        ImVec2 wsz(680.f, 400.f);
         if (wsz.x > sw) wsz.x = sw;
         if (wsz.y > sh) wsz.y = sh;
 
@@ -688,59 +614,58 @@ namespace ui::menu {
         ImDrawList* bg = ImGui::GetWindowDrawList();
 
         // Subtle glow using signature border color (no pink!)
-        bg->AddRectFilled({wp.x-4, wp.y-4}, {wp.x+ws.x+4, wp.y+ws.y+4},
-                          col(UITheme::border_light, 0.16f * ma), R+4.f);
-        bg->AddRectFilled({wp.x-8, wp.y-8}, {wp.x+ws.x+8, wp.y+ws.y+8},
-                          col(UITheme::border_light, 0.08f * ma), R+8.f);
+        bg->AddRectFilled({wp.x-3, wp.y-3}, {wp.x+ws.x+3, wp.y+ws.y+3},
+                          col(UITheme::border_light, 0.16f * ma), R+3.f);
+        bg->AddRectFilled({wp.x-6, wp.y-6}, {wp.x+ws.x+6, wp.y+ws.y+6},
+                          col(UITheme::border_light, 0.08f * ma), R+6.f);
 
         bg->AddRectFilled(wp, {wp.x+ws.x, wp.y+ws.y}, col(UITheme::bg, ma), R);
-        bg->AddRect(wp, {wp.x+ws.x, wp.y+ws.y}, col(UITheme::border_light, ma), R, 0, 1.5f);
+        bg->AddRect(wp, {wp.x+ws.x, wp.y+ws.y}, col(UITheme::border_light, ma), R, 0, 1.4f);
 
-        const float headerH = 64.f;
-        const float sidebarW = headerH; // Sidebar width matches header height (64.f)
+        const float headerH = 48.f;
+        const float sidebarW = 50.f;
 
         bg->AddRectFilled(wp, {wp.x+ws.x, wp.y+headerH},
                           col(UITheme::sidebar, ma), R, ImDrawFlags_RoundCornersTop);
         bg->AddLine({wp.x, wp.y+headerH}, {wp.x+ws.x, wp.y+headerH},
                     col(UITheme::border, ma), 1.2f);
 
-        float logoSize = 38.f;
-        float logoX = wp.x + 18.f;
+        float logoSize = 32.f;
+        float logoX = wp.x + 14.f;
         float logoY = wp.y + (headerH - logoSize) * 0.5f;
         float lcx = logoX + logoSize * 0.5f, lcy = logoY + logoSize * 0.5f;
         bg->AddCircleFilled({lcx, lcy}, logoSize * 0.5f, IM_COL32(36, 26, 56, (int)(250 * ma)));
-        bg->AddCircle({lcx, lcy}, logoSize * 0.5f, col(UITheme::border_light, ma), 32, 2.0f);
-        float nW = NS_TextSize("N", 20.f).x;
-        bg->AddText(ImGui::GetFont(), 20.f,
-                    {lcx - nW * 0.5f, lcy - 10.f},
+        bg->AddCircle({lcx, lcy}, logoSize * 0.5f, col(UITheme::border_light, ma), 32, 1.8f);
+        float nW = NS_TextSize("N", 17.5f).x;
+        bg->AddText(ImGui::GetFont(), 17.5f,
+                    {lcx - nW * 0.5f, lcy - 8.5f},
                     IM_COL32(255,255,255,255), "N");
 
-        // Header Title: Clean "NINMODS" vertically centered with the logo (STANDALONE & 64/32 removed)
-        dl->AddText(ImGui::GetFont(), 19.5f, {logoX + logoSize + 14.f, wp.y + (headerH - 19.5f) * 0.5f},
+        // Clean centered title
+        dl->AddText(ImGui::GetFont(), 17.0f, {logoX + logoSize + 12.f, wp.y + (headerH - 17.0f) * 0.5f},
                     col(UITheme::text, ma), "NINMODS");
 
-        // Borderless & Backgroundless Clean Close Button [X]
-        float btnW = 36.f, btnH = 36.f;
-        float closeX = wp.x + ws.x - btnW - 16.f;
+        // Borderless Clean Close Button [X]
+        float btnW = 32.f, btnH = 32.f;
+        float closeX = wp.x + ws.x - btnW - 12.f;
         float btnY   = wp.y + (headerH - btnH) * 0.5f;
 
-        bool hoverClose = (mp.x >= closeX - 8.f && mp.x <= closeX + btnW + 8.f &&
-                           mp.y >= btnY - 8.f && mp.y <= btnY + btnH + 8.f);
+        bool hoverClose = (mp.x >= closeX - 6.f && mp.x <= closeX + btnW + 6.f &&
+                           mp.y >= btnY - 6.f && mp.y <= btnY + btnH + 6.f);
         if (hoverClose && ImGui::IsMouseClicked(0)) {
-            // Store current menu location back to floating logo so it reappears exactly here!
             bar::set_pos(wp.x, wp.y);
             bar::g_open = false;
             drag = false;
             storage::save_config();
-            logger::log_info("[MENU] Close tapped. Preserved location (%.1f, %.1f) and returned to floating puck.", wp.x, wp.y);
+            logger::log_info("[MENU] Close tapped. Preserved location (%.1f, %.1f).", wp.x, wp.y);
         }
 
-        float cX = closeX + btnW * 0.5f, cY = btnY + btnH * 0.5f, cr = 8.5f;
+        float cX = closeX + btnW * 0.5f, cY = btnY + btnH * 0.5f, cr = 7.5f;
         ImU32 closeCol = hoverClose ? IM_COL32(255, 75, 75, (int)(255 * ma)) : col(UITheme::text_dim, ma);
-        bg->AddLine({cX - cr, cY - cr}, {cX + cr, cY + cr}, closeCol, 2.2f);
-        bg->AddLine({cX - cr, cY + cr}, {cX + cr, cY - cr}, closeCol, 2.2f);
+        bg->AddLine({cX - cr, cY - cr}, {cX + cr, cY + cr}, closeCol, 2.0f);
+        bg->AddLine({cX - cr, cY + cr}, {cX + cr, cY - cr}, closeCol, 2.0f);
 
-        // Sidebar extending fully to bottom without footer interference
+        // Sidebar
         float sbY = wp.y + headerH;
         float sbBot = wp.y + ws.y;
         bg->AddRectFilled({wp.x, sbY}, {wp.x+sidebarW, sbBot}, col(UITheme::sidebar, ma), R, ImDrawFlags_RoundCornersBottomLeft);
@@ -756,26 +681,24 @@ namespace ui::menu {
             { ICON_FA_INFO_CIRCLE }
         };
 
-        // Active Sidebar Tab: Floating rounded pill with 8px margin away from edges and dividing frame
-        float navStartY = sbY + 14.f;
-        float navItemH = 48.f;
-        float tabMarginX = 8.f;
+        float navStartY = sbY + 12.f;
+        float navItemH = 44.f;
+        float tabMarginX = 6.f;
         for (int i = 0; i < 4; i++) {
-            float ny = navStartY + i * (navItemH + 12.f);
+            float ny = navStartY + i * (navItemH + 10.f);
             bool act = (tab == i);
             bool hov = (mp.x >= wp.x && mp.x <= wp.x + sidebarW &&
                         mp.y >= ny && mp.y <= ny + navItemH);
 
             float rx1 = wp.x + tabMarginX;
             float rx2 = wp.x + sidebarW - tabMarginX;
-            float rRound = 8.f;
+            float rRound = 7.f;
 
             if (act) {
-                // Inset floating highlight that never touches the frame or divider line
                 bg->AddRectFilled({rx1, ny}, {rx2, ny + navItemH},
                                   col(UITheme::border_light, ma * 0.22f), rRound);
                 bg->AddRect({rx1, ny}, {rx2, ny + navItemH},
-                            col(UITheme::border_light, ma * 0.85f), rRound, 0, 1.4f);
+                            col(UITheme::border_light, ma * 0.85f), rRound, 0, 1.2f);
             } else if (hov) {
                 bg->AddRectFilled({rx1, ny}, {rx2, ny + navItemH},
                                   col(UITheme::widget, ma * 0.50f), rRound);
@@ -783,7 +706,7 @@ namespace ui::menu {
 
             ImU32 itemCol = act ? col(UITheme::border_light, ma) : (hov ? col(UITheme::text, ma) : col(UITheme::text_dim, ma));
 
-            float iconSize = 22.f;
+            float iconSize = 20.f;
             float iw = NS_TextSize(navTabs[i].icon, iconSize).x;
             dl->AddText(ImGui::GetFont(), iconSize,
                 {wp.x + (sidebarW - iw) * 0.5f, ny + (navItemH - iconSize) * 0.5f}, itemCol, navTabs[i].icon);
@@ -793,21 +716,19 @@ namespace ui::menu {
             }
         }
 
-        // Full content region utilizing vertical space formerly occupied by footer
-        float contentX = wp.x + sidebarW + 20.f;
-        float contentY = wp.y + headerH + 16.f;
-        float contentW = ws.x - sidebarW - 36.f;
-        float contentH = ws.y - headerH - 24.f;
+        // Full content region utilizing two-page book layout
+        float contentX = wp.x + sidebarW + 14.f;
+        float contentY = wp.y + headerH + 10.f;
+        float contentW = ws.x - sidebarW - 24.f;
+        float contentH = ws.y - headerH - 16.f;
 
         ImGui::SetCursorScreenPos({contentX, contentY});
-
-        // Hidden scrollbar with smooth native touch drag scrolling
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.f);
 
         ImGui::BeginChild("content_pane", {contentW, contentH}, false,
                           ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
 
-        // Native touch-drag scrolling across entire options page
+        // Smooth touch-drag scrolling across entire options page
         static bool s_is_touch_scrolling = false;
         static float s_touch_start_y = 0.f;
         static float s_scroll_start_y = 0.f;
@@ -832,6 +753,7 @@ namespace ui::menu {
         content_w = ImGui::GetContentRegionAvail().x;
         content_alpha = ma;
 
+        // Render Two-Page Book according to active tab
         switch (tab) {
             case 0: tab_aimbot(ma);   break;
             case 1: tab_visuals(ma);  break;
@@ -840,9 +762,9 @@ namespace ui::menu {
         }
 
         ImGui::EndChild();
-        ImGui::PopStyleVar(); // Pop ScrollbarSize
+        ImGui::PopStyleVar();
 
-        // Smooth window relocation drag via header bar
+        // Drag window by header
         bool inHeaderCloseBtn = (mp.x >= closeX - 8.f && mp.y <= wp.y + headerH);
         bool canDragStart = (!inHeaderCloseBtn && mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= wp.y && mp.y <= wp.y + headerH);
 

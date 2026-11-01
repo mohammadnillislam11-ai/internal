@@ -22,10 +22,9 @@ import android.view.WindowManager;
 /**
  * Official Android WindowManager Floating Overlay Service.
  * Implements strict Bounded Window dimensions:
- * - Puck Mode: Sized strictly to the floating puck (150x56 dp).
- * - Menu Mode: Sized strictly to the menu window (780x490 dp).
- * The rest of the screen has ZERO overlay window, allowing 100% native
- * touch pass-through to underlying games and apps with zero lag or interference.
+ * - Puck Mode: Strictly sized to floating puck (140x52 dp).
+ * - Menu Mode: Compact cyber dashboard (680x400 dp).
+ * Completely separates puck dragging from tap opening so sliding never triggers menu open.
  */
 public class FloatingService extends Service implements SurfaceHolder.Callback, View.OnTouchListener {
 
@@ -41,10 +40,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     private int screenWidth = 1080;
     private int screenHeight = 2400;
 
-    private int puckW = 150;
-    private int puckH = 56;
-    private int menuW = 780;
-    private int menuH = 490;
+    private int puckW = 140;
+    private int puckH = 52;
+    private int menuW = 680;
+    private int menuH = 400;
 
     private int lastPosX = 50;
     private int lastPosY = 200;
@@ -53,9 +52,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     private int initialY;
     private float initialTouchX;
     private float initialTouchY;
+    private long touchDownTime = 0;
     private boolean isDragging = false;
-    private int touchSlop = 10;
-    private int headerHeightPx = 64;
+    private int touchSlop = 12;
+    private int headerHeightPx = 50;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -78,13 +78,13 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
 
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
-        // Calculate bounded window dimensions
-        float scale = Math.min(Math.max(density / 2.0f, 1.0f), 1.25f);
-        puckW = (int) (150 * scale);
-        puckH = (int) (56 * scale);
-        menuW = (int) Math.min(screenWidth * 0.94f, 780 * scale);
-        menuH = (int) Math.min(screenHeight * 0.94f, 490 * scale);
-        headerHeightPx = (int) (64 * scale);
+        // Calculate compact bounded dimensions
+        float scale = Math.min(Math.max(density / 2.0f, 1.0f), 1.20f);
+        puckW = (int) (140 * scale);
+        puckH = (int) (52 * scale);
+        menuW = (int) Math.min(screenWidth * 0.90f, 680 * scale);
+        menuH = (int) Math.min(screenHeight * 0.90f, 400 * scale);
+        headerHeightPx = (int) (50 * scale);
 
         lastPosX = (int) (30 * density);
         lastPosY = (int) (120 * density);
@@ -170,6 +170,55 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         float rawX = event.getRawX();
         float rawY = event.getRawY();
 
+        // 1. PUCK MODE: Pure native WindowManager dragging & clean tap detection
+        if (!isMenuOpen) {
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                    initialX = params.x;
+                    initialY = params.y;
+                    initialTouchX = rawX;
+                    initialTouchY = rawY;
+                    touchDownTime = System.currentTimeMillis();
+                    isDragging = false;
+                    return true;
+
+                case MotionEvent.ACTION_MOVE:
+                    float dx = rawX - initialTouchX;
+                    float dy = rawY - initialTouchY;
+
+                    if (!isDragging && (dx * dx + dy * dy > touchSlop * touchSlop)) {
+                        isDragging = true;
+                    }
+
+                    if (isDragging) {
+                        params.x = (int) Math.max(0, Math.min(screenWidth - params.width, initialX + dx));
+                        params.y = (int) Math.max(0, Math.min(screenHeight - params.height, initialY + dy));
+                        windowManager.updateViewLayout(surfaceView, params);
+                        lastPosX = params.x;
+                        lastPosY = params.y;
+                    }
+                    return true;
+
+                case MotionEvent.ACTION_UP:
+                    float upDx = rawX - initialTouchX;
+                    float upDy = rawY - initialTouchY;
+                    long duration = System.currentTimeMillis() - touchDownTime;
+
+                    // Only open menu if user tapped without dragging
+                    if (!isDragging && (upDx * upDx + upDy * upDy <= touchSlop * touchSlop) && duration < 400) {
+                        openMenu();
+                    }
+                    isDragging = false;
+                    return true;
+
+                case MotionEvent.ACTION_CANCEL:
+                    isDragging = false;
+                    return true;
+            }
+            return false;
+        }
+
+        // 2. MENU MODE: Header dragging + body option interaction
         switch (action) {
             case MotionEvent.ACTION_DOWN:
                 initialX = params.x;
@@ -178,6 +227,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 initialTouchY = rawY;
                 isDragging = false;
 
+                // Deliver to ImGui (needed for close button and widgets)
                 NativeBridge.onTouch(action, event.getX(), event.getY());
                 return true;
 
@@ -185,15 +235,9 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 float dx = rawX - initialTouchX;
                 float dy = rawY - initialTouchY;
 
-                if (!isDragging && (dx * dx + dy * dy > touchSlop * touchSlop)) {
-                    if (!isMenuOpen) {
-                        isDragging = true;
-                    } else {
-                        // In menu mode, header drag moves the window; body drag scrolls options
-                        if (event.getY() <= headerHeightPx) {
-                            isDragging = true;
-                        }
-                    }
+                // Header drag moves the whole menu window
+                if (!isDragging && event.getY() <= headerHeightPx && (dx * dx + dy * dy > touchSlop * touchSlop)) {
+                    isDragging = true;
                 }
 
                 if (isDragging) {
@@ -210,16 +254,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
 
             case MotionEvent.ACTION_UP:
                 if (!isDragging) {
-                    if (!isMenuOpen) {
-                        // Tap on floating logo puck -> Open menu!
-                        openMenu();
-                    } else {
-                        // Deliver tap inside menu to C++ ImGui
-                        NativeBridge.onTouch(action, event.getX(), event.getY());
-                        // If user clicked close button [X], C++ will set bar::g_open = false
-                        if (!NativeBridge.isMenuOpen()) {
-                            closeMenu();
-                        }
+                    NativeBridge.onTouch(action, event.getX(), event.getY());
+                    // Check if close button was tapped in C++
+                    if (!NativeBridge.isMenuOpen()) {
+                        closeMenu();
                     }
                 } else {
                     NativeBridge.onTouch(action, event.getX(), event.getY());

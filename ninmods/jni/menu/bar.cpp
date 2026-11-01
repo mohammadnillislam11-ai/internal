@@ -106,11 +106,6 @@ static void render_fps_icon(float alpha) {
   if (ImGui::IsMouseReleased(0)) {
     if (g_fps_drag) {
       logger::log_info("[PUCK] Floating logo moved to: (X: %.1f, Y: %.1f)", g_fps_x, g_fps_y);
-    } else if (g_fps_potential) {
-      // Open menu at the exact position where the floating logo currently sits!
-      ui::menu::set_pos(g_fps_x, g_fps_y);
-      g_open = true;
-      logger::log_info("[MENU] Menu opened via floating logo tap at (%.1f, %.1f).", g_fps_x, g_fps_y);
     }
     g_fps_potential = false;
     g_fps_drag = false;
