@@ -89,6 +89,18 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         return null;
     }
 
+    private int getStatusBarHeight() {
+        int statusBarHeight = 0;
+        int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            statusBarHeight = getResources().getDimensionPixelSize(resourceId);
+        }
+        if (statusBarHeight <= 0) {
+            statusBarHeight = (int) (28 * getResources().getDisplayMetrics().density);
+        }
+        return statusBarHeight;
+    }
+
     private void updateScreenDimensions() {
         if (windowManager == null) return;
         DisplayMetrics dm = new DisplayMetrics();
@@ -129,10 +141,11 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         if (params != null && surfaceView != null && surfaceView.isAttachedToWindow()) {
             params.width = isMenuOpen ? menuW : puckW;
             params.height = isMenuOpen ? menuH : puckH;
+            int minY = getStatusBarHeight() + (int) (4 * getResources().getDisplayMetrics().density);
             int maxX = screenWidth - (int) (80 * getResources().getDisplayMetrics().density);
             int maxY = screenHeight - (int) (60 * getResources().getDisplayMetrics().density);
             params.x = Math.max(0, Math.min(maxX, params.x));
-            params.y = Math.max(0, Math.min(maxY, params.y));
+            params.y = Math.max(minY, Math.min(maxY, params.y));
             windowManager.updateViewLayout(surfaceView, params);
         }
     }
@@ -156,7 +169,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
         lastPosX = (int) (30 * density);
-        lastPosY = (int) (120 * density);
+        lastPosY = getStatusBarHeight() + (int) (12 * density);
 
         int overlayFlag = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -216,9 +229,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         updateScreenDimensions();
 
         float density = getResources().getDisplayMetrics().density;
+        int minY = getStatusBarHeight() + (int) (4 * density);
         int minX = -(menuW - (int) (100 * density));
         int maxX = screenWidth - (int) (100 * density);
-        int maxY = Math.max(0, screenHeight - (int) (80 * density));
+        int maxY = Math.max(minY, screenHeight - (int) (80 * density));
 
         params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
@@ -227,7 +241,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         params.width = menuW;
         params.height = menuH;
         params.x = Math.max(minX, Math.min(maxX, lastPosX));
-        params.y = Math.max(0, Math.min(maxY, lastPosY));
+        params.y = Math.max(minY, Math.min(maxY, lastPosY));
         lastPosX = params.x;
         lastPosY = params.y;
 
@@ -241,8 +255,9 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         updateScreenDimensions();
 
         float density = getResources().getDisplayMetrics().density;
+        int minY = getStatusBarHeight() + (int) (4 * density);
         int maxX = screenWidth - (int) (40 * density);
-        int maxY = screenHeight - (int) (40 * density);
+        int maxY = Math.max(minY, screenHeight - (int) (40 * density));
 
         params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
@@ -251,7 +266,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         params.width = puckW;
         params.height = puckH;
         params.x = Math.max(0, Math.min(maxX, lastPosX));
-        params.y = Math.max(0, Math.min(maxY, lastPosY));
+        params.y = Math.max(minY, Math.min(maxY, lastPosY));
         lastPosX = params.x;
         lastPosY = params.y;
 
@@ -309,8 +324,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                     }
 
                     if (isDragging) {
+                        float density = getResources().getDisplayMetrics().density;
+                        int minY = getStatusBarHeight() + (int) (4 * density);
                         params.x = (int) Math.max(0, Math.min(screenWidth - params.width, initialX + dx));
-                        params.y = (int) Math.max(0, Math.min(screenHeight - params.height, initialY + dy));
+                        params.y = (int) Math.max(minY, Math.min(screenHeight - params.height, initialY + dy));
                         windowManager.updateViewLayout(surfaceView, params);
                         lastPosX = params.x;
                         lastPosY = params.y;
@@ -362,11 +379,12 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
 
                 if (isDragging) {
                     float density = getResources().getDisplayMetrics().density;
+                    int minY = getStatusBarHeight() + (int) (4 * density);
                     int minX = -(params.width - (int) (100 * density));
                     int maxX = screenWidth - (int) (100 * density);
-                    int maxY = Math.max(0, screenHeight - (int) (80 * density));
+                    int maxY = Math.max(minY, screenHeight - (int) (80 * density));
                     params.x = (int) Math.max(minX, Math.min(maxX, initialX + dx));
-                    params.y = (int) Math.max(0, Math.min(maxY, initialY + dy));
+                    params.y = (int) Math.max(minY, Math.min(maxY, initialY + dy));
                     windowManager.updateViewLayout(surfaceView, params);
                     lastPosX = params.x;
                     lastPosY = params.y;
