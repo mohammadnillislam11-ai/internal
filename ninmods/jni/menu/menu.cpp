@@ -324,8 +324,8 @@ namespace ui::menu {
     };
 
     /**
-     * @brief Specialized Color Step Slider (স্কিপ বার) with 3 selectable colors: Blue, Red, Pink.
-     * Can be increased or decreased smoothly with interactive slider dots and color preview.
+     * @brief Specialized Color Skip Bar (কালার স্কিপ বার) with 3 selectable colors: Blue, Red, Pink.
+     * Can be increased or decreased smoothly via left/right buttons, step dots, and touch drag.
      */
     static bool NS_ColorStepSlider(const char* id, const char* label, ImVec4* color, int* cur_idx, float width = 0.0f) {
         if (!color || !cur_idx) return false;
@@ -340,6 +340,7 @@ namespace ui::menu {
         const char* curName = kEspColorNames[*cur_idx];
         ImVec4 activeVec = kEspColors[*cur_idx];
         ImU32 activeCol = ImGui::ColorConvertFloat4ToU32(activeVec);
+        bool changed = false;
 
         if (dl) {
             // Label on the left
@@ -353,59 +354,94 @@ namespace ui::menu {
 
             ImVec2 pillPos = {pos.x + w - rightTotalW, pos.y + 2.f};
             dl->AddCircleFilled({pillPos.x + pillW * 0.5f, pillPos.y + pillW * 0.5f}, pillW * 0.5f, activeCol);
-            dl->AddCircle({pillPos.x + pillW * 0.5f, pillPos.y + pillW * 0.5f}, pillW * 0.5f, IM_COL32(255, 255, 255, 160), 12, 1.0f);
-
+            dl->AddCircle({pillPos.x + pillW * 0.5f, pillPos.y + pillW * 0.5f}, pillW * 0.5f, IM_COL32(255, 255, 255, 180), 12, 1.0f);
             dl->AddText(ImGui::GetFont(), 13.5f, {pillPos.x + pillW + pillGap, pos.y}, activeCol, curName);
+        }
 
-            // Slider Track
-            float ty = pos.y + 20.f;
-            float tw2 = w;
-            float maxV = 2.0f; // 3 steps: 0, 1, 2
-            float rawPct = (float)(*cur_idx) / maxV;
-            float pct = NS_Anim(std::string(id) + "#col_pct", rawPct, 22.f);
+        // Second row: [ < ]  --- Track with 3 color dots ---  [ > ]
+        float rowY = pos.y + 20.f;
+        float btnW = 26.f;
+        float btnH = 22.f;
 
+        // Decrement button [ < ]
+        ImGui::SetCursorScreenPos({pos.x, rowY});
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 30, 60, (int)(content_alpha * 220)));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(65, 45, 95, (int)(content_alpha * 255)));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeCol);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+        if (ImGui::Button("<", ImVec2(btnW, btnH))) {
+            if (*cur_idx > 0) {
+                (*cur_idx)--;
+                changed = true;
+            }
+        }
+
+        // Track in middle between [ < ] and [ > ]
+        float trackX = pos.x + btnW + 8.f;
+        float trackW = w - (btnW * 2.f + 16.f);
+        float trackY = rowY + (btnH - 5.0f) * 0.5f;
+
+        float maxV = 2.0f; // 3 steps: 0, 1, 2
+        float rawPct = (float)(*cur_idx) / maxV;
+        float pct = NS_Anim(std::string(id) + "#col_pct", rawPct, 22.f);
+
+        if (dl) {
             // Track background
-            dl->AddRectFilled({pos.x, ty}, {pos.x + tw2, ty + 4.5f},
-                IM_COL32(38, 28, 55, (int)(content_alpha * 255)), 2.2f);
+            dl->AddRectFilled({trackX, trackY}, {trackX + trackW, trackY + 5.0f},
+                IM_COL32(38, 28, 55, (int)(content_alpha * 255)), 2.5f);
 
             // Active Track Fill
-            dl->AddRectFilled({pos.x, ty}, {pos.x + tw2 * pct, ty + 4.5f}, activeCol, 2.2f);
+            dl->AddRectFilled({trackX, trackY}, {trackX + trackW * pct, trackY + 5.0f}, activeCol, 2.5f);
 
             // 3 Color dots along the skip bar track (Blue dot at 0, Red dot at 1, Pink dot at 2)
             for (int s = 0; s < 3; s++) {
-                float sx = pos.x + (tw2 * ((float)s / maxV));
+                float sx = trackX + (trackW * ((float)s / maxV));
                 ImU32 dotCol = ImGui::ColorConvertFloat4ToU32(kEspColors[s]);
-                float dotRadius = (s == *cur_idx) ? 3.5f : 2.5f;
-                dl->AddCircleFilled({sx, ty + 2.2f}, dotRadius, dotCol);
+                float dotRadius = (s == *cur_idx) ? 4.5f : 3.0f;
+                dl->AddCircleFilled({sx, trackY + 2.5f}, dotRadius, dotCol);
                 if (s == *cur_idx) {
-                    dl->AddCircle({sx, ty + 2.2f}, dotRadius + 1.2f, IM_COL32(255, 255, 255, 220), 12, 1.0f);
+                    dl->AddCircle({sx, trackY + 2.5f}, dotRadius + 1.5f, IM_COL32(255, 255, 255, 230), 12, 1.2f);
                 }
             }
 
             // Thumb knob centered on active percentage
-            float thumbX = pos.x + tw2 * pct;
-            dl->AddCircleFilled({thumbX, ty + 2.2f}, 7.5f, IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
-            dl->AddCircleFilled({thumbX, ty + 2.2f}, 5.5f, activeCol);
-            dl->AddCircle({thumbX, ty + 2.2f}, 7.5f, IM_COL32(255, 255, 255, 220), 16, 1.5f);
-
-            ImGui::SetCursorScreenPos({pos.x, ty - 6.f});
-            ImGui::SetNextItemWidth(tw2);
+            float thumbX = trackX + trackW * pct;
+            dl->AddCircleFilled({thumbX, trackY + 2.5f}, 7.0f, IM_COL32(255, 255, 255, (int)(255 * content_alpha)));
+            dl->AddCircleFilled({thumbX, trackY + 2.5f}, 5.0f, activeCol);
+            dl->AddCircle({thumbX, trackY + 2.5f}, 7.0f, IM_COL32(255, 255, 255, 220), 16, 1.4f);
         }
 
+        // Invisible slider over track for touch drag & tap
+        ImGui::SetCursorScreenPos({trackX, rowY - 2.f});
+        ImGui::SetNextItemWidth(trackW);
         ImGui::PushStyleColor(ImGuiCol_FrameBg,          IM_COL32(0,0,0,0));
         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,   IM_COL32(0,0,0,0));
         ImGui::PushStyleColor(ImGuiCol_FrameBgActive,    IM_COL32(0,0,0,0));
         ImGui::PushStyleColor(ImGuiCol_SliderGrab,       IM_COL32(0,0,0,0));
         ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, IM_COL32(0,0,0,0));
-        bool changed = ImGui::SliderInt("##col_step", cur_idx, 0, 2, "");
+        if (ImGui::SliderInt("##col_step", cur_idx, 0, 2, "")) {
+            changed = true;
+        }
         ImGui::PopStyleColor(5);
+
+        // Increment button [ > ]
+        ImGui::SetCursorScreenPos({pos.x + w - btnW, rowY});
+        if (ImGui::Button(">", ImVec2(btnW, btnH))) {
+            if (*cur_idx < 2) {
+                (*cur_idx)++;
+                changed = true;
+            }
+        }
+        ImGui::PopStyleVar();    // Pop FrameRounding
+        ImGui::PopStyleColor(3);  // Pop Button colors
 
         if (changed) {
             *cur_idx = ImClamp(*cur_idx, 0, 2);
             *color = kEspColors[*cur_idx];
         }
 
-        ImGui::Dummy(ImVec2(0, 10.f));
+        ImGui::SetCursorScreenPos({pos.x, rowY + btnH + 6.f});
+        ImGui::Dummy(ImVec2(0, 4.f));
         ImGui::PopID();
         return changed;
     }
@@ -506,17 +542,19 @@ namespace ui::menu {
         ImGui::BeginGroup();
         NS_Slider("box_rd", oxorany("Rounding"),   &cfg::esp::box_rounding,  0.f,  10.f, "px", pageW - 24.f);
         NS_Slider("box_rg", oxorany("Max Range"),  &cfg::esp::max_range,     50.f, 500.f, "m",  pageW - 24.f);
-        static int s_box_col_idx = 0; // 0 = Blue, 1 = Red, 2 = Pink
-        static int s_vis_col_idx = 1; // 0 = Blue, 1 = Red, 2 = Pink
         static bool s_col_inited = false;
         if (!s_col_inited) {
             s_col_inited = true;
-            cfg::esp::box_col = kEspColors[s_box_col_idx];
-            cfg::esp::box_visible = kEspColors[s_vis_col_idx];
+            cfg::esp::box_col = kEspColors[cfg::esp::box_col_idx];
+            cfg::esp::box_visible = kEspColors[cfg::esp::vis_col_idx];
         }
 
-        NS_ColorStepSlider("col_box", oxorany("Box & Line Color"), &cfg::esp::box_col, &s_box_col_idx, pageW - 24.f);
-        NS_ColorStepSlider("col_vis", oxorany("Visible Color"),    &cfg::esp::box_visible, &s_vis_col_idx, pageW - 24.f);
+        if (NS_ColorStepSlider("col_box", oxorany("Box & Line Color"), &cfg::esp::box_col, &cfg::esp::box_col_idx, pageW - 24.f)) {
+            cfg::esp::box_col = kEspColors[cfg::esp::box_col_idx];
+        }
+        if (NS_ColorStepSlider("col_vis", oxorany("Visible Color"),    &cfg::esp::box_visible, &cfg::esp::vis_col_idx, pageW - 24.f)) {
+            cfg::esp::box_visible = kEspColors[cfg::esp::vis_col_idx];
+        }
 
         bool espActive = cfg::esp::box || cfg::esp::tracer || cfg::esp::health;
         NS_InfoRow(oxorany("ESP Engine"), espActive ? oxorany("ACTIVE") : oxorany("STANDBY"), espActive ? C_Success() : C_TextDim(), pageW - 24.f);

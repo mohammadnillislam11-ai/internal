@@ -34,6 +34,15 @@ public class ESPView extends View {
         }
     };
 
+    private static int getColorForIdx(int idx) {
+        switch (idx) {
+            case 0: return Color.rgb(26, 166, 255);  // Blue (নীল)
+            case 1: return Color.rgb(255, 56, 64);   // Red (লাল)
+            case 2: return Color.rgb(255, 89, 204);  // Pink (পিং)
+            default: return Color.rgb(26, 166, 255);
+        }
+    }
+
     public ESPView(Context context) {
         super(context);
         setBackgroundColor(Color.TRANSPARENT);
@@ -64,9 +73,12 @@ public class ESPView extends View {
 
         boolean drawFov = espBuffer[0] > 0.5f;
         float fovRadius = espBuffer[1];
-        int boxColor = (int) espBuffer[2];
-        int visibleColor = (int) espBuffer[3];
+        int boxColorIdx = (int) espBuffer[2];
+        int visibleColorIdx = (int) espBuffer[3];
         boolean tracerEnabled = espBuffer[4] > 0.5f;
+
+        int boxColor = getColorForIdx(boxColorIdx);
+        int visibleColor = getColorForIdx(visibleColorIdx);
 
         // 1. Draw Aim FOV Circle & Crosshair Center Dot
         if (drawFov && fovRadius > 5.0f) {

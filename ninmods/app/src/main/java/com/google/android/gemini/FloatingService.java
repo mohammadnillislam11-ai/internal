@@ -156,6 +156,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 puckH,
                 overlayFlag,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT
@@ -185,6 +186,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         int maxX = screenWidth - (int) (80 * density);
         int maxY = screenHeight - (int) (60 * density);
 
+        params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                       WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
+                       WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+                       WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
         params.width = menuW;
         params.height = menuH;
         params.x = Math.max(0, Math.min(maxX, lastPosX));
@@ -205,6 +210,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         int maxX = screenWidth - (int) (40 * density);
         int maxY = screenHeight - (int) (40 * density);
 
+        params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                       WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
+                       WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+                       WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
         params.width = puckW;
         params.height = puckH;
         params.x = Math.max(0, Math.min(maxX, lastPosX));

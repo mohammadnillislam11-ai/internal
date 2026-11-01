@@ -21,8 +21,10 @@
 #include "menu/menu.hpp"
 #include "menu/bar.hpp"
 #include "menu/styles.h"
+#include "menu/config.hpp"
 #include "engine/engine.hpp"
 #include "engine/game_data.hpp"
+#include "engine/data/game_data.hpp"
 #include "engine/esp.hpp"
 #include "engine/aimbot.hpp"
 #include "logger.h"
@@ -306,34 +308,24 @@ JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_fetchESPData(
     jfloat temp[1024];
     temp[0] = cfg::aim::draw_fov ? 1.0f : 0.0f;
     temp[1] = cfg::aim::fov;
-
-    auto toArgb = [](const ImVec4& c) -> float {
-        int a = (int)(c.w * 255.0f);
-        int r = (int)(c.x * 255.0f);
-        int g = (int)(c.y * 255.0f);
-        int b = (int)(c.z * 255.0f);
-        int argb = (a << 24) | (r << 16) | (g << 8) | b;
-        return (float)argb;
-    };
-
-    temp[2] = toArgb(cfg::esp::box_col);
-    temp[3] = toArgb(cfg::esp::box_visible);
+    temp[2] = static_cast<float>(cfg::esp::box_col_idx);
+    temp[3] = static_cast<float>(cfg::esp::vis_col_idx);
     temp[4] = cfg::esp::tracer ? 1.0f : 0.0f;
 
     int idx = 5;
 
-    if (cfg::esp::enabled && data::in_match()) {
-        std::lock_guard<std::mutex> lock(data::g_players_mutex);
-        for (const auto& p : data::g_players) {
+    if (cfg::esp::enabled && engine::data::g_in_match.load()) {
+        std::lock_guard<std::mutex> lock(engine::data::g_players_mutex);
+        for (const auto& p : engine::data::g_players) {
             if (idx + 8 > len || idx + 8 > 1024) break;
-            if (!p.isOnScreen || p.isDead || p.curHP <= 0) continue;
+            if (!p.isOnScreen || p.curHP <= 0) continue;
 
             temp[idx++]     = p.Head.x;
             temp[idx++]     = p.Head.y;
             temp[idx++]     = p.Toe.x;
             temp[idx++]     = p.Toe.y;
             temp[idx++]     = p.distance;
-            temp[idx++]     = (float)p.curHP;
+            temp[idx++]     = static_cast<float>(p.curHP);
             temp[idx++]     = p.isVisible ? 1.0f : 0.0f;
             temp[idx++]     = cfg::esp::tracer ? 1.0f : 0.0f;
         }
