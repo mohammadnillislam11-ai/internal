@@ -66,8 +66,19 @@ static void get_fps_pos(float w, float h) {
  * @param alpha Global opacity multiplier.
  */
 static void render_fps_icon(float alpha) {
-  const float w = 146.f, h = 54.f;
-  get_fps_pos(w, h);
+  const float w = (g_sw > 0.f && g_sw <= 250.f) ? g_sw : 146.f;
+  const float h = (g_sh > 0.f && g_sh <= 120.f) ? g_sh : 54.f;
+
+  if (g_sw > 250.f) {
+    get_fps_pos(w, h);
+  } else {
+    g_fps_x = 0.f;
+    g_fps_y = 0.f;
+    g_puck_x = 0.f;
+    g_puck_y = 0.f;
+    g_puck_w = w;
+    g_puck_h = h;
+  }
 
   ImDrawList *dl = ImGui::GetForegroundDrawList();
   ImVec2 mp = ImGui::GetMousePos();

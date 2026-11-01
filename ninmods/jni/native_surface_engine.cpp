@@ -279,6 +279,11 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gemini_NativeBridge_isMenuOpe
     return ui::bar::g_open;
 }
 
+JNIEXPORT void JNICALL Java_com_google_android_gemini_NativeBridge_setMenuOpen(
+    JNIEnv* env, jclass clazz, jboolean open) {
+    ui::bar::g_open = open;
+}
+
 JNIEXPORT void JNICALL Java_com_google_android_gemini_NativeBridge_stopEngine(
     JNIEnv* env, jclass clazz) {
     g_running.store(false);

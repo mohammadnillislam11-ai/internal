@@ -652,20 +652,24 @@ namespace ui::menu {
         g_sh = sh;
 
         ImVec2 wsz(780.f, 490.f);
-        if (wsz.x > sw * 0.94f) wsz.x = sw * 0.94f;
-        if (wsz.y > sh * 0.94f) wsz.y = sh * 0.94f;
+        if (wsz.x > sw) wsz.x = sw;
+        if (wsz.y > sh) wsz.y = sh;
 
-        // Position memory: If uninitialized, place at screen center; otherwise use preserved g_menu_pos
-        if (g_menu_pos.x < 0.f || g_menu_pos.y < 0.f) {
-            g_menu_pos = {(sw - wsz.x) * 0.5f, (sh - wsz.y) * 0.5f};
+        bool isBounded = (sw <= wsz.x + 50.f && sh <= wsz.y + 50.f);
+        ImVec2 winPos(0.f, 0.f);
+        if (!isBounded) {
+            if (g_menu_pos.x < 0.f || g_menu_pos.y < 0.f) {
+                g_menu_pos = {(sw - wsz.x) * 0.5f, (sh - wsz.y) * 0.5f};
+            }
+            float maxX = ImMax(0.f, sw - wsz.x);
+            float maxY = ImMax(0.f, sh - wsz.y);
+            g_menu_pos.x = ImClamp(g_menu_pos.x, 0.f, maxX);
+            g_menu_pos.y = ImClamp(g_menu_pos.y, 0.f, maxY);
+            winPos = g_menu_pos;
         }
-        float maxX = ImMax(0.f, sw - wsz.x);
-        float maxY = ImMax(0.f, sh - wsz.y);
-        g_menu_pos.x = ImClamp(g_menu_pos.x, 0.f, maxX);
-        g_menu_pos.y = ImClamp(g_menu_pos.y, 0.f, maxY);
 
         ImGui::SetNextWindowSize(wsz, ImGuiCond_Always);
-        ImGui::SetNextWindowPos(g_menu_pos, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(winPos, ImGuiCond_Always);
 
         ImGui::Begin("##m", nullptr,
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |

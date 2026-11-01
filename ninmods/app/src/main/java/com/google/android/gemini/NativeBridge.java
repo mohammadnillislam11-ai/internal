@@ -18,5 +18,6 @@ public class NativeBridge {
     public static native void onTouch(int action, float x, float y);
     public static native boolean isTouchInside(float x, float y);
     public static native boolean isMenuOpen();
+    public static native void setMenuOpen(boolean open);
     public static native void stopEngine();
 }
