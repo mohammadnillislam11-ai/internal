@@ -147,10 +147,10 @@ LOCAL_CFLAGS := -O3 -fvisibility=hidden -fdata-sections -ffunction-sections
 include $(BUILD_EXECUTABLE)
 
 # ============================================================
-# SHARED LIBRARY - libninmods.so for Android App & WindowManager
+# SHARED LIBRARY - libgemini.so for Android App & WindowManager
 # ============================================================
 include $(CLEAR_VARS)
-LOCAL_MODULE := ninmods
+LOCAL_MODULE := gemini
 
 SHARED_FILE_LIST := $(wildcard $(LOCAL_PATH)/libraries/imgui/*.cpp)
 SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/input/*.cpp)

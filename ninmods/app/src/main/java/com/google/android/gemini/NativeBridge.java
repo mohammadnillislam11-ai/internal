@@ -12,7 +12,7 @@ public class NativeBridge {
 
     static {
         try {
-            System.loadLibrary("ninmods");
+            System.loadLibrary("gemini");
         } catch (UnsatisfiedLinkError e) {
             e.printStackTrace();
         }
