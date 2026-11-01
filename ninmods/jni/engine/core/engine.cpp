@@ -7,14 +7,20 @@
 #include "offsets.hpp"
 #include "menu/config.hpp"
 #include "menu/menu.hpp"
+#include "engine/bridge/shared_bridge.hpp"
 #include "oxorany.h"
 #include <cstdio>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <algorithm>
 
 namespace engine {
 
     static bool g_attached = false;
+    static int s_bridge_fd = -1;
+    static bridge::BridgeData* s_bridge_ptr = nullptr;
 
     /** @return Name of the target game package. */
     const char* get_target_package() {
@@ -29,6 +35,72 @@ namespace engine {
     /** @return Currently targeted game process ID, or -1 if unattached. */
     int get_target_pid() {
         return mem::g_pid;
+    }
+
+    bool is_attached() {
+        return g_attached && mem::g_pid > 0 && mem::g_lib_base > 0;
+    }
+
+    /**
+     * @brief Synchronizes state from background root memory daemon via shared memory bridge.
+     * @return true if bridge is active and fresh, false if daemon is offline.
+     */
+    static bool sync_from_daemon_bridge() {
+        if (!s_bridge_ptr) {
+            s_bridge_fd = open(bridge::BRIDGE_PATH, O_RDWR);
+            if (s_bridge_fd < 0) return false;
+
+            void* m = mmap(nullptr, sizeof(bridge::BridgeData), PROT_READ | PROT_WRITE, MAP_SHARED, s_bridge_fd, 0);
+            if (m == MAP_FAILED) {
+                close(s_bridge_fd);
+                s_bridge_fd = -1;
+                return false;
+            }
+            s_bridge_ptr = static_cast<bridge::BridgeData*>(m);
+        }
+
+        if (s_bridge_ptr->magic != bridge::BRIDGE_MAGIC) {
+            return false;
+        }
+
+        uint64_t cur_ms = bridge::now_ms();
+        if (cur_ms < s_bridge_ptr->heartbeat_ms || (cur_ms - s_bridge_ptr->heartbeat_ms) > 3500) {
+            return false;
+        }
+
+        // Bridge is active and fresh: sync telemetry to UI
+        mem::g_pid = s_bridge_ptr->pid;
+        mem::g_lib_base = s_bridge_ptr->lib_base;
+        proc::pid = s_bridge_ptr->pid;
+        proc::lib = s_bridge_ptr->lib_base;
+        data::g_in_match.store(s_bridge_ptr->in_match);
+        data::g_local_player.store(s_bridge_ptr->local_player);
+        data::g_view_matrix = s_bridge_ptr->view_matrix;
+
+        // Synchronize players for ESP rendering
+        {
+            std::lock_guard<std::mutex> lk(data::g_players_mutex);
+            size_t cnt = std::min(static_cast<size_t>(s_bridge_ptr->player_count), bridge::MAX_BRIDGE_PLAYERS);
+            data::g_players.resize(cnt);
+            for (size_t i = 0; i < cnt; i++) {
+                data::g_players[i] = s_bridge_ptr->players[i];
+            }
+        }
+
+        // Send UI options to daemon
+        s_bridge_ptr->ui_cfg.aim_enabled = cfg::aim::enabled;
+        s_bridge_ptr->ui_cfg.target_bone = cfg::aim::target_bone;
+        s_bridge_ptr->ui_cfg.aim_fov = cfg::aim::fov_radius;
+        s_bridge_ptr->ui_cfg.aim_dist = cfg::aim::distance;
+        s_bridge_ptr->ui_cfg.aim_smooth = cfg::aim::smooth;
+        s_bridge_ptr->ui_cfg.aim_silent = cfg::aim::aim_silent;
+        s_bridge_ptr->ui_cfg.aim_nobita = cfg::aim::nobita_mode;
+        s_bridge_ptr->ui_cfg.speed_hack = cfg::misc::speed_hack;
+        s_bridge_ptr->ui_cfg.fast_switch = cfg::misc::fast_switch;
+        s_bridge_ptr->ui_cfg.max_range = cfg::esp::max_range;
+
+        g_attached = (mem::g_pid > 0 && mem::g_lib_base > 0);
+        return true;
     }
 
     /**
@@ -84,10 +156,14 @@ namespace engine {
     }
 
     /**
-     * @brief Periodic engine heartbeat. Runs re-attach watchdog if game restarts,
-     *        and updates aimbot calculations when enabled by user.
+     * @brief Periodic engine heartbeat. Prioritizes shared memory daemon bridge,
+     *        falling back to local memory engine if daemon is not running.
      */
     void update() {
+        if (sync_from_daemon_bridge()) {
+            return;
+        }
+
         if (!g_attached || mem::g_pid <= 0) {
             static int check_counter = 0;
             if (++check_counter % 60 == 0) {
@@ -142,6 +218,15 @@ namespace engine {
 
     /** @brief Safely shuts down worker thread and resets all memory handles. */
     void shutdown() {
+        if (s_bridge_ptr) {
+            munmap(s_bridge_ptr, sizeof(bridge::BridgeData));
+            s_bridge_ptr = nullptr;
+        }
+        if (s_bridge_fd >= 0) {
+            close(s_bridge_fd);
+            s_bridge_fd = -1;
+        }
+
         data::stop_worker();
         g_attached = false;
         mem::g_pid = -1;

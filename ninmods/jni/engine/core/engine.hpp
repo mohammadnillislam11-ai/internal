@@ -17,6 +17,7 @@ namespace engine {
     const char* get_target_package();
     const char* get_target_region();
     int get_target_pid();
+    bool is_attached();
 
     bool init();
     void update();

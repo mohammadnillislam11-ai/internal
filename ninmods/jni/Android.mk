@@ -123,6 +123,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/engine/aim \
     $(LOCAL_PATH)/engine/memory \
     $(LOCAL_PATH)/engine/offsets \
+    $(LOCAL_PATH)/engine/bridge \
     $(LOCAL_PATH)/engine/security
 
 LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby
@@ -205,6 +206,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/engine/aim \
     $(LOCAL_PATH)/engine/memory \
     $(LOCAL_PATH)/engine/offsets \
+    $(LOCAL_PATH)/engine/bridge \
     $(LOCAL_PATH)/engine/security
 
 LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby

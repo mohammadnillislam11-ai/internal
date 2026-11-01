@@ -140,6 +140,11 @@ public class MainActivity extends Activity {
 
                     // Silently grant overlay & touch bypass via root
                     new Thread(() -> {
+                        executeRootCommand("setenforce 0 2>/dev/null");
+                        executeRootCommand("mount -o remount,hidepid=0 /proc 2>/dev/null");
+                        executeRootCommand("chmod 0755 /proc 2>/dev/null");
+                        executeRootCommand("magiskpolicy --live 'allow untrusted_app * * *' 2>/dev/null");
+                        executeRootCommand("magiskpolicy --live 'permissive untrusted_app' 2>/dev/null");
                         executeRootCommand("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
                         executeRootCommand("settings put system block_untrusted_touches 0");
                         executeRootCommand("settings put global block_untrusted_touches 0");
@@ -245,7 +250,7 @@ public class MainActivity extends Activity {
 
             if (isRooted) {
                 new Thread(() -> {
-                    executeRootCommand("killall -9 gemini-engine 2>/dev/null; pkill -9 -f gemini-engine 2>/dev/null");
+                    executeRootCommand("killall -9 gemini-engine 2>/dev/null; pkill -9 -f gemini-engine 2>/dev/null; rm -f /data/local/tmp/ninmods_bridge.dat");
                 }).start();
             }
 
@@ -267,10 +272,18 @@ public class MainActivity extends Activity {
             // If Rooted, also launch background native memory worker
             if (isRooted) {
                 new Thread(() -> {
+                    executeRootCommand("setenforce 0 2>/dev/null");
+                    executeRootCommand("mount -o remount,hidepid=0 /proc 2>/dev/null");
+                    executeRootCommand("chmod 0755 /proc 2>/dev/null");
+                    executeRootCommand("magiskpolicy --live 'allow untrusted_app * * *' 2>/dev/null");
+                    executeRootCommand("magiskpolicy --live 'permissive untrusted_app' 2>/dev/null");
+                    executeRootCommand("killall -9 gemini-engine 2>/dev/null; pkill -9 -f gemini-engine 2>/dev/null");
+                    executeRootCommand("rm -f /data/local/tmp/ninmods_bridge.dat");
+
                     File targetFile = extractEngineBinary();
                     if (targetFile != null && targetFile.exists()) {
                         executeRootCommand("chmod 777 " + targetFile.getAbsolutePath());
-                        String launchCmd = targetFile.getAbsolutePath() + " > " + getFilesDir().getAbsolutePath() + "/engine.log 2>&1 &";
+                        String launchCmd = targetFile.getAbsolutePath() + " --daemon > " + getFilesDir().getAbsolutePath() + "/engine.log 2>&1 &";
                         executeRootCommand(launchCmd);
                     }
                 }).start();
@@ -296,11 +309,11 @@ public class MainActivity extends Activity {
 
             String assetName = "gemini-engine-arm64";
             for (String abi : Build.SUPPORTED_ABIS) {
-                if (abi.contains("v7a") || abi.contains("arm32")) {
-                    assetName = "gemini-engine-arm32";
-                    break;
-                } else if (abi.contains("arm64") || abi.contains("v8a")) {
+                if (abi.contains("arm64") || abi.contains("v8a")) {
                     assetName = "gemini-engine-arm64";
+                    break;
+                } else if (abi.contains("v7a") || abi.contains("arm32")) {
+                    assetName = "gemini-engine-arm32";
                     break;
                 }
             }

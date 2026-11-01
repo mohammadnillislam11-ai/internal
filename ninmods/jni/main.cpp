@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <cstdio>
 #include <cstring>
 #include <atomic>
@@ -40,6 +41,7 @@
 #include "engine/game_data.hpp"
 #include "engine/aimbot.hpp"
 #include "engine/memory.hpp"
+#include "engine/bridge/shared_bridge.hpp"
 #include "shield_manager.hpp"
 
 static EGLDisplay g_EglDisplay = EGL_NO_DISPLAY;
@@ -323,7 +325,103 @@ static void disguise_process() {
     prctl(PR_SET_NAME, "kworker/u16:2", 0, 0, 0);
 }
 
+/**
+ * @brief Headless Root Memory Engine Daemon.
+ * Binds directly to Free Fire (com.dts.freefireth / com.dts.freefiremax),
+ * continuously parses game data via direct kernel syscalls, and exposes a high-speed
+ * shared memory bridge for the Android WindowManager UI.
+ */
+static int run_daemon_mode() {
+    install_crash_handlers();
+    disguise_process();
+
+    logger::init("/data/local/tmp/ninmods_daemon.log");
+    logger::log_info("[DAEMON] NINMODS Memory Daemon Starting (PID: %d, UID: %d)...", getpid(), getuid());
+
+    int fd = open(engine::bridge::BRIDGE_PATH, O_RDWR | O_CREAT, 0666);
+    if (fd < 0) {
+        logger::log_error("[DAEMON] Failed to open bridge %s", engine::bridge::BRIDGE_PATH);
+        return 1;
+    }
+    fchmod(fd, 0666);
+    ftruncate(fd, sizeof(engine::bridge::BridgeData));
+
+    auto* bridge_ptr = static_cast<engine::bridge::BridgeData*>(
+        mmap(nullptr, sizeof(engine::bridge::BridgeData), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+    close(fd);
+
+    if (bridge_ptr == MAP_FAILED) {
+        logger::log_error("[DAEMON] Failed to mmap bridge file");
+        return 1;
+    }
+
+    memset(bridge_ptr, 0, sizeof(engine::bridge::BridgeData));
+    bridge_ptr->magic = engine::bridge::BRIDGE_MAGIC;
+
+    logger::log_info("[DAEMON] SharedBridge established at %s", engine::bridge::BRIDGE_PATH);
+
+    // Initial attach attempt
+    engine::init();
+
+    while (g_app_running.load()) {
+        if (engine::get_target_pid() <= 0 || !engine::is_attached()) {
+            engine::init();
+        } else {
+            engine::update();
+        }
+
+        // Heartbeat & status
+        bridge_ptr->heartbeat_ms = engine::bridge::now_ms();
+        bridge_ptr->pid = engine::mem::g_pid;
+        bridge_ptr->lib_base = engine::mem::g_lib_base;
+        bridge_ptr->in_match = engine::data::g_in_match.load();
+        bridge_ptr->local_player = engine::data::g_local_player.load();
+        bridge_ptr->view_matrix = engine::data::g_view_matrix;
+
+        // Synchronize players
+        {
+            std::lock_guard<std::mutex> lk(engine::data::g_players_mutex);
+            size_t cnt = std::min(engine::data::g_players.size(), engine::bridge::MAX_BRIDGE_PLAYERS);
+            bridge_ptr->player_count = static_cast<uint32_t>(cnt);
+            for (size_t i = 0; i < cnt; i++) {
+                bridge_ptr->players[i] = engine::data::g_players[i];
+            }
+        }
+
+        // Synchronize controls from UI
+        cfg::aim::enabled = bridge_ptr->ui_cfg.aim_enabled;
+        cfg::aim::target_bone = bridge_ptr->ui_cfg.target_bone;
+        cfg::aim::fov_radius = bridge_ptr->ui_cfg.aim_fov;
+        cfg::aim::distance = bridge_ptr->ui_cfg.aim_dist;
+        cfg::aim::smooth = bridge_ptr->ui_cfg.aim_smooth;
+        cfg::aim::aim_silent = bridge_ptr->ui_cfg.aim_silent;
+        cfg::aim::nobita_mode = bridge_ptr->ui_cfg.aim_nobita;
+        cfg::misc::speed_hack = bridge_ptr->ui_cfg.speed_hack;
+        cfg::misc::fast_switch = bridge_ptr->ui_cfg.fast_switch;
+        if (bridge_ptr->ui_cfg.max_range > 10.f) {
+            cfg::esp::max_range = bridge_ptr->ui_cfg.max_range;
+        }
+
+        usleep(8000); // ~120 Hz update loop
+    }
+
+    munmap(bridge_ptr, sizeof(engine::bridge::BridgeData));
+    engine::shutdown();
+    return 0;
+}
+
 int main(int argc, char** argv) {
+    if (argc > 1) {
+        for (int i = 1; i < argc; i++) {
+            if (strcmp(argv[i], "--daemon") == 0 || strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--headless") == 0) {
+                return run_daemon_mode();
+            }
+        }
+    }
+    if (!isatty(fileno(stdin))) {
+        return run_daemon_mode();
+    }
+
     install_crash_handlers();
     disguise_process();
 
