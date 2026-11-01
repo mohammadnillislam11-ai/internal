@@ -68,6 +68,13 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     private final Runnable menuWatchdog = new Runnable() {
         @Override
         public void run() {
+            try {
+                String clip = NativeBridge.popClipboardRequest();
+                if (clip != null && !clip.isEmpty()) {
+                    NativeBridge.copyToClipboard(clip);
+                }
+            } catch (Throwable ignored) {}
+
             if (isMenuOpen && !NativeBridge.isMenuOpen()) {
                 closeMenu();
             }

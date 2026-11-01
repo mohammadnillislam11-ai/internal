@@ -237,43 +237,69 @@ namespace engine::data {
 
 
 
-    static inline uint64_t resolve_candidate_basegame(uint64_t cell_addr) {
+    static inline uint64_t resolve_candidate_basegame(uint64_t cell_addr, uint64_t& out_ptr1, uint64_t& out_ptr2, uint64_t& out_sf) {
+        out_ptr1 = 0; out_ptr2 = 0; out_sf = 0;
         if (!engine::mem::addr_valid(cell_addr)) return 0;
 
         uint64_t ptr1 = rpm<uint64_t>(cell_addr);
         if (!engine::mem::addr_valid(ptr1)) return 0;
+        out_ptr1 = ptr1;
 
         // Path A: ptr1 is gf_cell (Double indirection: cell -> class -> static_fields -> base_game)
         uint64_t ptr2 = rpm<uint64_t>(ptr1);
         if (engine::mem::addr_valid(ptr2)) {
-            uint64_t sf = rpm<uint64_t>(ptr2 + offsets::GameFacade_P2); // 0xB8
-            if (engine::mem::addr_valid(sf)) {
-                uint64_t bg = rpm<uint64_t>(sf + 0x8);
-                if (engine::mem::addr_valid(bg)) return bg;
-                bg = rpm<uint64_t>(sf + 0x0);
-                if (engine::mem::addr_valid(bg)) return bg;
+            out_ptr2 = ptr2;
+            for (uintptr_t p2_off : {0xB8, 0xB0, 0xC0}) {
+                uint64_t sf = rpm<uint64_t>(ptr2 + p2_off);
+                if (engine::mem::addr_valid(sf)) {
+                    out_sf = sf;
+                    for (uintptr_t bg_off : {0x8, 0x0, 0x10}) {
+                        uint64_t bg = rpm<uint64_t>(sf + bg_off);
+                        if (engine::mem::addr_valid(bg)) return bg;
+                    }
+                }
             }
         }
 
         // Path B: ptr1 is gf_class directly (Single indirection: cell -> static_fields -> base_game)
-        uint64_t sf = rpm<uint64_t>(ptr1 + offsets::GameFacade_P2); // 0xB8
-        if (engine::mem::addr_valid(sf)) {
-            uint64_t bg = rpm<uint64_t>(sf + 0x8);
-            if (engine::mem::addr_valid(bg)) return bg;
-            bg = rpm<uint64_t>(sf + 0x0);
-            if (engine::mem::addr_valid(bg)) return bg;
+        for (uintptr_t p2_off : {0xB8, 0xB0, 0xC0}) {
+            uint64_t sf = rpm<uint64_t>(ptr1 + p2_off);
+            if (engine::mem::addr_valid(sf)) {
+                out_sf = sf;
+                for (uintptr_t bg_off : {0x8, 0x0, 0x10}) {
+                    uint64_t bg = rpm<uint64_t>(sf + bg_off);
+                    if (engine::mem::addr_valid(bg)) return bg;
+                }
+            }
         }
 
         return 0;
     }
 
     /**
-     * @brief One full entity scan cycle.
+     * @brief One full entity scan cycle with comprehensive sector diagnostics.
      */
     void update_cycle() {
         int pid = (engine::mem::g_pid > 0) ? engine::mem::g_pid : proc::pid;
         uintptr_t lib = (engine::mem::g_lib_base > 0) ? engine::mem::g_lib_base : proc::lib;
         if (pid <= 0 || lib == 0) return;
+
+        static double s_last_diag_tick = 0.0;
+        double now_sec = ImGui::GetTime();
+        bool print_diag = (now_sec - s_last_diag_tick >= 2.5);
+        if (print_diag) s_last_diag_tick = now_sec;
+
+        // SECTOR 1: Verify ELF Header Readability
+        static bool s_elf_verified = false;
+        if (!s_elf_verified) {
+            uint32_t elf_magic = rpm<uint32_t>(lib);
+            if (elf_magic == 0x464C457F) { // ELF
+                logger::log_success("[SECTOR-1] Memory Read Verified: libil2cpp ELF=0x%08X", elf_magic);
+                s_elf_verified = true;
+            } else {
+                logger::log_warn("[SECTOR-1] Memory Read Alert: libil2cpp at 0x%lx returned 0x%08X", (unsigned long)lib, elf_magic);
+            }
+        }
 
         float screen_w = static_cast<float>(display::width > 0 ? display::width : 2400);
         float screen_h = static_cast<float>(display::height > 0 ? display::height : 1080);
@@ -281,44 +307,57 @@ namespace engine::data {
         std::vector<PlayerData> tmp_players;
         tmp_players.reserve(64);
 
-        // Base Chain with dynamic multi-version fallback (Supports Standard & MAX)
+        // SECTOR 1: BaseGame Candidate Evaluation
         static uintptr_t s_working_facade_offset = 0;
         uint64_t base_game = 0;
+        uint64_t diag_p1 = 0, diag_p2 = 0, diag_sf = 0;
 
         if (s_working_facade_offset != 0) {
-            base_game = resolve_candidate_basegame(lib + s_working_facade_offset);
+            base_game = resolve_candidate_basegame(lib + s_working_facade_offset, diag_p1, diag_p2, diag_sf);
             if (!base_game) s_working_facade_offset = 0;
         }
 
+        static const uintptr_t candidates[] = {
+            0xA72E4E0, // ZqwClient / ninmodpro FF Normal OB55 / 1.132.x
+            0xAD6DC18, // STORM_MODS FF MAX
+            0xAD68E18, // STORM_MODS FF MAX Ind
+            0xB4C41A0, // NEXOMODS FF MAX
+            0xA986B7C, // NEXOMODS FF MAX alt
+            0xA7384E0,
+            0xA8E44E0,
+            0xAD74BB0,
+            0xAD6FDA8,
+            0xAB74BB0,
+            0xA62E4E0,
+            0xA82E4E0,
+            0xA92E4E0,
+            0xA72E500,
+            0xA72E4C0
+        };
+
         if (!base_game) {
-            static const uintptr_t candidates[] = {
-                0xA72E4E0, // ZqwClient FF Normal OB55 / 1.132.1
-                0xAD6DC18, // STORM_MODS FF MAX
-                0xAD68E18, // STORM_MODS FF MAX Ind
-                0xB4C41A0, // NEXOMODS FF MAX
-                0xA986B7C, // NEXOMODS FF MAX alt
-                0xA7384E0,
-                0xA8E44E0,
-                0xAD74BB0,
-                0xAD6FDA8,
-                0xAB74BB0,
-                0xA62E4E0,
-                0xA82E4E0,
-                0xA92E4E0
-            };
             for (uintptr_t cand : candidates) {
-                uint64_t bg = resolve_candidate_basegame(lib + cand);
+                uint64_t bg = resolve_candidate_basegame(lib + cand, diag_p1, diag_p2, diag_sf);
                 if (bg) {
                     s_working_facade_offset = cand;
                     base_game = bg;
-                    logger::log_success("[DATA] BaseGame linked at: 0x%lx (Offset: 0x%lx)", (unsigned long)bg, (unsigned long)cand);
+                    logger::log_success("[SECTOR-1] LINKED BaseGame: 0x%lx (Offset: 0x%lx, cell=0x%lx, class=0x%lx, sf=0x%lx)",
+                        (unsigned long)bg, (unsigned long)cand, (unsigned long)diag_p1, (unsigned long)diag_p2, (unsigned long)diag_sf);
                     break;
                 }
+            }
+
+            if (!base_game && print_diag) {
+                uint64_t p1 = 0, p2 = 0, sf = 0;
+                resolve_candidate_basegame(lib + candidates[0], p1, p2, sf);
+                logger::log_info("[SECTOR-1] Searching BaseGame... Cand 0x%lx: cell=0x%lx, class=0x%lx, sf=0x%lx",
+                    (unsigned long)candidates[0], (unsigned long)p1, (unsigned long)p2, (unsigned long)sf);
             }
         }
 
         if (!base_game) return;
 
+        // SECTOR 2: Match State & Local Player
         uint64_t match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
         uint64_t local_player = match ? rpm<uint64_t>(match + offsets::Match_LocalPlayer) : 0;
         if (!local_player) {
@@ -334,16 +373,23 @@ namespace engine::data {
         } else if (local_player && engine::mem::addr_valid(local_player)) {
             match_active = true;
         }
+
+        // SECTOR 3: Player Dictionary
+        uint64_t dict_addr = rpm<uint64_t>(base_game + offsets::Match_PlayerDict);
+        if (!dict_addr && match) {
+            dict_addr = rpm<uint64_t>(match + offsets::Match_PlayerDict);
+        }
+
+        ManagedDictionary dict(dict_addr);
+        if (dict.valid && dict.count > 0) {
+            match_active = true; // Combat or Training targets exist! Force active!
+        }
         g_in_match.store(match_active);
 
-        static bool s_last_in_match = false;
-        if (match_active != s_last_in_match) {
-            s_last_in_match = match_active;
-            if (match_active) {
-                logger::log_success("[MATCH] Combat match active! Telemetry radar engaged.");
-            } else {
-                logger::log_info("[MATCH] In Lobby / Standby.");
-            }
+        if (print_diag) {
+            logger::log_info("[SECTOR-2] MatchState -> BaseGame=0x%lx | Match=0x%lx | Local=0x%lx | Running=%s | Dict=0x%lx (Count: %d)",
+                (unsigned long)base_game, (unsigned long)match, (unsigned long)local_player,
+                match_active ? "ACTIVE" : "STANDBY", (unsigned long)dict_addr, dict.valid ? dict.count : 0);
         }
 
         if (!match_active) {
@@ -354,20 +400,18 @@ namespace engine::data {
                 std::lock_guard<std::mutex> lk(g_players_mutex);
                 g_players.clear();
             }
-            {
-                std::lock_guard<std::mutex> lk(g_loots_mutex);
-                g_loots.clear();
-            }
             return;
         }
 
-        // Camera Matrix
+        // SECTOR 4: Camera Matrix Resolution
         uint64_t int_ptr = 0;
+        uint64_t follow = 0;
+        uint64_t cam = 0;
         if (local_player && engine::mem::addr_valid(local_player)) {
             g_local_player.store(local_player);
 
-            uint64_t follow = rpm<uint64_t>(local_player + 0x690);
-            uint64_t cam = follow ? rpm<uint64_t>(follow + offsets::Camera_Follow) : 0;
+            follow = rpm<uint64_t>(local_player + 0x690);
+            cam = follow ? rpm<uint64_t>(follow + offsets::Camera_Follow) : 0;
             if (cam) int_ptr = rpm<uint64_t>(cam + offsets::Camera_IntPtr);
 
             if (!int_ptr) {
@@ -386,6 +430,11 @@ namespace engine::data {
             g_view_matrix = rpm<Matrix4x4>(int_ptr + offsets::Camera_Matrix);
         }
 
+        if (print_diag && local_player) {
+            logger::log_info("[SECTOR-3] Camera -> follow=0x%lx, cam=0x%lx, int_ptr=0x%lx, vm.m11=%.2f",
+                (unsigned long)follow, (unsigned long)cam, (unsigned long)int_ptr, g_view_matrix.m11);
+        }
+
         Vector3 local_pos = Vector3::Zero();
         if (local_player) {
             uint64_t local_head_node = rpm<uint64_t>(local_player + offsets::Bone_Head);
@@ -393,25 +442,16 @@ namespace engine::data {
             if (local_head_node) local_pos = get_node_position(local_head_node);
         }
 
-        // Player Dictionary Scan
-        uint64_t dict_addr = rpm<uint64_t>(base_game + offsets::Match_PlayerDict);
-        if (!dict_addr && match) {
-            dict_addr = rpm<uint64_t>(match + offsets::Match_PlayerDict);
-        }
-        if (!dict_addr) {
+        if (!dict.valid || dict.count <= 0) {
             std::lock_guard<std::mutex> lk(g_players_mutex);
             g_players.clear();
             return;
         }
 
-        ManagedDictionary dict(dict_addr);
-        if (!dict.valid) {
-            std::lock_guard<std::mutex> lk(g_players_mutex);
-            g_players.clear();
-            return;
-        }
-
+        // SECTOR 5: Entity Scanning & Screen Projection
         int num_entries = dict.get_count();
+        int valid_entities_count = 0;
+
         for (int i = 0; i < num_entries; i++) {
             uint64_t enemy = dict.entry(i);
             if (!enemy || enemy < 0x100000 || (local_player && enemy == local_player)) continue;
@@ -435,8 +475,6 @@ namespace engine::data {
             }
 
             bool raw_visible = uma ? rpm<bool>(uma + offsets::Uma_Visible) : true;
-
-            // Visibility Debouncing
             bool visible = raw_visible;
             {
                 auto it = g_vis_stable.find(enemy);
@@ -461,7 +499,9 @@ namespace engine::data {
             uint64_t head_node = rpm<uint64_t>(enemy + offsets::Bone_Head);
             if (!head_node) head_node = rpm<uint64_t>(enemy + 0x6A0);
             if (!head_node) head_node = rpm<uint64_t>(enemy + 0x6A8);
+            if (!head_node) head_node = rpm<uint64_t>(enemy + 0x6B0);
             if (!head_node) continue;
+
             Vector3 head_world = get_node_position(head_node);
             if (head_world == Vector3::Zero()) continue;
 
@@ -507,7 +547,21 @@ namespace engine::data {
             }
 
             tmp_players.push_back(pd);
+            valid_entities_count++;
+
+            if (print_diag && valid_entities_count <= 2) {
+                logger::log_info("[SECTOR-5] Target[%d]: addr=0x%lx, hp=%d, dist=%.0fm, screen=(%.0f, %.0f)",
+                    i, (unsigned long)enemy, hp, dist, head_screen.x, head_screen.y);
+            }
         }
+
+        if (print_diag && !tmp_players.empty()) {
+            logger::log_success("[RADAR] Tracking %zu target(s) on-screen! P0 at (%.0f, %.0f) dist=%.0fm",
+                tmp_players.size(), tmp_players[0].Head.x, tmp_players[0].Head.y, tmp_players[0].distance);
+        }
+
+        std::lock_guard<std::mutex> lk(g_players_mutex);
+        g_players = std::move(tmp_players);
 
         if (g_vis_stable.size() > 200) {
             g_vis_stable.clear();

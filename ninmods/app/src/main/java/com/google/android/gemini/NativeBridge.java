@@ -57,5 +57,6 @@ public class NativeBridge {
     public static native void setMenuOpen(boolean open);
     public static native void stopEngine();
     public static native int fetchESPData(float[] buffer);
+    public static native String popClipboardRequest();
 }
 

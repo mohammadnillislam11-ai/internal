@@ -206,31 +206,11 @@ namespace {
 
 extern "C" {
 
-void native_copy_to_clipboard(const std::string& text) {
-    if (!g_jvm) return;
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    jint res = g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
-    if (res == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
-            attached = true;
-        }
-    }
-    if (env) {
-        jclass clazz = env->FindClass("com/google/android/gemini/NativeBridge");
-        if (clazz) {
-            jmethodID mid = env->GetStaticMethodID(clazz, "copyToClipboard", "(Ljava/lang/String;)V");
-            if (mid) {
-                jstring jstr = env->NewStringUTF(text.c_str());
-                env->CallStaticVoidMethod(clazz, mid, jstr);
-                env->DeleteLocalRef(jstr);
-            }
-            env->DeleteLocalRef(clazz);
-        }
-        if (attached) {
-            g_jvm->DetachCurrentThread();
-        }
-    }
+JNIEXPORT jstring JNICALL Java_com_google_android_gemini_NativeBridge_popClipboardRequest(
+    JNIEnv* env, jclass clazz) {
+    std::string text = clipboard::pop_pending_text();
+    if (text.empty()) return nullptr;
+    return env->NewStringUTF(text.c_str());
 }
 
 JNIEXPORT void JNICALL Java_com_google_android_gemini_NativeBridge_initSurface(
@@ -345,18 +325,19 @@ JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_fetchESPData(
 
     int idx = 5;
 
-    if (cfg::esp::enabled && engine::data::g_in_match.load()) {
+    bool any_esp = cfg::esp::tracer || cfg::esp::box || cfg::esp::health || cfg::esp::enabled;
+    if (any_esp) {
         std::lock_guard<std::mutex> lock(engine::data::g_players_mutex);
         for (const auto& p : engine::data::g_players) {
             if (idx + 8 > len || idx + 8 > 1024) break;
-            if (!p.isOnScreen || p.curHP <= 0) continue;
+            if (!p.isOnScreen) continue;
 
             temp[idx++]     = p.Head.x;
             temp[idx++]     = p.Head.y;
             temp[idx++]     = p.Toe.x;
             temp[idx++]     = p.Toe.y;
             temp[idx++]     = p.distance;
-            temp[idx++]     = static_cast<float>(p.curHP);
+            temp[idx++]     = static_cast<float>(p.curHP > 0 ? p.curHP : 100);
             temp[idx++]     = p.isVisible ? 1.0f : 0.0f;
             temp[idx++]     = cfg::esp::tracer ? 1.0f : 0.0f;
         }

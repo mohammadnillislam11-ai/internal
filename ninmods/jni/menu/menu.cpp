@@ -711,9 +711,16 @@ namespace ui::menu {
             }
         }
 
-        // Auto-scroll to bottom on new entries
+        // Native Touch Swipe Scrolling
+        if (ImGui::IsWindowHovered() && ImGui::IsMouseDragging(0)) {
+            float dragDeltaY = ImGui::GetIO().MouseDelta.y;
+            ImGui::SetScrollY(ImGui::GetScrollY() - dragDeltaY);
+        }
+
+        // Auto-scroll to bottom only when user is near bottom
         static size_t s_last_entry_count = 0;
-        if (entries.size() != s_last_entry_count) {
+        bool isAtBottom = (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - S(30.f));
+        if (isAtBottom && entries.size() != s_last_entry_count) {
             s_last_entry_count = entries.size();
             ImGui::SetScrollHereY(1.0f);
         }
@@ -733,9 +740,7 @@ namespace ui::menu {
         if (NS_Button("copy_term_logs", copyLogLbl, {copyW, S(30.f)}, logCopied)) {
             std::string allLogs = logger::get_all_terminal_text();
             if (allLogs.empty()) allLogs = "[NINMODS] No terminal logs recorded yet.\n";
-            clipboard::set_text(allLogs.c_str());
-            ImGui::SetClipboardText(allLogs.c_str());
-            logger::log_info("[CLIP] Copied terminal logs to clipboard (%zu chars)", allLogs.size());
+            clipboard::set_text(allLogs);
             s_copy_log_feedback = ImGui::GetTime();
         }
 

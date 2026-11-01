@@ -4,13 +4,18 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <mutex>
+#include <atomic>
 
 namespace clipboard {
 
 namespace {
     static std::string s_clipboard_cache = "";
+    static std::mutex  s_clipboard_mutex;
+    static std::string s_pending_copy = "";
+    static std::atomic<bool> s_has_pending{false};
 
-    // Method 1: Android dumpsys clipboard (Root-accessible primary clip reader across all Android 7-15)
+    // Method 1: Android dumpsys clipboard (Root-accessible primary clip reader across Android 7-15)
     static std::string tryDumpsysClipboard() {
         FILE* f = popen("dumpsys clipboard 2>/dev/null", "r");
         if (!f) return "";
@@ -20,7 +25,6 @@ namespace {
         while (fgets(buf, sizeof(buf), f)) {
             std::string line = buf;
 
-            // Pattern A: Quoted clip text strings like: ClipData { text/plain "FREE" }
             size_t q1 = line.find('\"');
             if (q1 != std::string::npos) {
                 size_t q2 = line.find('\"', q1 + 1);
@@ -37,7 +41,6 @@ namespace {
                 }
             }
 
-            // Pattern B: Item { T:FREE } or mText=FREE (common in Android 11, 12, 13, 14, 15 dumpsys)
             size_t tpos = line.find("T:");
             if (tpos != std::string::npos) {
                 size_t start = tpos + 2;
@@ -50,24 +53,12 @@ namespace {
                     }
                 }
             }
-
-            size_t mpos = line.find("mText=");
-            if (mpos != std::string::npos) {
-                size_t start = mpos + 6;
-                size_t end = line.find_first_of(" }\r\n", start);
-                if (end != std::string::npos && end > start) {
-                    std::string extracted = line.substr(start, end - start);
-                    if (extracted.length() >= 2 && extracted.length() <= 128) {
-                        candidate = extracted;
-                    }
-                }
-            }
         }
         pclose(f);
         return candidate;
     }
 
-    // Method 2: File fallback (/sdcard/key.txt or /sdcard/license.txt)
+    // Method 2: File fallback
     static std::string tryFileKey() {
         const char* paths[] = {
             "/sdcard/key.txt",
@@ -75,8 +66,7 @@ namespace {
             "/storage/emulated/0/key.txt",
             "/storage/emulated/0/license.txt",
             "/data/local/tmp/key.txt",
-            "/data/local/tmp/license.txt",
-            "/storage/emulated/0/NXODA/.nxkey"
+            "/data/local/tmp/license.txt"
         };
         for (const char* p : paths) {
             FILE* fp = fopen(p, "r");
@@ -96,47 +86,6 @@ namespace {
         return "";
     }
 
-    // Method 3: Disabled due to Android 12+ IPC parcel limit error
-    static std::string tryServiceCall() {
-        return "";
-    }
-
-    // Method 4: Android cmd clipboard get (Android 10+)
-    static std::string tryCmdClipboard() {
-        FILE* f = popen("cmd clipboard get 2>/dev/null", "r");
-        if (!f) return "";
-
-        char buf[4096];
-        std::string raw;
-        while (fgets(buf, sizeof(buf), f)) {
-            raw += buf;
-        }
-        pclose(f);
-
-        while (!raw.empty() && (raw.back() == '\n' || raw.back() == '\r' || raw.back() == ' ')) {
-            raw.pop_back();
-        }
-        return raw;
-    }
-
-    // Method 5: Termux clipboard API if available
-    static std::string tryTermuxClipboard() {
-        FILE* fp = popen("termux-clipboard-get 2>/dev/null", "r");
-        if (!fp) return "";
-
-        char buf[256];
-        std::string result;
-        while (fgets(buf, sizeof(buf), fp)) {
-            result += buf;
-        }
-        pclose(fp);
-
-        while (!result.empty() && (result.back() == '\n' || result.back() == '\r' || result.back() == ' ')) {
-            result.pop_back();
-        }
-        return result;
-    }
-
     const char* ImGui_GetClipboard(void* user_data) {
         s_clipboard_cache = get_text();
         return s_clipboard_cache.c_str();
@@ -150,36 +99,13 @@ namespace {
 }
 
 std::string get_text() {
-    // 1. Try dumpsys clipboard (most reliable on Android 10-15 under root)
     std::string text = tryDumpsysClipboard();
     if (!text.empty()) {
         s_clipboard_cache = text;
         return text;
     }
 
-    // 2. Try file key fallback (/sdcard/key.txt or /sdcard/license.txt)
     text = tryFileKey();
-    if (!text.empty()) {
-        s_clipboard_cache = text;
-        return text;
-    }
-
-    // 3. Try Android service call
-    text = tryServiceCall();
-    if (!text.empty()) {
-        s_clipboard_cache = text;
-        return text;
-    }
-
-    // 4. Try Android cmd clipboard
-    text = tryCmdClipboard();
-    if (!text.empty()) {
-        s_clipboard_cache = text;
-        return text;
-    }
-
-    // 5. Try Termux clipboard
-    text = tryTermuxClipboard();
     if (!text.empty()) {
         s_clipboard_cache = text;
         return text;
@@ -188,19 +114,20 @@ std::string get_text() {
     return s_clipboard_cache;
 }
 
-__attribute__((weak)) extern "C" void native_copy_to_clipboard(const std::string& text) {
-    // Weak default for CLI executable
-}
-
 void set_text(const std::string& text) {
     s_clipboard_cache = text;
-    native_copy_to_clipboard(text);
+    std::lock_guard<std::mutex> lock(s_clipboard_mutex);
+    s_pending_copy = text;
+    s_has_pending.store(true);
+}
 
-    FILE* f = fopen("/sdcard/Download/ninmods_terminal_logs.txt", "w");
-    if (f) {
-        fwrite(text.data(), 1, text.size(), f);
-        fclose(f);
-    }
+std::string pop_pending_text() {
+    if (!s_has_pending.load()) return "";
+    std::lock_guard<std::mutex> lock(s_clipboard_mutex);
+    s_has_pending.store(false);
+    std::string out = std::move(s_pending_copy);
+    s_pending_copy.clear();
+    return out;
 }
 
 void install_imgui_hooks() {

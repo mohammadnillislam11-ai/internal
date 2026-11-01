@@ -9,6 +9,7 @@ namespace clipboard {
 
     std::string get_text();
     void set_text(const std::string& text);
+    std::string pop_pending_text();
 
     void install_imgui_hooks();
 
