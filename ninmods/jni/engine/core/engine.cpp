@@ -16,9 +16,9 @@ namespace engine {
 
     static bool g_attached = false;
 
-    /** @return Name of the target game package. */
+    /** @return Name of the target game package (Strictly com.dts.freefireth). */
     const char* get_target_package() {
-        return g_active_package;
+        return TARGET_PACKAGE;
     }
 
     /** @return Region string identifier. */
@@ -36,7 +36,7 @@ namespace engine {
     }
 
     /**
-     * @brief Detects and attaches strictly to the running Free Fire process (com.dts.freefireth / com.dts.freefiremax).
+     * @brief Detects and attaches strictly to the Normal Free Fire process (com.dts.freefireth).
      *        Operates 100% in-memory via direct kernel assembly syscalls.
      * @return true if successfully attached, false if game is not running or still launching.
      */
@@ -50,21 +50,12 @@ namespace engine {
             mem::g_mem_fd = -1;
         }
 
-        static const char* packages[] = { TARGET_PACKAGE, TARGET_PACKAGE_MAX };
-        int found_pid = -1;
-        const char* matched_package = TARGET_PACKAGE;
-        for (const char* pkg : packages) {
-            found_pid = mem::find_pid_by_name(pkg);
-            if (found_pid > 0) {
-                matched_package = pkg;
-                break;
-            }
-        }
+        int found_pid = mem::find_pid_by_name(TARGET_PACKAGE);
         if (found_pid <= 0) {
             return false;
         }
 
-        g_active_package = matched_package;
+        g_active_package = TARGET_PACKAGE;
         mem::g_pid = found_pid;
 
         // Locate libil2cpp.so module base
@@ -83,7 +74,7 @@ namespace engine {
         data::start_worker();
         aim::init();
 
-        printf("\033[92m[*] Attached: \033[93mcom.gemini.cli\033[0m (PID: \033[92m%d\033[0m)\033[0m\n", mem::g_pid);
+        printf("\033[92m[*] Attached: \033[93mcom.dts.freefireth\033[0m (PID: \033[92m%d\033[0m)\033[0m\n", mem::g_pid);
         return true;
     }
 
@@ -110,9 +101,8 @@ namespace engine {
             security::init(mem::g_pid);
         }
 
-        if (cfg::aim::enabled) {
-            aim::update();
-        }
+        // Aimbot update and state restoration safety
+        aim::update();
 
         uint64_t local = data::g_local_player.load(std::memory_order_relaxed);
         if (mem::is_valid_addr(local) && data::g_in_match.load(std::memory_order_relaxed)) {
@@ -146,6 +136,7 @@ namespace engine {
 
     /** @brief Safely shuts down worker thread and resets all memory handles. */
     void shutdown() {
+        aim::restore_state();
         data::stop_worker();
         g_attached = false;
         mem::g_pid = -1;

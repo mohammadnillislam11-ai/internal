@@ -19,90 +19,44 @@ namespace engine::aim {
     static uint64_t g_current_target = 0;
     static bool g_hook_installed = false;
 
-    /**
-     * @brief 9-parameter damage intercept hook for silent aim headshot redirection.
-     *        Rewrites hit group, hit location, hit normal, and ray direction to target head.
-     */
-    static int (*orig_OnCalcDamage_9)(void* player, int damage, unsigned int damagerID,
-                                      void* damageInfo, int hitGroup,
-                                      Vector3 hitPos, Vector3 hitNormal,
-                                      void* checkParams, void* weaponInfo, unsigned int vehicleID) = nullptr;
+    // Safety state tracking for reversible memory restoration
+    static bool s_silent_modified = false;
+    static uint64_t s_last_aim_info = 0;
+    static Vector3 s_saved_dir = Vector3::Zero();
 
-    static int hook_OnCalcDamage_9(void* player, int damage, unsigned int damagerID,
-                                   void* damageInfo, int hitGroup,
-                                   Vector3 hitPos, Vector3 hitNormal,
-                                   void* checkParams, void* weaponInfo, unsigned int vehicleID) {
-        if ((cfg::aim::silent || cfg::aim::nobita) && damageInfo != nullptr && g_current_target != 0) {
-            uint64_t head_node = rpm<uint64_t>(g_current_target + offsets::Bone_Head);
-            if (head_node) {
-                Vector3 enemy_head_world = data::get_node_position(head_node);
-                if (enemy_head_world != Vector3::Zero()) {
-                    Vector3 my_pos = Vector3::Zero();
-                    uint64_t local = data::g_local_player.load(std::memory_order_relaxed);
-                    if (local) {
-                        uint64_t my_head_node = rpm<uint64_t>(local + offsets::Bone_Head);
-                        if (my_head_node) my_pos = data::get_node_position(my_head_node);
-                    }
-
-                    Vector3 direction = hitNormal;
-                    if (my_pos != Vector3::Zero()) {
-                        float dx = enemy_head_world.x - my_pos.x;
-                        float dy = enemy_head_world.y - my_pos.y;
-                        float dz = enemy_head_world.z - my_pos.z;
-                        float len = sqrtf(dx * dx + dy * dy + dz * dz);
-                        if (len > 0.001f) {
-                            direction = Vector3(dx / len, dy / len, dz / len);
-                        }
-                    }
-
-                    *reinterpret_cast<short*>(reinterpret_cast<uintptr_t>(damageInfo) + offsets::DmgInfo_HitGroup) = 1;
-                    *reinterpret_cast<Vector3*>(reinterpret_cast<uintptr_t>(damageInfo) + offsets::DmgInfo_HitLocation) = enemy_head_world;
-                    *reinterpret_cast<Vector3*>(reinterpret_cast<uintptr_t>(damageInfo) + offsets::DmgInfo_HitNormal) = direction;
-                    *reinterpret_cast<Vector3*>(reinterpret_cast<uintptr_t>(damageInfo) + offsets::DmgInfo_RayDir) = direction;
-
-                    hitGroup = 1;
-                    hitPos = enemy_head_world;
-                    hitNormal = direction;
-                }
-            }
-        }
-
-        if (orig_OnCalcDamage_9) {
-            return orig_OnCalcDamage_9(player, damage, damagerID, damageInfo,
-                                      hitGroup, hitPos, hitNormal,
-                                      checkParams, weaponInfo, vehicleID);
-        }
-        return 0;
-    }
+    static bool s_nobita_modified = false;
+    static uint64_t s_last_local = 0;
+    static Quaternion s_saved_rot{};
 
     /**
-     * @brief 4-parameter damage intercept hook secondary path.
+     * @brief Restores original game memory vectors and rotations when aim is turned off or target is lost.
      */
-    static void (*orig_OnCalcDamage_4)(void* player, void* damageInfo,
-                                       void* weaponInfo, void* checkParams,
-                                       unsigned int vehicleID) = nullptr;
-
-    static void hook_OnCalcDamage_4(void* player, void* damageInfo,
-                                    void* weaponInfo, void* checkParams,
-                                    unsigned int vehicleID) {
-        if ((cfg::aim::silent || cfg::aim::nobita) && damageInfo != nullptr && g_current_target != 0) {
-            uint64_t head_node = rpm<uint64_t>(g_current_target + offsets::Bone_Head);
-            if (head_node) {
-                Vector3 head_world = data::get_node_position(head_node);
-                if (head_world != Vector3::Zero()) {
-                    *reinterpret_cast<short*>(reinterpret_cast<uintptr_t>(damageInfo) + offsets::DmgInfo_HitGroup) = 1;
-                    *reinterpret_cast<Vector3*>(reinterpret_cast<uintptr_t>(damageInfo) + offsets::DmgInfo_HitLocation) = head_world;
-                }
+    void restore_state() {
+        if (s_silent_modified && engine::mem::addr_valid(s_last_aim_info)) {
+            if (s_saved_dir != Vector3::Zero()) {
+                wpm<Vector3>(s_last_aim_info + offsets::AimInfo_Direction, s_saved_dir);
             }
+            s_silent_modified = false;
+            s_saved_dir = Vector3::Zero();
+            s_last_aim_info = 0;
         }
 
-        if (orig_OnCalcDamage_4) {
-            orig_OnCalcDamage_4(player, damageInfo, weaponInfo, checkParams, vehicleID);
+        if (s_nobita_modified && engine::mem::addr_valid(s_last_local)) {
+            if (s_saved_rot.w != 0.0f || s_saved_rot.x != 0.0f || s_saved_rot.y != 0.0f || s_saved_rot.z != 0.0f) {
+                wpm<Quaternion>(s_last_local + offsets::Player_Rotation, s_saved_rot);
+                wpm<Quaternion>(s_last_local + 0x614, s_saved_rot);
+            }
+            s_nobita_modified = false;
+            s_saved_rot = Quaternion{};
+            s_last_local = 0;
         }
+        g_current_target = 0;
     }
 
     void init() {
         g_current_target = 0;
+        s_silent_modified = false;
+        s_nobita_modified = false;
         if (!g_hook_installed && engine::mem::g_lib_base != 0) {
             g_hook_installed = true;
             LOGI("[+] Aimbot initialized (Direct memory vector redirection active)");
@@ -168,18 +122,18 @@ namespace engine::aim {
 
     /**
      * @brief Per-frame aim assist and memory redirection update.
-     *        Strictly targets entities within 2D FOV circle.
+     *        Safely saves original direction/rotation and restores on toggle off.
      */
     void update() {
         bool aim_active = cfg::aim::silent || cfg::aim::nobita;
         if (!aim_active || !data::g_in_match.load(std::memory_order_relaxed)) {
-            g_current_target = 0;
+            restore_state();
             return;
         }
 
         uint64_t local = data::g_local_player.load(std::memory_order_relaxed);
         if (!engine::mem::addr_valid(local)) {
-            g_current_target = 0;
+            restore_state();
             return;
         }
 
@@ -187,25 +141,21 @@ namespace engine::aim {
         if (cfg::aim::trigger_type == 1) { // On Fire
             bool is_firing = rpm<bool>(local + offsets::Player_IsFiring) || rpm<bool>(local + 0x848);
             if (!is_firing) {
-                g_current_target = 0;
+                restore_state();
                 return;
             }
         } else if (cfg::aim::trigger_type == 2) { // On Scope
             bool is_sight = rpm<bool>(local + offsets::Player_IsSight);
             if (!is_sight) {
-                g_current_target = 0;
+                restore_state();
                 return;
             }
         }
 
         // Resolve AimInfo with multi-version fallback (0xE58, 0xE50, 0xD80)
         uint64_t aim_info = rpm<uint64_t>(local + offsets::Player_AimInfo);
-        if (!engine::mem::addr_valid(aim_info)) {
-            aim_info = rpm<uint64_t>(local + 0xE50);
-        }
-        if (!engine::mem::addr_valid(aim_info)) {
-            aim_info = rpm<uint64_t>(local + 0xD80);
-        }
+        if (!engine::mem::addr_valid(aim_info)) aim_info = rpm<uint64_t>(local + 0xE50);
+        if (!engine::mem::addr_valid(aim_info)) aim_info = rpm<uint64_t>(local + 0xD80);
 
         float cx = static_cast<float>(display::width > 0 ? display::width : 2400) * 0.5f;
         float cy = static_cast<float>(display::height > 0 ? display::height : 1080) * 0.5f;
@@ -225,8 +175,17 @@ namespace engine::aim {
             }
 
             if (enemy_bone_world != Vector3::Zero()) {
-                // 1. Silent Aim (RayDir vector redirection - verified in STORM_MODS & NEXOMODSROOT)
+                // 1. Silent Aim with clean safety save/restore
                 if (cfg::aim::silent && engine::mem::addr_valid(aim_info)) {
+                    if (!s_silent_modified || s_last_aim_info != aim_info) {
+                        Vector3 current_dir = rpm<Vector3>(aim_info + offsets::AimInfo_Direction);
+                        if (current_dir != Vector3::Zero()) {
+                            s_saved_dir = current_dir;
+                        }
+                        s_last_aim_info = aim_info;
+                        s_silent_modified = true;
+                    }
+
                     Vector3 start_pos = rpm<Vector3>(aim_info + offsets::AimInfo_StartPosition);
                     if (start_pos == Vector3::Zero()) {
                         uint64_t my_head_node = rpm<uint64_t>(local + offsets::Bone_Head);
@@ -237,10 +196,22 @@ namespace engine::aim {
                         Vector3 dir = enemy_bone_world - start_pos;
                         wpm<Vector3>(aim_info + offsets::AimInfo_Direction, dir);
                     }
+                } else if (!cfg::aim::silent && s_silent_modified) {
+                    // Revert silent aim if turned off
+                    if (engine::mem::addr_valid(s_last_aim_info) && s_saved_dir != Vector3::Zero()) {
+                        wpm<Vector3>(s_last_aim_info + offsets::AimInfo_Direction, s_saved_dir);
+                    }
+                    s_silent_modified = false;
                 }
 
-                // 2. Nobita Mode / Aim Lock (Rotation quaternion write - verified in STORM_MODS)
+                // 2. Nobita Mode with clean safety save/restore
                 if (cfg::aim::nobita) {
+                    if (!s_nobita_modified || s_last_local != local) {
+                        s_saved_rot = rpm<Quaternion>(local + offsets::Player_Rotation);
+                        s_last_local = local;
+                        s_nobita_modified = true;
+                    }
+
                     uint64_t follow = rpm<uint64_t>(local + offsets::Player_Camera);
                     if (!follow) follow = rpm<uint64_t>(local + 0x690);
                     uint64_t cam = follow ? rpm<uint64_t>(follow + offsets::Camera_Follow) : 0;
@@ -296,10 +267,17 @@ namespace engine::aim {
                             wpm<Quaternion>(local + 0x614, final_rot);
                         }
                     }
+                } else if (!cfg::aim::nobita && s_nobita_modified) {
+                    // Revert Nobita rotation if turned off
+                    if (engine::mem::addr_valid(s_last_local) && (s_saved_rot.w != 0.0f || s_saved_rot.x != 0.0f)) {
+                        wpm<Quaternion>(s_last_local + offsets::Player_Rotation, s_saved_rot);
+                        wpm<Quaternion>(s_last_local + 0x614, s_saved_rot);
+                    }
+                    s_nobita_modified = false;
                 }
             }
         } else {
-            g_current_target = 0;
+            restore_state();
         }
     }
 
