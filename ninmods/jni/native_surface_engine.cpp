@@ -27,6 +27,7 @@
 #include "engine/data/game_data.hpp"
 #include "engine/esp.hpp"
 #include "engine/aimbot.hpp"
+#include "engine/shared_channel.hpp"
 #include "logger.h"
 
 namespace {
@@ -316,6 +317,51 @@ JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_fetchESPData(
     jsize len = env->GetArrayLength(outBuffer);
     if (len < 5) return 0;
 
+    static engine::shm::SharedChannel* s_shm = nullptr;
+    if (!s_shm) {
+        s_shm = engine::shm::open_shm(false);
+    }
+
+    // Sync UI control options into Shared Memory for Root Engine
+    if (s_shm && s_shm->magic == GEMINI_SHM_MAGIC) {
+        s_shm->config.esp_enabled     = cfg::esp::enabled;
+        s_shm->config.tracer_enabled  = cfg::esp::tracer;
+        s_shm->config.box_enabled     = cfg::esp::box;
+        s_shm->config.health_enabled  = cfg::esp::health;
+        s_shm->config.aim_enabled     = cfg::aim::enabled;
+        s_shm->config.aim_target      = cfg::aim::target_bone;
+        s_shm->config.aim_fov         = cfg::aim::fov;
+        s_shm->config.aim_smooth      = cfg::aim::smooth;
+        s_shm->config.zero_recoil     = cfg::aim::zero_recoil;
+
+        if (s_shm->entity_count > 0) {
+            jfloat temp[1024];
+            temp[0] = cfg::aim::draw_fov ? 1.0f : 0.0f;
+            temp[1] = cfg::aim::fov;
+            temp[2] = static_cast<float>(cfg::esp::box_col_idx);
+            temp[3] = static_cast<float>(cfg::esp::vis_col_idx);
+            temp[4] = cfg::esp::tracer ? 1.0f : 0.0f;
+
+            int idx = 5;
+            for (int i = 0; i < s_shm->entity_count && idx + 8 <= len && idx + 8 <= 1024; i++) {
+                const auto& e = s_shm->entities[i];
+                if (!e.is_on_screen) continue;
+
+                temp[idx++] = e.head_x;
+                temp[idx++] = e.head_y;
+                temp[idx++] = e.toe_x;
+                temp[idx++] = e.toe_y;
+                temp[idx++] = e.distance;
+                temp[idx++] = static_cast<float>(e.hp > 0 ? e.hp : 100);
+                temp[idx++] = e.is_visible ? 1.0f : 0.0f;
+                temp[idx++] = e.is_tracer ? 1.0f : 0.0f;
+            }
+            env->SetFloatArrayRegion(outBuffer, 0, idx, temp);
+            return idx;
+        }
+    }
+
+    // Fallback: local engine reading
     jfloat temp[1024];
     temp[0] = cfg::aim::draw_fov ? 1.0f : 0.0f;
     temp[1] = cfg::aim::fov;
@@ -349,6 +395,9 @@ JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_fetchESPData(
 
 JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_getTargetPid(
     JNIEnv* env, jclass clazz) {
+    static engine::shm::SharedChannel* s_shm = nullptr;
+    if (!s_shm) s_shm = engine::shm::open_shm(false);
+    if (s_shm && s_shm->active_pid > 0) return s_shm->active_pid;
     if (engine::mem::g_pid > 0) return engine::mem::g_pid;
     if (proc::pid > 0) return proc::pid;
     return engine::mem::g_detected_pid;

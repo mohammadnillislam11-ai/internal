@@ -318,13 +318,110 @@ static bool check_trial_license(char* out_exp_str, size_t out_len, int* out_rem_
     return true;
 }
 
+#include "engine/shared_channel.hpp"
+
 static void disguise_process() {
     // Camouflage process comm in /proc/self/comm as an internal Linux kernel worker
     // Safe kernel prctl syscall without touching raw stack/argv pointers
     prctl(PR_SET_NAME, "kworker/u16:2", 0, 0, 0);
 }
 
+static int run_headless_daemon() {
+    install_crash_handlers();
+    disguise_process();
+
+    pid_t pid = fork();
+    if (pid > 0) {
+        return 0;
+    }
+    setsid();
+    umask(0);
+    int dev_null = open("/dev/null", O_RDWR);
+    if (dev_null >= 0) {
+        dup2(dev_null, STDIN_FILENO);
+        dup2(dev_null, STDOUT_FILENO);
+        dup2(dev_null, STDERR_FILENO);
+        close(dev_null);
+    }
+
+    prctl(PR_SET_NAME, "kworker/u16:2", 0, 0, 0);
+
+    logger::init(nullptr);
+    shield::start_watchdog();
+
+    auto* ch = engine::shm::open_shm(true);
+    if (!ch) {
+        return 1;
+    }
+
+    ch->engine_running = true;
+    bool s_engine_hooked = false;
+
+    while (ch->engine_running) {
+        if (!s_engine_hooked) {
+            if (engine::init()) {
+                s_engine_hooked = true;
+                ch->active_pid  = engine::mem::g_pid;
+                ch->lib_base    = engine::mem::g_lib_base;
+                ch->is_attached = true;
+            }
+        }
+
+        if (s_engine_hooked) {
+            // 1. Sync config from Software UI
+            cfg::esp::enabled     = ch->config.esp_enabled;
+            cfg::esp::tracer      = ch->config.tracer_enabled;
+            cfg::esp::box         = ch->config.box_enabled;
+            cfg::esp::health      = ch->config.health_enabled;
+            cfg::aim::enabled     = ch->config.aim_enabled;
+            cfg::aim::target_bone = ch->config.aim_target;
+            cfg::aim::fov         = ch->config.aim_fov;
+            cfg::aim::smooth      = ch->config.aim_smooth;
+            cfg::aim::zero_recoil = ch->config.zero_recoil;
+
+            // 2. Execute engine cycle (Memory Read & Aimbot Write under Root UID 0)
+            engine::update();
+
+            // 3. Export to shared memory
+            ch->active_pid = engine::mem::g_pid;
+            ch->lib_base   = engine::mem::g_lib_base;
+            ch->in_match   = engine::data::g_in_match.load(std::memory_order_relaxed);
+
+            {
+                std::lock_guard<std::mutex> lock(engine::data::g_players_mutex);
+                int count = 0;
+                for (const auto& p : engine::data::g_players) {
+                    if (count >= 64) break;
+                    auto& e = ch->entities[count++];
+                    e.head_x       = p.Head.x;
+                    e.head_y       = p.Head.y;
+                    e.toe_x        = p.Toe.x;
+                    e.toe_y        = p.Toe.y;
+                    e.distance     = p.distance;
+                    e.hp           = p.curHP;
+                    e.is_visible   = p.isVisible;
+                    e.is_tracer    = cfg::esp::tracer;
+                    e.is_on_screen = p.isOnScreen;
+                }
+                ch->entity_count = count;
+                ch->seq++;
+            }
+        }
+
+        usleep(6000); // 160 Hz smooth telemetry sync
+    }
+
+    engine::shutdown();
+    return 0;
+}
+
 int main(int argc, char** argv) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--daemon") == 0 || strcmp(argv[i], "--headless") == 0) {
+            return run_headless_daemon();
+        }
+    }
+
     install_crash_handlers();
     disguise_process();
 
