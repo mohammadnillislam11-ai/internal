@@ -16,6 +16,7 @@
         android:roundIcon="@drawable/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.Gemini">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,6 +26,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Official Floating Menu & N Puck Overlay Service -->
+        <service
+            android:name=".FloatingService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>

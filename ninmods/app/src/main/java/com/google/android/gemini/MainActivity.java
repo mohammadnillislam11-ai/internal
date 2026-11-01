@@ -1,11 +1,14 @@
 package com.google.android.gemini;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -20,12 +23,14 @@ import java.io.OutputStream;
 
 public class MainActivity extends Activity {
 
+    private static final int REQUEST_OVERLAY_PERMISSION = 2026;
+
     private TextView tvRootStatus;
     private TextView tvOverlayStatus;
     private TextView tvStatus;
     private Button btnToggleEngine;
 
-    private boolean isRunning = false;
+    private boolean isRooted = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
@@ -39,112 +44,172 @@ public class MainActivity extends Activity {
         btnToggleEngine = findViewById(R.id.btnToggleEngine);
 
         btnToggleEngine.setOnClickListener(v -> toggleEngine());
-
-        checkRootAndEnvironment();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        checkIfEngineRunning();
+        checkPermissionsAndEnvironment();
     }
 
-    private void checkRootAndEnvironment() {
+    private void checkPermissionsAndEnvironment() {
         new Thread(() -> {
-            boolean hasRoot = executeRootCommand("id").contains("uid=0");
-            if (hasRoot) {
-                // Silently auto-grant SYSTEM_ALERT_WINDOW permission via root
+            isRooted = checkRootAccess();
+
+            if (isRooted) {
+                // Silently auto-grant overlay permission via root if possible
                 executeRootCommand("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
                 executeRootCommand("settings put system block_untrusted_touches 0");
                 executeRootCommand("settings put global block_untrusted_touches 0");
             }
 
+            boolean canDraw = hasOverlayPermission();
+
             mainHandler.post(() -> {
-                if (hasRoot) {
-                    tvRootStatus.setText("Active (Rooted)");
+                if (isRooted) {
+                    tvRootStatus.setText("Rooted (Full Access)");
                     tvRootStatus.setTextColor(Color.parseColor("#00E676"));
-                    tvOverlayStatus.setText("Granted & Ready");
+                } else {
+                    tvRootStatus.setText("Non-Root Mode");
+                    tvRootStatus.setTextColor(Color.parseColor("#00E5FF"));
+                }
+
+                if (canDraw) {
+                    tvOverlayStatus.setText("Permission Granted");
                     tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
                 } else {
-                    tvRootStatus.setText("Root Not Detected");
-                    tvRootStatus.setTextColor(Color.parseColor("#FF5252"));
-                    tvOverlayStatus.setText("Manual Grant Needed");
-                    tvOverlayStatus.setTextColor(Color.parseColor("#FFA000"));
+                    tvOverlayStatus.setText("Permission Required");
+                    tvOverlayStatus.setTextColor(Color.parseColor("#FF5252"));
                 }
-            });
 
-            checkIfEngineRunning();
+                updateUiState(FloatingService.isServiceRunning);
+            });
         }).start();
     }
 
-    private void checkIfEngineRunning() {
-        new Thread(() -> {
-            String pgrep = executeRootCommand("pgrep -f gemini-engine");
-            boolean active = !pgrep.trim().isEmpty();
-            mainHandler.post(() -> updateUiState(active));
-        }).start();
+    private boolean hasOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return Settings.canDrawOverlays(this);
+        }
+        return true;
+    }
+
+    private void requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Toast.makeText(this, "Please enable 'Display over other apps' for NINMODS", Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName())
+            );
+            startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+            if (hasOverlayPermission()) {
+                tvOverlayStatus.setText("Permission Granted");
+                tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
+                Toast.makeText(this, "Permission granted! Tap START to launch floating N icon", Toast.LENGTH_SHORT).show();
+            } else {
+                tvOverlayStatus.setText("Permission Denied");
+                tvOverlayStatus.setTextColor(Color.parseColor("#FF5252"));
+                Toast.makeText(this, "Overlay permission is required to display the floating menu", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private void updateUiState(boolean active) {
-        this.isRunning = active;
         if (active) {
             btnToggleEngine.setText("STOP ENGINE");
             btnToggleEngine.setBackgroundResource(R.drawable.btn_stop_bg);
-            tvStatus.setText("Floating menu is active on screen");
+            tvStatus.setText("Floating 'N' icon is active on screen");
             tvStatus.setTextColor(Color.parseColor("#00E676"));
         } else {
             btnToggleEngine.setText("START ENGINE");
             btnToggleEngine.setBackgroundResource(R.drawable.btn_start_bg);
-            tvStatus.setText("Tap START to launch floating menu");
+            tvStatus.setText("Tap START to launch floating N icon");
             tvStatus.setTextColor(Color.parseColor("#9AA0B6"));
         }
     }
 
     private void toggleEngine() {
+        if (!hasOverlayPermission()) {
+            requestOverlayPermission();
+            return;
+        }
+
         btnToggleEngine.setEnabled(false);
 
-        if (isRunning) {
-            tvStatus.setText("Stopping floating engine...");
-            new Thread(() -> {
-                executeRootCommand("killall -9 gemini-engine 2>/dev/null; pkill -9 -f gemini-engine 2>/dev/null");
-                try { Thread.sleep(300); } catch (Exception ignored) {}
-                mainHandler.post(() -> {
-                    btnToggleEngine.setEnabled(true);
-                    updateUiState(false);
-                    Toast.makeText(MainActivity.this, "Engine Stopped", Toast.LENGTH_SHORT).show();
-                });
-            }).start();
+        if (FloatingService.isServiceRunning) {
+            // Stop Overlay Service
+            stopService(new Intent(this, FloatingService.class));
+
+            if (isRooted) {
+                new Thread(() -> {
+                    executeRootCommand("killall -9 gemini-engine 2>/dev/null; pkill -9 -f gemini-engine 2>/dev/null");
+                }).start();
+            }
+
+            mainHandler.postDelayed(() -> {
+                btnToggleEngine.setEnabled(true);
+                updateUiState(false);
+                Toast.makeText(MainActivity.this, "NINMODS Engine Stopped", Toast.LENGTH_SHORT).show();
+            }, 300);
+
         } else {
-            tvStatus.setText("Launching floating engine...");
-            new Thread(() -> {
-                File targetFile = extractEngineBinary();
-                if (targetFile == null || !targetFile.exists()) {
-                    mainHandler.post(() -> {
-                        btnToggleEngine.setEnabled(true);
-                        tvStatus.setText("Error: Engine binary not found");
-                        tvStatus.setTextColor(Color.parseColor("#FF5252"));
-                    });
-                    return;
-                }
+            // Start Official Floating Service
+            Intent serviceIntent = new Intent(this, FloatingService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
 
-                // Grant executable permissions
-                executeRootCommand("chmod 777 " + targetFile.getAbsolutePath());
+            // If Rooted, also launch background native memory worker
+            if (isRooted) {
+                new Thread(() -> {
+                    File targetFile = extractEngineBinary();
+                    if (targetFile != null && targetFile.exists()) {
+                        executeRootCommand("chmod 777 " + targetFile.getAbsolutePath());
+                        String launchCmd = targetFile.getAbsolutePath() + " > " + getFilesDir().getAbsolutePath() + "/engine.log 2>&1 &";
+                        executeRootCommand(launchCmd);
+                    }
+                }).start();
+            }
 
-                // Launch engine detached with root
-                String launchCmd = targetFile.getAbsolutePath() + " > " + getFilesDir().getAbsolutePath() + "/engine.log 2>&1 &";
-                executeRootCommand(launchCmd);
+            mainHandler.postDelayed(() -> {
+                btnToggleEngine.setEnabled(true);
+                updateUiState(true);
+                Toast.makeText(MainActivity.this, "NINMODS Floating Icon Launched!", Toast.LENGTH_SHORT).show();
 
-                try { Thread.sleep(600); } catch (Exception ignored) {}
+                // Automatically minimize app to display floating 'N' icon directly on screen/game
+                mainHandler.postDelayed(() -> moveTaskToBack(true), 400);
+            }, 400);
+        }
+    }
 
-                mainHandler.post(() -> {
-                    btnToggleEngine.setEnabled(true);
-                    updateUiState(true);
-                    Toast.makeText(MainActivity.this, "Gemini Engine Started", Toast.LENGTH_SHORT).show();
+    private boolean checkRootAccess() {
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec("su");
+            OutputStream stdin = p.getOutputStream();
+            stdin.write("id\nexit\n".getBytes());
+            stdin.flush();
+            stdin.close();
 
-                    // Automatically minimize app to display floating overlay directly on game
-                    mainHandler.postDelayed(() -> moveTaskToBack(true), 400);
-                });
-            }).start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line = reader.readLine();
+            p.waitFor();
+            return line != null && line.contains("uid=0");
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (p != null) {
+                try { p.destroy(); } catch (Exception ignored) {}
+            }
         }
     }
 
@@ -166,7 +231,6 @@ public class MainActivity extends Activity {
                 }
             }
 
-            // Fallback: If specific arch asset not found, test alternative
             try (InputStream in = getAssets().open(assetName)) {
                 try (OutputStream out = new FileOutputStream(outFile)) {
                     byte[] buffer = new byte[8192];
@@ -177,7 +241,6 @@ public class MainActivity extends Activity {
                     out.flush();
                 }
             } catch (Exception e) {
-                // If named arch asset fails, try default gemini-engine
                 try (InputStream inFallback = getAssets().open("gemini-engine")) {
                     try (OutputStream out = new FileOutputStream(outFile)) {
                         byte[] buffer = new byte[8192];
@@ -194,7 +257,6 @@ public class MainActivity extends Activity {
             outFile.setReadable(true, false);
             return outFile;
         } catch (Exception e) {
-            e.printStackTrace();
             return null;
         }
     }
@@ -217,8 +279,7 @@ public class MainActivity extends Activity {
                 output.append(line).append("\n");
             }
             process.waitFor();
-        } catch (Exception e) {
-            // Root not accessible
+        } catch (Exception ignored) {
         } finally {
             if (process != null) {
                 try { process.destroy(); } catch (Exception ignored) {}

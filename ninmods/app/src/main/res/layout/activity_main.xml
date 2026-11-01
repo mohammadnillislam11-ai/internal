@@ -13,28 +13,28 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- App Logo / Title -->
+    <!-- App Logo (Stylized 'N') -->
     <ImageView
-        android:layout_width="72dp"
-        android:layout_height="72dp"
-        android:src="@drawable/ic_launcher"
-        android:contentDescription="Gemini Logo" />
+        android:layout_width="88dp"
+        android:layout_height="88dp"
+        android:src="@drawable/logo_n"
+        android:contentDescription="NINMODS Logo" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="GEMINI ENGINE"
+        android:text="NINMODS"
         android:textColor="@color/text_white"
-        android:textSize="24sp"
+        android:textSize="26sp"
         android:textStyle="bold"
-        android:letterSpacing="0.05" />
+        android:letterSpacing="0.06" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="Standalone Native Floating System"
+        android:text="Official Standalone Floating System"
         android:textColor="@color/accent_cyan"
         android:textSize="13sp" />
 
@@ -87,7 +87,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Root Privileges"
+                android:text="Environment"
                 android:textColor="@color/text_gray"
                 android:textSize="14sp" />
 
@@ -118,7 +118,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Floating Overlay"
+                android:text="Display Over Other Apps"
                 android:textColor="@color/text_gray"
                 android:textSize="14sp" />
 
@@ -126,8 +126,8 @@
                 android:id="@+id/tvOverlayStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Auto-Configured"
-                android:textColor="@color/accent_green"
+                android:text="Checking..."
+                android:textColor="@color/accent_cyan"
                 android:textSize="13sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -153,7 +153,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="Tap START to launch floating menu"
+        android:text="Tap START to launch floating N icon"
         android:textColor="@color/text_gray"
         android:textSize="13sp" />
 
