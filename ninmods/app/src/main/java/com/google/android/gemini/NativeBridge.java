@@ -59,6 +59,5 @@ public class NativeBridge {
     public static native int fetchESPData(float[] buffer);
     public static native String popClipboardRequest();
     public static native int getTargetPid();
-    public static native void setMemoryFd(int fd);
 }
 

@@ -312,31 +312,17 @@ namespace engine::mem {
         if (pid <= 0 || !module_name) return 0;
 
         char mp[64];
-        int ps = 0;
-        const char* ps_ = oxorany("/proc/");
-        while (*ps_) mp[ps++] = *ps_++;
-
-        char pds[16];
-        int pl = 0;
-        int tm = pid;
-        while (tm > 0) { pds[pl++] = '0' + (tm % 10); tm /= 10; }
-        for (int i = pl - 1; i >= 0; i--) mp[ps++] = pds[i];
-
-        const char* ms = oxorany("/maps");
-        while (*ms) mp[ps++] = *ms++;
-        mp[ps] = '\0';
+        snprintf(mp, sizeof(mp), "/proc/%d/maps", pid);
 
         int mfd = sys::openat(AT_FDCWD, mp, O_RDONLY);
         if (mfd < 0) {
             mfd = open(mp, O_RDONLY);
         }
-        sys::wipe(mp,  sizeof(mp));
-        sys::wipe(pds, sizeof(pds));
 
-        uintptr_t base_addr = 0;
+        uintptr_t best_base = 0;
 
         if (mfd >= 0) {
-            char buf[4096];
+            char buf[8192];
             char line[512];
             int  lpos = 0;
 
@@ -350,8 +336,8 @@ namespace engine::mem {
                         line[lpos] = '\0';
 
                         if (strstr(line, module_name) && (strstr(line, "r--p") || strstr(line, "r-xp"))) {
+                            uint64_t st = 0, en = 0;
                             char* cur = line;
-                            uintptr_t parsed = 0;
                             while (*cur && *cur != '-') {
                                 char h = *cur++;
                                 int digit = 0;
@@ -359,13 +345,33 @@ namespace engine::mem {
                                 else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
                                 else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
                                 else break;
-                                parsed = (parsed << 4) | digit;
+                                st = (st << 4) | digit;
                             }
-                            base_addr = parsed;
-                            sys::wipe(line, sizeof(line));
-                            sys::wipe(buf, sizeof(buf));
-                            sys::close(mfd);
-                            return base_addr;
+                            if (*cur == '-') cur++;
+                            while (*cur && *cur != ' ') {
+                                char h = *cur++;
+                                int digit = 0;
+                                if (h >= '0' && h <= '9') digit = h - '0';
+                                else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
+                                else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
+                                else break;
+                                en = (en << 4) | digit;
+                            }
+
+                            // ZqwClient verified mapping filter: (en - st) < 0x5100000
+                            if (st > 0 && (en == 0 || (en - st) < 0x5100000)) {
+                                if (best_base == 0) best_base = st;
+
+                                // Fast verify ELF magic if readable directly
+                                uint32_t magic = 0;
+                                struct iovec loc{&magic, sizeof(magic)};
+                                struct iovec rem{reinterpret_cast<void*>(st), sizeof(magic)};
+                                if (sys::vm_read(pid, &loc, 1, &rem, 1) == sizeof(magic) && magic == 0x464C457F) {
+                                    best_base = st;
+                                    sys::close(mfd);
+                                    return best_base;
+                                }
+                            }
                         }
                         lpos = 0;
                     } else {
@@ -375,42 +381,16 @@ namespace engine::mem {
             }
 
             sys::close(mfd);
-            sys::wipe(buf, sizeof(buf));
-            sys::wipe(line, sizeof(line));
         }
 
-        // Rung 3 Root Fallback: unlock /proc/<pid>/maps and mem permissions and locate module base via su
-        if (base_addr == 0) {
-            char cmd[256];
-            snprintf(cmd, sizeof(cmd), "su -c 'chmod 666 /proc/%d/maps /proc/%d/mem 2>/dev/null; grep %s /proc/%d/maps | head -n 1'", pid, pid, module_name, pid);
-            FILE* fp = popen(cmd, "r");
-            if (fp) {
-                char sline[512] = {0};
-                if (fgets(sline, sizeof(sline), fp)) {
-                    uintptr_t parsed = 0;
-                    char* cur = sline;
-                    while (*cur && *cur != '-') {
-                        char h = *cur++;
-                        int digit = 0;
-                        if (h >= '0' && h <= '9') digit = h - '0';
-                        else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
-                        else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
-                        else break;
-                        parsed = (parsed << 4) | digit;
-                    }
-                    pclose(fp);
-                    if (parsed > 0) return parsed;
-                } else {
-                    pclose(fp);
-                }
-            }
-        }
-
-        return base_addr;
+        return best_base;
     }
 
     /**
-     * @brief Low-level memory read executing direct vm_read syscall with /proc/$pid/mem fallback.
+     * @brief Triple-engine high-performance memory reader.
+     *        1. Direct Kernel Assembly SVC #0 (0-libc overhead, native speed).
+     *        2. Standard Bionic process_vm_readv (seamless emulator & translation layer support).
+     *        3. Direct /proc/<pid>/mem cached pread64.
      */
     inline bool read_raw(uintptr_t address, void* buffer, size_t size) {
         int target_pid = (g_pid > 0) ? g_pid : proc::pid;
@@ -424,42 +404,23 @@ namespace engine::mem {
         remote_iov.iov_base = reinterpret_cast<void*>(address);
         remote_iov.iov_len  = size;
 
+        // Engine 1: Direct Kernel Assembly SVC #0
         long r = sys::vm_read(target_pid, &local_iov, 1, &remote_iov, 1);
         if (r == static_cast<long>(size)) return true;
 
+        // Engine 2: Libc process_vm_readv
+        ssize_t lr = process_vm_readv(target_pid, &local_iov, 1, &remote_iov, 1, 0);
+        if (lr == static_cast<ssize_t>(size)) return true;
+
+        // Engine 3: Cached /proc/<pid>/mem pread64
         if (g_mem_fd < 0) {
             char mem_path[64];
             snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", target_pid);
-            g_mem_fd = open(mem_path, O_RDWR);
-            if (g_mem_fd < 0) {
-                g_mem_fd = open(mem_path, O_RDONLY);
-            }
-            if (g_mem_fd < 0) {
-                // Try known su binary locations on Android Magisk / KernelSU / APatch
-                const char* su_bins[] = {
-                    "/data/adb/ksu/bin/su", "/data/adb/ap/bin/su", "/data/adb/magisk/su",
-                    "/system/xbin/su", "/system/bin/su", "/sbin/su", "su"
-                };
-                for (const char* su_bin : su_bins) {
-                    char ucmd[160];
-                    snprintf(ucmd, sizeof(ucmd), "%s -c 'setenforce 0; echo 0 > /proc/sys/kernel/yama/ptrace_scope; chmod 666 %s 2>/dev/null'", su_bin, mem_path);
-                    system(ucmd);
-                    g_mem_fd = open(mem_path, O_RDWR);
-                    if (g_mem_fd < 0) g_mem_fd = open(mem_path, O_RDONLY);
-                    if (g_mem_fd >= 0) break;
-                }
-            }
+            g_mem_fd = open(mem_path, O_RDONLY);
         }
-
         if (g_mem_fd >= 0) {
-            ssize_t pr = pread64(g_mem_fd, buffer, size, address);
-            if (pr == static_cast<ssize_t>(size)) {
-                return true;
-            }
-            if (pr < 0 && (errno == EBADF || errno == EIO || errno == EACCES)) {
-                close(g_mem_fd);
-                g_mem_fd = -1;
-            }
+            ssize_t pr = pread64(g_mem_fd, buffer, size, static_cast<off64_t>(address));
+            if (pr == static_cast<ssize_t>(size)) return true;
         }
 
         memset(buffer, 0, size);
@@ -467,7 +428,7 @@ namespace engine::mem {
     }
 
     /**
-     * @brief Low-level memory write executing direct vm_write syscall with /proc/$pid/mem fallback.
+     * @brief Triple-engine high-performance memory writer.
      */
     inline bool write_raw(uintptr_t address, const void* buffer, size_t size) {
         int target_pid = (g_pid > 0) ? g_pid : proc::pid;
@@ -481,27 +442,23 @@ namespace engine::mem {
         remote_iov.iov_base = reinterpret_cast<void*>(address);
         remote_iov.iov_len  = size;
 
+        // Engine 1: Direct Kernel Assembly SVC #0
         long r = sys::vm_write(target_pid, &local_iov, 1, &remote_iov, 1);
         if (r == static_cast<long>(size)) return true;
 
+        // Engine 2: Libc process_vm_writev
+        ssize_t lr = process_vm_writev(target_pid, &local_iov, 1, &remote_iov, 1, 0);
+        if (lr == static_cast<ssize_t>(size)) return true;
+
+        // Engine 3: Cached /proc/<pid>/mem pwrite64
         if (g_mem_fd < 0) {
             char mem_path[64];
             snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", target_pid);
             g_mem_fd = open(mem_path, O_RDWR);
-            if (g_mem_fd < 0) {
-                g_mem_fd = open(mem_path, O_RDONLY);
-            }
-            if (g_mem_fd < 0) {
-                char ucmd[80];
-                snprintf(ucmd, sizeof(ucmd), "su -c 'chmod 666 %s 2>/dev/null'", mem_path);
-                system(ucmd);
-                g_mem_fd = open(mem_path, O_RDWR);
-                if (g_mem_fd < 0) g_mem_fd = open(mem_path, O_RDONLY);
-            }
         }
-
         if (g_mem_fd >= 0) {
-            return (pwrite64(g_mem_fd, buffer, size, address) == static_cast<ssize_t>(size));
+            ssize_t pw = pwrite64(g_mem_fd, buffer, size, static_cast<off64_t>(address));
+            if (pw == static_cast<ssize_t>(size)) return true;
         }
 
         return false;

@@ -352,13 +352,4 @@ JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_getTargetPid(
     return (engine::mem::g_pid > 0) ? engine::mem::g_pid : proc::pid;
 }
 
-JNIEXPORT void JNICALL Java_com_google_android_gemini_NativeBridge_setMemoryFd(
-    JNIEnv* env, jclass clazz, jint fd) {
-    if (fd >= 0) {
-        if (engine::mem::g_mem_fd >= 0) close(engine::mem::g_mem_fd);
-        engine::mem::g_mem_fd = fd;
-        logger::log_success("[MEM] Direct Kernel Memory FD injected: %d", fd);
-    }
-}
-
 }

@@ -4,7 +4,7 @@
 /**
  * @file offsets.hpp
  * @brief Memory offsets and RVA hooks for Target Game (com.dts.freefireth).
- * Sourced and standardized from official game analysis.
+ * Sourced and standardized from ZqwClient verified structure.
  */
 
 namespace offsets {
@@ -26,24 +26,24 @@ namespace offsets {
     constexpr uintptr_t Dict_EntryStride     = 0x18;
     constexpr uintptr_t Dict_EntryValue      = 0x10;
 
-    /** @brief PLAYER FIELDS */
-    constexpr uintptr_t Player_Rotation      = 0x61C;
-    constexpr uintptr_t Player_HeadTF        = 0x6A8;
+    /** @brief PLAYER FIELDS - Aligned strictly with ZqwClient verified structure */
+    constexpr uintptr_t Player_Rotation      = 0x614;
+    constexpr uintptr_t Player_HeadTF        = 0x6A0;
     constexpr uintptr_t Player_FootTF        = 0x6E8;
-    constexpr uintptr_t Player_Camera        = 0x698;
-    constexpr uintptr_t Player_IsFiring      = 0x850;
+    constexpr uintptr_t Player_Camera        = 0x690;
+    constexpr uintptr_t Player_IsFiring      = 0x848;
     constexpr uintptr_t Player_IsSight       = 0x8A0;
     constexpr uintptr_t Player_HP            = 0x70;
     constexpr uintptr_t Player_Armor         = 0x74;
     constexpr uintptr_t Player_IsDead        = 0x7C;
-    constexpr uintptr_t Player_Avatar        = 0x778;
-    constexpr uintptr_t Player_HeadCollider  = 0x740;
+    constexpr uintptr_t Player_Avatar        = 0x770;
+    constexpr uintptr_t Player_HeadCollider  = 0x738;
     constexpr uintptr_t Player_ColWrite      = 0x80;
     constexpr uintptr_t Player_DeathInfo     = 0x24A8;
-    constexpr uintptr_t Player_IsBot         = 0x4A8;
+    constexpr uintptr_t Player_IsBot         = 0x4A0;
     
-    constexpr uintptr_t Player_Name          = 0x498;
-    constexpr uintptr_t Player_AimInfo       = 0xE58;
+    constexpr uintptr_t Player_Name          = 0x490;
+    constexpr uintptr_t Player_AimInfo       = 0xE50;
     constexpr uintptr_t Player_Velocity      = 0xF0;
     constexpr uintptr_t Player_IsGrounded    = 0x11C;
     constexpr uintptr_t Player_FOVOffset     = 0x84;
