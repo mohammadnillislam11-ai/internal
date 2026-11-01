@@ -20,6 +20,7 @@
 
 #include "menu/menu.hpp"
 #include "menu/bar.hpp"
+#include "menu/styles.h"
 #include "engine/engine.hpp"
 #include "engine/game_data.hpp"
 #include "engine/esp.hpp"
@@ -157,6 +158,8 @@ namespace {
 
             int sw = g_screen_w > 0 ? g_screen_w : 1920;
             int sh = g_screen_h > 0 ? g_screen_h : 1080;
+            g_sw = static_cast<float>(sw);
+            g_sh = static_cast<float>(sh);
 
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplAndroid_NewFrame(sw, sh);

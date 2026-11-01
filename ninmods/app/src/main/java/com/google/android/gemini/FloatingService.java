@@ -96,17 +96,32 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         NativeBridge.surfaceDestroyed();
     }
 
+    private boolean isTrackingTouch = false;
+
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         float x = event.getX();
         float y = event.getY();
-        int action = event.getAction();
+        int action = event.getActionMasked();
 
-        // Forward raw touch event directly to C++ ImGui IO
-        NativeBridge.onTouch(action, x, y);
+        if (action == MotionEvent.ACTION_DOWN) {
+            isTrackingTouch = NativeBridge.isTouchInside(x, y);
+            if (isTrackingTouch) {
+                NativeBridge.onTouch(action, x, y);
+                return true;
+            }
+            return false;
+        }
 
-        // Only consume touch if user touches C++ ImGui menu or floating puck
-        return NativeBridge.isTouchInside(x, y);
+        if (isTrackingTouch) {
+            NativeBridge.onTouch(action, x, y);
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                isTrackingTouch = false;
+            }
+            return true;
+        }
+
+        return false;
     }
 
     @Override

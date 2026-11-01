@@ -645,19 +645,25 @@ namespace ui::menu {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, {0,0,0,0});
         ImGui::PushStyleColor(ImGuiCol_Border, {0,0,0,0});
 
-        ImVec2 wsz(860.f, 530.f);
-        if (wsz.x > g_sw && g_sw > 0.f) wsz.x = g_sw * 0.94f;
-        if (wsz.y > g_sh && g_sh > 0.f) wsz.y = g_sh * 0.94f;
+        ImGuiIO& io = ImGui::GetIO();
+        float sw = g_sw > 100.f ? g_sw : (io.DisplaySize.x > 100.f ? io.DisplaySize.x : 1920.f);
+        float sh = g_sh > 100.f ? g_sh : (io.DisplaySize.y > 100.f ? io.DisplaySize.y : 1080.f);
+        g_sw = sw;
+        g_sh = sh;
+
+        ImVec2 wsz(780.f, 490.f);
+        if (wsz.x > sw * 0.94f) wsz.x = sw * 0.94f;
+        if (wsz.y > sh * 0.94f) wsz.y = sh * 0.94f;
         
         static bool s_menu_pos_init = false;
-        if (!s_menu_pos_init && g_sw > 0.f && g_sh > 0.f) {
-            g_menu_pos = {(g_sw - wsz.x) * 0.5f, (g_sh - wsz.y) * 0.5f};
+        if (!s_menu_pos_init && sw > 0.f && sh > 0.f) {
+            g_menu_pos = {(sw - wsz.x) * 0.5f, (sh - wsz.y) * 0.5f};
             s_menu_pos_init = true;
         }
-        if (g_sw > 0.f)
-            g_menu_pos.x = ImClamp(g_menu_pos.x, 0.f, ImMax(0.f, g_sw - wsz.x));
-        if (g_sh > 0.f)
-            g_menu_pos.y = ImClamp(g_menu_pos.y, 0.f, ImMax(0.f, g_sh - wsz.y));
+        float maxX = ImMax(0.f, sw - wsz.x);
+        float maxY = ImMax(0.f, sh - wsz.y);
+        g_menu_pos.x = ImClamp(g_menu_pos.x, 0.f, maxX);
+        g_menu_pos.y = ImClamp(g_menu_pos.y, 0.f, maxY);
 
         ImGui::SetNextWindowSize(wsz, ImGuiCond_Always);
         ImGui::SetNextWindowPos(g_menu_pos, ImGuiCond_Always);
@@ -711,62 +717,32 @@ namespace ui::menu {
         dl->AddText(ImGui::GetFont(), 13.0f, {logoX + logoSize + 14.f, wp.y + 36.f},
                     col(UITheme::accent_light, ma), "Global 64/32");
 
-        // Window control buttons: [ ] (center), — (minimize), X (close) - Exactly matching Mockup Image 2
-        float btnW = 42.f, btnH = 42.f;
-        float closeX = wp.x + ws.x - btnW - 12.f;
-        float minX   = closeX - btnW - 6.f;
-        float winX   = minX - btnW - 6.f;
+        // Single Close Button [X] - Tap to cleanly close menu and return to floating logo
+        float btnW = 44.f, btnH = 44.f;
+        float closeX = wp.x + ws.x - btnW - 14.f;
         float btnY   = wp.y + (headerH - btnH) * 0.5f;
 
-        // 1. Close Button [X]
-        bool hoverClose = (mp.x >= closeX - 4.f && mp.x <= closeX + btnW + 4.f &&
-                           mp.y >= btnY - 4.f && mp.y <= btnY + btnH + 4.f);
+        bool hoverClose = (mp.x >= closeX - 6.f && mp.x <= closeX + btnW + 6.f &&
+                           mp.y >= btnY - 6.f && mp.y <= btnY + btnH + 6.f);
         if (hoverClose) {
             bg->AddRectFilled({closeX, btnY}, {closeX + btnW, btnY + btnH},
-                              col(UITheme::danger, ma * 0.85f), 6.f);
+                              col(UITheme::danger, ma * 0.90f), 8.f);
             if (ImGui::IsMouseClicked(0)) {
                 bar::g_open = false;
                 drag = false;
                 storage::save_config();
-                logger::log_info("[MENU] Close button triggered. Config saved. Switched to floating puck.");
+                logger::log_info("[MENU] Close button tapped. Saved config and returned to floating puck.");
             }
+        } else {
+            bg->AddRectFilled({closeX, btnY}, {closeX + btnW, btnY + btnH},
+                              IM_COL32(35, 38, 55, (int)(180 * ma)), 8.f);
+            bg->AddRect({closeX, btnY}, {closeX + btnW, btnY + btnH},
+                        col(UITheme::border_light, ma * 0.6f), 8.f, 0, 1.2f);
         }
-        float cX = closeX + btnW * 0.5f, cY = btnY + btnH * 0.5f, cr = 7.f;
-        ImU32 closeCol = hoverClose ? IM_COL32(255, 255, 255, 255) : col(UITheme::text_dim, ma);
-        bg->AddLine({cX - cr, cY - cr}, {cX + cr, cY + cr}, closeCol, 2.2f);
-        bg->AddLine({cX - cr, cY + cr}, {cX + cr, cY - cr}, closeCol, 2.2f);
-
-        // 2. Minimize Button [—]
-        bool hoverMin = (mp.x >= minX - 4.f && mp.x <= minX + btnW + 4.f &&
-                         mp.y >= btnY - 4.f && mp.y <= btnY + btnH + 4.f);
-        if (hoverMin) {
-            bg->AddRectFilled({minX, btnY}, {minX + btnW, btnY + btnH},
-                              col(UITheme::widget, ma * 0.85f), 6.f);
-            if (ImGui::IsMouseClicked(0)) {
-                bar::g_open = false;
-                drag = false;
-                storage::save_config();
-                logger::log_info("[MENU] Minimize button triggered. Config saved. Switched to floating puck.");
-            }
-        }
-        float mX = minX + btnW * 0.5f, mY = btnY + btnH * 0.5f, mr = 7.f;
-        ImU32 minCol = hoverMin ? IM_COL32(255, 255, 255, 255) : col(UITheme::text_dim, ma);
-        bg->AddLine({mX - mr, mY}, {mX + mr, mY}, minCol, 2.2f);
-
-        // 3. Center / Window Button [ ]
-        bool hoverWin = (mp.x >= winX - 4.f && mp.x <= winX + btnW + 4.f &&
-                         mp.y >= btnY - 4.f && mp.y <= btnY + btnH + 4.f);
-        if (hoverWin) {
-            bg->AddRectFilled({winX, btnY}, {winX + btnW, btnY + btnH},
-                              col(UITheme::widget, ma * 0.85f), 6.f);
-            if (ImGui::IsMouseClicked(0)) {
-                g_menu_pos = {(g_sw - wsz.x) * 0.5f, (g_sh - wsz.y) * 0.5f};
-                logger::log_info("[MENU] Menu recentered on screen.");
-            }
-        }
-        float wX = winX + btnW * 0.5f, wY = btnY + btnH * 0.5f, wr = 6.f;
-        ImU32 winCol = hoverWin ? IM_COL32(255, 255, 255, 255) : col(UITheme::text_dim, ma);
-        bg->AddRect({wX - wr, wY - wr}, {wX + wr, wY + wr}, winCol, 2.f, 0, 1.8f);
+        float cX = closeX + btnW * 0.5f, cY = btnY + btnH * 0.5f, cr = 8.f;
+        ImU32 closeCol = hoverClose ? IM_COL32(255, 255, 255, 255) : col(UITheme::text, ma);
+        bg->AddLine({cX - cr, cY - cr}, {cX + cr, cY + cr}, closeCol, 2.4f);
+        bg->AddLine({cX - cr, cY + cr}, {cX + cr, cY - cr}, closeCol, 2.4f);
 
         float sbY = wp.y + headerH;
         float sbBot = wp.y + ws.y - footerH;
@@ -868,20 +844,30 @@ namespace ui::menu {
         dl->AddText(ImGui::GetFont(), 12.5f, {bX + (bW - actW) * 0.5f, bY + (bH - 12.5f) * 0.5f},
                     IM_COL32(52, 211, 110, (int)(255 * ma)), "ACTIVE");
 
-        bool inHeaderControls = (mp.x >= winX - 10.f && mp.y <= wp.y + headerH);
-        if (!inHeaderControls && (mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= wp.y && mp.y <= wp.y + headerH)) {
-            if (ImGui::IsMouseClicked(0) || (!drag && ImGui::IsMouseDown(0))) {
-                drag = true;
-                doff = {mp.x - g_menu_pos.x, mp.y - g_menu_pos.y};
-            }
+        bool inHeaderCloseBtn = (mp.x >= closeX - 8.f && mp.y <= wp.y + headerH);
+        bool canDragStart = false;
+
+        // 1. Drag by header bar (outside close button)
+        if (!inHeaderCloseBtn && (mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= wp.y && mp.y <= wp.y + headerH)) {
+            canDragStart = true;
         }
+        // 2. Drag by footer bar
+        if (mp.x >= wp.x && mp.x <= wp.x + ws.x && mp.y >= fy && mp.y <= wp.y + ws.y) {
+            canDragStart = true;
+        }
+
+        if (canDragStart && (ImGui::IsMouseClicked(0) || (!drag && ImGui::IsMouseDown(0)))) {
+            drag = true;
+            doff = {mp.x - g_menu_pos.x, mp.y - g_menu_pos.y};
+        }
+
         if (drag) {
             if (ImGui::IsMouseDown(0)) {
-                ImVec2 np{mp.x-doff.x, mp.y-doff.y};
-                float maxX = ImMax(0.f, g_sw - ws.x);
-                float maxY = ImMax(0.f, g_sh - ws.y);
-                np.x = ImClamp(np.x, 0.f, maxX);
-                np.y = ImClamp(np.y, 0.f, maxY);
+                ImVec2 np{mp.x - doff.x, mp.y - doff.y};
+                float dMaxX = ImMax(0.f, sw - ws.x);
+                float dMaxY = ImMax(0.f, sh - ws.y);
+                np.x = ImClamp(np.x, 0.f, dMaxX);
+                np.y = ImClamp(np.y, 0.f, dMaxY);
                 g_menu_pos = np;
             } else {
                 drag = false;
