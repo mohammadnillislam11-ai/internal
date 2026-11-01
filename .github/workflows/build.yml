@@ -96,9 +96,12 @@ jobs:
           set -o pipefail
           cd refer/NEXOMODSROOT
           chmod +x gradlew
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "ndk.dir=$ANDROID_NDK_HOME" >> local.properties
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
           if ! ./gradlew assembleRelease --stacktrace 2>&1 | tee gradle.log; then
             echo "=== NEXO GRADLE BUILD ERROR ==="
-            tail -n 120 gradle.log
+            tail -n 150 gradle.log
             exit 1
           fi
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
@@ -113,6 +116,14 @@ jobs:
             exit 1
           fi
           cd ../..
+
+      - name: Upload NEXOMODS Gradle Failure Log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexo-gradle-failure-log
+          path: refer/NEXOMODSROOT/gradle.log
+          if-no-files-found: ignore
 
       - name: Upload Unlocked NEXOMODSROOT APK
         uses: actions/upload-artifact@v4
