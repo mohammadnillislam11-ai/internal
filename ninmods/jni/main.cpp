@@ -391,11 +391,11 @@ static int run_daemon_mode() {
         // Synchronize controls from UI
         cfg::aim::enabled = bridge_ptr->ui_cfg.aim_enabled;
         cfg::aim::target_bone = bridge_ptr->ui_cfg.target_bone;
-        cfg::aim::fov_radius = bridge_ptr->ui_cfg.aim_fov;
+        cfg::aim::fov = bridge_ptr->ui_cfg.aim_fov;
         cfg::aim::distance = bridge_ptr->ui_cfg.aim_dist;
         cfg::aim::smooth = bridge_ptr->ui_cfg.aim_smooth;
-        cfg::aim::aim_silent = bridge_ptr->ui_cfg.aim_silent;
-        cfg::aim::nobita_mode = bridge_ptr->ui_cfg.aim_nobita;
+        cfg::aim::silent = bridge_ptr->ui_cfg.aim_silent;
+        cfg::aim::nobita = bridge_ptr->ui_cfg.aim_nobita;
         cfg::misc::speed_hack = bridge_ptr->ui_cfg.speed_hack;
         cfg::misc::fast_switch = bridge_ptr->ui_cfg.fast_switch;
         if (bridge_ptr->ui_cfg.max_range > 10.f) {

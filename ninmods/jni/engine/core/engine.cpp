@@ -90,11 +90,11 @@ namespace engine {
         // Send UI options to daemon
         s_bridge_ptr->ui_cfg.aim_enabled = cfg::aim::enabled;
         s_bridge_ptr->ui_cfg.target_bone = cfg::aim::target_bone;
-        s_bridge_ptr->ui_cfg.aim_fov = cfg::aim::fov_radius;
+        s_bridge_ptr->ui_cfg.aim_fov = cfg::aim::fov;
         s_bridge_ptr->ui_cfg.aim_dist = cfg::aim::distance;
         s_bridge_ptr->ui_cfg.aim_smooth = cfg::aim::smooth;
-        s_bridge_ptr->ui_cfg.aim_silent = cfg::aim::aim_silent;
-        s_bridge_ptr->ui_cfg.aim_nobita = cfg::aim::nobita_mode;
+        s_bridge_ptr->ui_cfg.aim_silent = cfg::aim::silent;
+        s_bridge_ptr->ui_cfg.aim_nobita = cfg::aim::nobita;
         s_bridge_ptr->ui_cfg.speed_hack = cfg::misc::speed_hack;
         s_bridge_ptr->ui_cfg.fast_switch = cfg::misc::fast_switch;
         s_bridge_ptr->ui_cfg.max_range = cfg::esp::max_range;
