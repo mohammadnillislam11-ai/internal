@@ -21,6 +21,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 
+/**
+ * NINMODS Official Launcher Activity.
+ * Interacts with Android's official Superuser (Magisk, KernelSU, APatch, SuperSU)
+ * and WindowManager system services.
+ */
 public class MainActivity extends Activity {
 
     private static final int REQUEST_OVERLAY_PERMISSION = 2026;
@@ -29,6 +34,7 @@ public class MainActivity extends Activity {
     private TextView tvOverlayStatus;
     private TextView tvStatus;
     private Button btnToggleEngine;
+    private View rootRow;
 
     private boolean isRooted = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -43,7 +49,21 @@ public class MainActivity extends Activity {
         tvStatus = findViewById(R.id.tvStatus);
         btnToggleEngine = findViewById(R.id.btnToggleEngine);
 
+        // Make root status row clickable to re-prompt official Superuser dialog
+        View parent = (View) tvRootStatus.getParent();
+        if (parent != null) {
+            parent.setClickable(true);
+            parent.setFocusable(true);
+            parent.setOnClickListener(v -> {
+                Toast.makeText(this, "Requesting Superuser permission...", Toast.LENGTH_SHORT).show();
+                requestSuperuserAccess(true);
+            });
+        }
+
         btnToggleEngine.setOnClickListener(v -> toggleEngine());
+
+        // Automatically trigger official system Superuser prompt on launch
+        requestSuperuserAccess(false);
     }
 
     @Override
@@ -54,24 +74,17 @@ public class MainActivity extends Activity {
 
     private void checkPermissionsAndEnvironment() {
         new Thread(() -> {
-            isRooted = checkRootAccess();
-
-            if (isRooted) {
-                // Silently auto-grant overlay permission via root if possible
-                executeRootCommand("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
-                executeRootCommand("settings put system block_untrusted_touches 0");
-                executeRootCommand("settings put global block_untrusted_touches 0");
-            }
-
+            boolean rooted = checkRootAccessSilent();
             boolean canDraw = hasOverlayPermission();
 
             mainHandler.post(() -> {
+                isRooted = rooted;
                 if (isRooted) {
-                    tvRootStatus.setText("Rooted (Full Access)");
+                    tvRootStatus.setText("Superuser Granted (Full Access)");
                     tvRootStatus.setTextColor(Color.parseColor("#00E676"));
                 } else {
-                    tvRootStatus.setText("Non-Root Mode");
-                    tvRootStatus.setTextColor(Color.parseColor("#00E5FF"));
+                    tvRootStatus.setText("Superuser Required (Tap to Grant)");
+                    tvRootStatus.setTextColor(Color.parseColor("#FF5252"));
                 }
 
                 if (canDraw) {
@@ -85,6 +98,84 @@ public class MainActivity extends Activity {
                 updateUiState(FloatingService.isServiceRunning);
             });
         }).start();
+    }
+
+    /**
+     * Executes the standard Android 'su' command which forces Magisk / KernelSU / APatch
+     * to pop up the official system Superuser permission dialog.
+     */
+    private void requestSuperuserAccess(boolean manualTap) {
+        new Thread(() -> {
+            Process p = null;
+            boolean granted = false;
+            try {
+                // Official system call to trigger Magisk/KernelSU Superuser dialog
+                p = Runtime.getRuntime().exec("su");
+                OutputStream stdin = p.getOutputStream();
+                stdin.write("id\nexit\n".getBytes());
+                stdin.flush();
+                stdin.close();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                String line = reader.readLine();
+                p.waitFor();
+
+                if (line != null && line.contains("uid=0")) {
+                    granted = true;
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (p != null) {
+                    try { p.destroy(); } catch (Exception ignored) {}
+                }
+            }
+
+            final boolean finalGranted = granted;
+            mainHandler.post(() -> {
+                isRooted = finalGranted;
+                if (finalGranted) {
+                    tvRootStatus.setText("Superuser Granted (Full Access)");
+                    tvRootStatus.setTextColor(Color.parseColor("#00E676"));
+                    Toast.makeText(MainActivity.this, "Superuser access granted!", Toast.LENGTH_SHORT).show();
+
+                    // Silently grant overlay & touch bypass via root
+                    new Thread(() -> {
+                        executeRootCommand("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
+                        executeRootCommand("settings put system block_untrusted_touches 0");
+                        executeRootCommand("settings put global block_untrusted_touches 0");
+                        mainHandler.post(() -> {
+                            if (hasOverlayPermission()) {
+                                tvOverlayStatus.setText("Permission Granted");
+                                tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
+                            }
+                        });
+                    }).start();
+                } else {
+                    tvRootStatus.setText("Superuser Required (Tap to Grant)");
+                    tvRootStatus.setTextColor(Color.parseColor("#FF5252"));
+                    if (manualTap) {
+                        Toast.makeText(MainActivity.this, "Superuser permission denied or root not installed", Toast.LENGTH_LONG).show();
+                    }
+                }
+            });
+        }).start();
+    }
+
+    private boolean checkRootAccessSilent() {
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(new String[]{"su", "-c", "id"});
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line = reader.readLine();
+            p.waitFor();
+            return line != null && line.contains("uid=0");
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (p != null) {
+                try { p.destroy(); } catch (Exception ignored) {}
+            }
+        }
     }
 
     private boolean hasOverlayPermission() {
@@ -136,6 +227,11 @@ public class MainActivity extends Activity {
     }
 
     private void toggleEngine() {
+        if (!isRooted) {
+            // First prompt official Superuser dialog if not granted yet
+            requestSuperuserAccess(true);
+        }
+
         if (!hasOverlayPermission()) {
             requestOverlayPermission();
             return;
@@ -188,28 +284,6 @@ public class MainActivity extends Activity {
                 // Automatically minimize app to display floating 'N' icon directly on screen/game
                 mainHandler.postDelayed(() -> moveTaskToBack(true), 400);
             }, 400);
-        }
-    }
-
-    private boolean checkRootAccess() {
-        Process p = null;
-        try {
-            p = Runtime.getRuntime().exec("su");
-            OutputStream stdin = p.getOutputStream();
-            stdin.write("id\nexit\n".getBytes());
-            stdin.flush();
-            stdin.close();
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line = reader.readLine();
-            p.waitFor();
-            return line != null && line.contains("uid=0");
-        } catch (Exception e) {
-            return false;
-        } finally {
-            if (p != null) {
-                try { p.destroy(); } catch (Exception ignored) {}
-            }
         }
     }
 
