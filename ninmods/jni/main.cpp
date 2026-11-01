@@ -92,7 +92,7 @@ bool InitEGL(int width, int height) {
     system("settings put secure block_untrusted_touches 0 > /dev/null 2>&1");
 
     g_NativeWindow = android::ANativeWindowCreator::Create(
-        "com.android.systemui", width, height);
+        "ninmods_overlay", width, height);
 
     if (!g_NativeWindow) {
         logger::log_error("[-] Failed to create ANativeWindow overlay!");
