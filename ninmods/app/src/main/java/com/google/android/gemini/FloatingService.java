@@ -7,6 +7,7 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.IBinder;
@@ -28,6 +29,7 @@ import android.view.WindowManager;
  */
 public class FloatingService extends Service implements SurfaceHolder.Callback, View.OnTouchListener {
 
+    public static final String ACTION_SERVICE_STATE_CHANGED = "com.google.android.gemini.SERVICE_STATE_CHANGED";
     public static boolean isServiceRunning = false;
 
     private WindowManager windowManager;
@@ -152,6 +154,9 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         if (width <= 0) width = isMenuOpen ? menuW : puckW;
         if (height <= 0) height = isMenuOpen ? menuH : puckH;
         NativeBridge.initSurface(holder.getSurface(), width, height);
+
+        // Notify activity that floating surface is fully created and active
+        sendBroadcast(new Intent(ACTION_SERVICE_STATE_CHANGED).putExtra("running", true));
     }
 
     @Override
@@ -285,6 +290,9 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
             windowManager.removeView(surfaceView);
             surfaceView = null;
         }
+
+        // Notify activity that service is fully stopped
+        sendBroadcast(new Intent(ACTION_SERVICE_STATE_CHANGED).putExtra("running", false));
     }
 
     private void startForegroundNotification() {
@@ -303,7 +311,13 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                     .setContentText("C++ ImGui Floating Engine Active")
                     .setSmallIcon(R.drawable.logo_n)
                     .build();
-            startForeground(1337, notification);
+
+            // Official Android 14+ Foreground Service Type
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(1337, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(1337, notification);
+            }
         }
     }
 }

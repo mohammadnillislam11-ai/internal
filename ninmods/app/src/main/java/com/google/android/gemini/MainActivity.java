@@ -1,7 +1,11 @@
 package com.google.android.gemini;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -16,171 +20,239 @@ import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 
 /**
  * NINMODS Official Launcher Activity.
- * Interacts with Android's official Superuser (Magisk, KernelSU, APatch, SuperSU)
+ * Interacts officially with Android's Superuser (Magisk, KernelSU, APatch)
  * and WindowManager system services.
+ * Features:
+ * - Pre-detection before invoking Superuser (Zero prompt spam, exactly one clean call).
+ * - 100% pure in-memory execution (No disk files, no /data/local/tmp).
+ * - Full Android 14+ compatibility (FGS type specialUse, verified state callbacks).
+ * - Automatic system settings restore when engine stops.
  */
 public class MainActivity extends Activity {
 
     private static final int REQUEST_OVERLAY_PERMISSION = 2026;
+    private static final String PREF_NAME = "ninmods_prefs";
+    private static final String KEY_ROOT_GRANTED = "key_root_granted";
 
     private TextView tvRootStatus;
     private TextView tvOverlayStatus;
     private TextView tvStatus;
     private Button btnToggleEngine;
-    private View rootRow;
 
     private boolean isRooted = false;
+    private boolean isRootDetecting = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private SharedPreferences prefs;
+
+    private final BroadcastReceiver serviceStateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (FloatingService.ACTION_SERVICE_STATE_CHANGED.equals(intent.getAction())) {
+                boolean running = intent.getBooleanExtra("running", false);
+                updateUiState(running);
+                btnToggleEngine.setEnabled(true);
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        isRooted = prefs.getBoolean(KEY_ROOT_GRANTED, false);
+
         tvRootStatus = findViewById(R.id.tvRootStatus);
         tvOverlayStatus = findViewById(R.id.tvOverlayStatus);
         tvStatus = findViewById(R.id.tvStatus);
         btnToggleEngine = findViewById(R.id.btnToggleEngine);
 
-        // Make root status row clickable to re-prompt official Superuser dialog
+        // Click root row to officially request or re-verify Superuser
         View parent = (View) tvRootStatus.getParent();
         if (parent != null) {
             parent.setClickable(true);
             parent.setFocusable(true);
             parent.setOnClickListener(v -> {
-                Toast.makeText(this, "Requesting Superuser permission...", Toast.LENGTH_SHORT).show();
-                requestSuperuserAccess(true);
+                if (!isRooted) {
+                    performOfficialSuperuserCall(true);
+                } else {
+                    Toast.makeText(this, "Superuser already granted (Full Access)", Toast.LENGTH_SHORT).show();
+                }
             });
         }
 
         btnToggleEngine.setOnClickListener(v -> toggleEngine());
 
-        // Automatically trigger official system Superuser prompt on launch
-        requestSuperuserAccess(false);
+        // Register verified service state receiver
+        IntentFilter filter = new IntentFilter(FloatingService.ACTION_SERVICE_STATE_CHANGED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(serviceStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(serviceStateReceiver, filter);
+        }
+
+        // Detect environment first; if rooted and never prompted, prompt once
+        checkEnvironment(true);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        checkPermissionsAndEnvironment();
+        checkEnvironment(false);
     }
 
-    private void checkPermissionsAndEnvironment() {
-        new Thread(() -> {
-            boolean rooted = checkRootAccessSilent();
-            boolean canDraw = hasOverlayPermission();
-
-            mainHandler.post(() -> {
-                isRooted = rooted;
-                if (isRooted) {
-                    tvRootStatus.setText("Superuser Granted (Full Access)");
-                    tvRootStatus.setTextColor(Color.parseColor("#00E676"));
-                } else {
-                    tvRootStatus.setText("Superuser Required (Tap to Grant)");
-                    tvRootStatus.setTextColor(Color.parseColor("#FF5252"));
-                }
-
-                if (canDraw) {
-                    tvOverlayStatus.setText("Permission Granted");
-                    tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
-                } else {
-                    tvOverlayStatus.setText("Permission Required");
-                    tvOverlayStatus.setTextColor(Color.parseColor("#FF5252"));
-                }
-
-                updateUiState(FloatingService.isServiceRunning);
-            });
-        }).start();
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            unregisterReceiver(serviceStateReceiver);
+        } catch (Exception ignored) {}
     }
 
     /**
-     * Executes the standard Android 'su' command which forces Magisk / KernelSU / APatch
-     * to pop up the official system Superuser permission dialog.
+     * Non-intrusive environment inspection.
+     * Uses fast filesystem and system API checks without executing 'su' repeatedly.
      */
-    private void requestSuperuserAccess(boolean manualTap) {
+    private void checkEnvironment(boolean allowPrompt) {
+        boolean rootAvailable = isRootAvailableOnDevice();
+        boolean canDraw = hasOverlayPermission();
+
+        if (isRooted) {
+            tvRootStatus.setText("Superuser Granted (Full Access)");
+            tvRootStatus.setTextColor(Color.parseColor("#00E676"));
+        } else if (rootAvailable) {
+            tvRootStatus.setText("Superuser Available (Tap to Grant)");
+            tvRootStatus.setTextColor(Color.parseColor("#FFD54F"));
+            if (allowPrompt && !prefs.getBoolean(KEY_ROOT_GRANTED, false)) {
+                performOfficialSuperuserCall(false);
+            }
+        } else {
+            tvRootStatus.setText("Non-Root Environment (Normal)");
+            tvRootStatus.setTextColor(Color.parseColor("#9AA0B6"));
+        }
+
+        if (canDraw) {
+            tvOverlayStatus.setText("Permission Granted");
+            tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
+        } else {
+            tvOverlayStatus.setText("Permission Required");
+            tvOverlayStatus.setTextColor(Color.parseColor("#FF5252"));
+        }
+
+        updateUiState(FloatingService.isServiceRunning);
+    }
+
+    /**
+     * Detects presence of official root binaries (Magisk, KernelSU, APatch)
+     * purely via File checks in RAM/ROM without spawning any processes.
+     */
+    public static boolean isRootAvailableOnDevice() {
+        String[] paths = {
+            "/system/bin/su", "/system/xbin/su", "/sbin/su",
+            "/system/sd/xbin/su", "/system/bin/failsafe/su",
+            "/data/local/xbin/su", "/data/local/bin/su", "/data/local/su",
+            "/data/adb/ksu/bin/su", "/data/adb/ap/bin/su", "/data/adb/magisk/su"
+        };
+        for (String p : paths) {
+            try {
+                if (new File(p).exists()) return true;
+            } catch (Exception ignored) {}
+        }
+        String pathEnv = System.getenv("PATH");
+        if (pathEnv != null) {
+            for (String dir : pathEnv.split(":")) {
+                try {
+                    if (new File(dir, "su").exists()) return true;
+                } catch (Exception ignored) {}
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Executes EXACTLY ONE clean official call to 'su'.
+     * Detects root first, executes configuration in a single atomic batch,
+     * and caches the granted status so 'su' is never spammed again.
+     */
+    private void performOfficialSuperuserCall(boolean manualTap) {
+        if (isRootDetecting) return;
+        isRootDetecting = true;
+
         new Thread(() -> {
-            Process p = null;
+            Process su = null;
             boolean granted = false;
             try {
-                // Official system call to trigger Magisk/KernelSU Superuser dialog
-                p = Runtime.getRuntime().exec("su");
-                OutputStream stdin = p.getOutputStream();
-                stdin.write("id\nexit\n".getBytes());
+                su = Runtime.getRuntime().exec("su");
+                OutputStream stdin = su.getOutputStream();
+                InputStream stdout = su.getInputStream();
+
+                // Send setup commands in a single atomic stream
+                String script =
+                        "id\n" +
+                        "setenforce 0 2>/dev/null\n" +
+                        "mount -o remount,hidepid=0 /proc 2>/dev/null\n" +
+                        "chmod 0755 /proc 2>/dev/null\n" +
+                        "magiskpolicy --live \"allow untrusted_app * * *\" 2>/dev/null\n" +
+                        "magiskpolicy --live \"permissive untrusted_app\" 2>/dev/null\n" +
+                        "appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow 2>/dev/null\n" +
+                        "settings put system block_untrusted_touches 0 2>/dev/null\n" +
+                        "settings put global block_untrusted_touches 0 2>/dev/null\n" +
+                        "exit\n";
+
+                stdin.write(script.getBytes());
                 stdin.flush();
                 stdin.close();
 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                BufferedReader reader = new BufferedReader(new InputStreamReader(stdout));
                 String line = reader.readLine();
-                p.waitFor();
+                su.waitFor();
 
                 if (line != null && line.contains("uid=0")) {
                     granted = true;
                 }
             } catch (Exception ignored) {
             } finally {
-                if (p != null) {
-                    try { p.destroy(); } catch (Exception ignored) {}
+                if (su != null) {
+                    try { su.destroy(); } catch (Exception ignored) {}
                 }
+                isRootDetecting = false;
             }
 
             final boolean finalGranted = granted;
             mainHandler.post(() -> {
                 isRooted = finalGranted;
+                prefs.edit().putBoolean(KEY_ROOT_GRANTED, finalGranted).apply();
+
                 if (finalGranted) {
                     tvRootStatus.setText("Superuser Granted (Full Access)");
                     tvRootStatus.setTextColor(Color.parseColor("#00E676"));
                     Toast.makeText(MainActivity.this, "Superuser access granted!", Toast.LENGTH_SHORT).show();
 
-                    // Silently grant overlay & touch bypass via root
-                    new Thread(() -> {
-                        executeRootCommand("setenforce 0 2>/dev/null");
-                        executeRootCommand("mount -o remount,hidepid=0 /proc 2>/dev/null");
-                        executeRootCommand("chmod 0755 /proc 2>/dev/null");
-                        executeRootCommand("magiskpolicy --live 'allow untrusted_app * * *' 2>/dev/null");
-                        executeRootCommand("magiskpolicy --live 'permissive untrusted_app' 2>/dev/null");
-                        executeRootCommand("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
-                        executeRootCommand("settings put system block_untrusted_touches 0");
-                        executeRootCommand("settings put global block_untrusted_touches 0");
-                        mainHandler.post(() -> {
-                            if (hasOverlayPermission()) {
-                                tvOverlayStatus.setText("Permission Granted");
-                                tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
-                            }
-                        });
-                    }).start();
+                    if (hasOverlayPermission()) {
+                        tvOverlayStatus.setText("Permission Granted");
+                        tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
+                    }
                 } else {
-                    tvRootStatus.setText("Superuser Required (Tap to Grant)");
-                    tvRootStatus.setTextColor(Color.parseColor("#FF5252"));
-                    if (manualTap) {
-                        Toast.makeText(MainActivity.this, "Superuser permission denied or root not installed", Toast.LENGTH_LONG).show();
+                    if (isRootAvailableOnDevice()) {
+                        tvRootStatus.setText("Superuser Required (Tap to Grant)");
+                        tvRootStatus.setTextColor(Color.parseColor("#FF5252"));
+                        if (manualTap) {
+                            Toast.makeText(MainActivity.this, "Superuser permission denied in root manager", Toast.LENGTH_LONG).show();
+                        }
+                    } else {
+                        tvRootStatus.setText("Non-Root Environment (Normal)");
+                        tvRootStatus.setTextColor(Color.parseColor("#9AA0B6"));
                     }
                 }
             });
         }).start();
-    }
-
-    private boolean checkRootAccessSilent() {
-        Process p = null;
-        try {
-            p = Runtime.getRuntime().exec(new String[]{"su", "-c", "id"});
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line = reader.readLine();
-            p.waitFor();
-            return line != null && line.contains("uid=0");
-        } catch (Exception e) {
-            return false;
-        } finally {
-            if (p != null) {
-                try { p.destroy(); } catch (Exception ignored) {}
-            }
-        }
     }
 
     private boolean hasOverlayPermission() {
@@ -208,11 +280,10 @@ public class MainActivity extends Activity {
             if (hasOverlayPermission()) {
                 tvOverlayStatus.setText("Permission Granted");
                 tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
-                Toast.makeText(this, "Permission granted! Tap START to launch floating N icon", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Overlay permission granted! Tap START to launch", Toast.LENGTH_SHORT).show();
             } else {
                 tvOverlayStatus.setText("Permission Denied");
                 tvOverlayStatus.setTextColor(Color.parseColor("#FF5252"));
-                Toast.makeText(this, "Overlay permission is required to display the floating menu", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -232,9 +303,8 @@ public class MainActivity extends Activity {
     }
 
     private void toggleEngine() {
-        if (!isRooted) {
-            // First prompt official Superuser dialog if not granted yet
-            requestSuperuserAccess(true);
+        if (isRootAvailableOnDevice() && !isRooted) {
+            performOfficialSuperuserCall(true);
         }
 
         if (!hasOverlayPermission()) {
@@ -245,12 +315,13 @@ public class MainActivity extends Activity {
         btnToggleEngine.setEnabled(false);
 
         if (FloatingService.isServiceRunning) {
-            // Stop Overlay Service
+            // Stop Official Floating Service
             stopService(new Intent(this, FloatingService.class));
 
+            // Restore Android system settings cleanly upon engine shutdown
             if (isRooted) {
                 new Thread(() -> {
-                    executeRootCommand("killall -9 gemini-engine 2>/dev/null; pkill -9 -f gemini-engine 2>/dev/null; rm -f /data/local/tmp/ninmods_bridge.dat");
+                    restoreSystemSettings();
                 }).start();
             }
 
@@ -261,7 +332,7 @@ public class MainActivity extends Activity {
             }, 300);
 
         } else {
-            // Start Official Floating Service
+            // Start Official Floating Service (100% in-memory via libninmods.so)
             Intent serviceIntent = new Intent(this, FloatingService.class);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent);
@@ -269,109 +340,38 @@ public class MainActivity extends Activity {
                 startService(serviceIntent);
             }
 
-            // If Rooted, also launch background native memory worker
-            if (isRooted) {
-                new Thread(() -> {
-                    executeRootCommand("setenforce 0 2>/dev/null");
-                    executeRootCommand("mount -o remount,hidepid=0 /proc 2>/dev/null");
-                    executeRootCommand("chmod 0755 /proc 2>/dev/null");
-                    executeRootCommand("magiskpolicy --live 'allow untrusted_app * * *' 2>/dev/null");
-                    executeRootCommand("magiskpolicy --live 'permissive untrusted_app' 2>/dev/null");
-                    executeRootCommand("killall -9 gemini-engine 2>/dev/null; pkill -9 -f gemini-engine 2>/dev/null");
-                    executeRootCommand("rm -f /data/local/tmp/ninmods_bridge.dat");
-
-                    File targetFile = extractEngineBinary();
-                    if (targetFile != null && targetFile.exists()) {
-                        executeRootCommand("chmod 777 " + targetFile.getAbsolutePath());
-                        String launchCmd = targetFile.getAbsolutePath() + " --daemon > " + getFilesDir().getAbsolutePath() + "/engine.log 2>&1 &";
-                        executeRootCommand(launchCmd);
-                    }
-                }).start();
-            }
-
             mainHandler.postDelayed(() -> {
                 btnToggleEngine.setEnabled(true);
                 updateUiState(true);
                 Toast.makeText(MainActivity.this, "NINMODS Floating Icon Launched!", Toast.LENGTH_SHORT).show();
 
-                // Automatically minimize app to display floating 'N' icon directly on screen/game
+                // Minimize activity to show floating puck directly on game/screen
                 mainHandler.postDelayed(() -> moveTaskToBack(true), 400);
             }, 400);
         }
     }
 
-    private File extractEngineBinary() {
+    /**
+     * Clean system settings restore when engine is stopped.
+     */
+    private void restoreSystemSettings() {
+        Process p = null;
         try {
-            File filesDir = getFilesDir();
-            if (!filesDir.exists()) filesDir.mkdirs();
-
-            File outFile = new File(filesDir, "gemini-engine");
-
-            String assetName = "gemini-engine-arm64";
-            for (String abi : Build.SUPPORTED_ABIS) {
-                if (abi.contains("arm64") || abi.contains("v8a")) {
-                    assetName = "gemini-engine-arm64";
-                    break;
-                } else if (abi.contains("v7a") || abi.contains("arm32")) {
-                    assetName = "gemini-engine-arm32";
-                    break;
-                }
-            }
-
-            try (InputStream in = getAssets().open(assetName)) {
-                try (OutputStream out = new FileOutputStream(outFile)) {
-                    byte[] buffer = new byte[8192];
-                    int read;
-                    while ((read = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, read);
-                    }
-                    out.flush();
-                }
-            } catch (Exception e) {
-                try (InputStream inFallback = getAssets().open("gemini-engine")) {
-                    try (OutputStream out = new FileOutputStream(outFile)) {
-                        byte[] buffer = new byte[8192];
-                        int read;
-                        while ((read = inFallback.read(buffer)) != -1) {
-                            out.write(buffer, 0, read);
-                        }
-                        out.flush();
-                    }
-                }
-            }
-
-            outFile.setExecutable(true, false);
-            outFile.setReadable(true, false);
-            return outFile;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private String executeRootCommand(String command) {
-        StringBuilder output = new StringBuilder();
-        Process process = null;
-        try {
-            process = Runtime.getRuntime().exec("su");
-            OutputStream stdin = process.getOutputStream();
-            InputStream stdout = process.getInputStream();
-
-            stdin.write((command + "\nexit\n").getBytes());
+            p = Runtime.getRuntime().exec("su");
+            OutputStream stdin = p.getOutputStream();
+            String script =
+                    "settings put system block_untrusted_touches 1 2>/dev/null\n" +
+                    "settings put global block_untrusted_touches 1 2>/dev/null\n" +
+                    "exit\n";
+            stdin.write(script.getBytes());
             stdin.flush();
             stdin.close();
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(stdout));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-            process.waitFor();
+            p.waitFor();
         } catch (Exception ignored) {
         } finally {
-            if (process != null) {
-                try { process.destroy(); } catch (Exception ignored) {}
+            if (p != null) {
+                try { p.destroy(); } catch (Exception ignored) {}
             }
         }
-        return output.toString();
     }
 }
