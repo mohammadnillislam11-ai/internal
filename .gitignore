@@ -17,6 +17,7 @@ data.json
 docs/
 *.log
 *.zip
+*.apk
 GEMINI.md
 README.md
 push_and_wait.ps1
