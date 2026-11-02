@@ -52,34 +52,37 @@ static bool Touch_readOnly = true;
 static bool checkDeviceIsTouch(int fd) {
     uint8_t *bits = NULL;
     ssize_t bits_size = 0;
-    int res, j, k;
+    int res = 0, j, k;
     bool itmp = false, itmp2 = false, itmp3 = false;
     struct input_absinfo abs{};
     while (true) {
         res = ioctl(fd, EVIOCGBIT(EV_ABS, bits_size), bits);
-        if (res < bits_size)
+        if (res < 0 || res < bits_size)
             break;
         bits_size = res + 16;
         bits = (uint8_t *) realloc(bits, bits_size * 2);
     }
-    for (j = 0; j < res; j++) {
-        for (k = 0; k < 8; k++) {
-            if (bits[j] & (1 << k)) {
-                if (ioctl(fd, EVIOCGABS(j * 8 + k), &abs) == 0) {
-                    if (j * 8 + k == ABS_MT_SLOT) {
-                        itmp = true;
-                    }
-                    if (j * 8 + k == ABS_MT_POSITION_X) {
-                        itmp2 = true;
-                    }
-                    if (j * 8 + k == ABS_MT_POSITION_Y) {
-                        itmp3 = true;
+    if (res > 0 && bits != NULL) {
+        for (j = 0; j < res; j++) {
+            for (k = 0; k < 8; k++) {
+                if (bits[j] & (1 << k)) {
+                    int code = j * 8 + k;
+                    if (ioctl(fd, EVIOCGABS(code), &abs) == 0) {
+                        if (code == ABS_MT_SLOT || code == ABS_MT_TRACKING_ID) {
+                            itmp = true;
+                        }
+                        if (code == ABS_MT_POSITION_X || code == ABS_X) {
+                            itmp2 = true;
+                        }
+                        if (code == ABS_MT_POSITION_Y || code == ABS_Y) {
+                            itmp3 = true;
+                        }
                     }
                 }
             }
         }
     }
-    free(bits);
+    if (bits) free(bits);
     return itmp && itmp2 && itmp3;
 }
 
@@ -116,23 +119,25 @@ static void *TypeA(void *arg) {
                     }
                     continue;
                 }
-                if (ie.code == ABS_MT_POSITION_X) {
+                if (ie.code == ABS_MT_POSITION_X || ie.code == ABS_X) {
                     Finger[i][latest].id = (i * 2 + 1) * maxF + latest;
                     Finger[i][latest].x = (int) (ie.value * S2TX);
                     continue;
                 }
-                if (ie.code == ABS_MT_POSITION_Y) {
+                if (ie.code == ABS_MT_POSITION_Y || ie.code == ABS_Y) {
                     Finger[i][latest].id = (i * 2 + 1) * maxF + latest;
                     Finger[i][latest].y = (int) (ie.value * S2TY);
                     continue;
                 }
             }
             if (ie.type == EV_KEY) {
-                if (ie.code == BTN_TOUCH || ie.code == BTN_TOOL_FINGER) {
+                if (ie.code == BTN_TOUCH || ie.code == BTN_TOOL_FINGER || ie.code == BTN_LEFT) {
                     if (ie.value == 0) {
                         for (int f = 0; f < maxF; f++) {
                             Finger[i][f].isDown = false;
                         }
+                    } else {
+                        Finger[i][latest].isDown = true;
                     }
                 }
             }
@@ -261,7 +266,13 @@ namespace touch {
             }
             if (checkDeviceIsTouch(fd)) {
                 tmp1 = ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &absX[fdNum]);
+                if (tmp1 != 0) {
+                    tmp1 = ioctl(fd, EVIOCGABS(ABS_X), &absX[fdNum]);
+                }
                 tmp2 = ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &absY[fdNum]);
+                if (tmp2 != 0) {
+                    tmp2 = ioctl(fd, EVIOCGABS(ABS_Y), &absY[fdNum]);
+                }
                 if (tmp1 == 0 && tmp2 == 0) {
                     origfd[fdNum] = fd;
                     if (i < minCnt) {

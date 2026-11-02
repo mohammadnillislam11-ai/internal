@@ -541,8 +541,9 @@ int main(int argc, char** argv) {
     int screenH = min_size;
     g_sw = static_cast<float>(screenW);
     g_sh = static_cast<float>(screenH);
+    int dispW = g_DisplayInfo.width > 0 ? g_DisplayInfo.width : screenW;
+    int dispH = g_DisplayInfo.height > 0 ? g_DisplayInfo.height : screenH;
     uint8_t init_ori = (uint8_t)g_DisplayInfo.orientation;
-    if (init_ori == 0) init_ori = 1;
 
     if (!InitEGL(screenW, screenH)) {
         printf("\033[91m  [!] Surface initialization failed.\033[0m\n");
@@ -552,7 +553,7 @@ int main(int argc, char** argv) {
 
     InitImGui();
     display::init(screenW, screenH);
-    touch::init(screenW, screenH, init_ori);
+    touch::init(dispW, dispH, init_ori);
     signal(SIGPIPE, SIG_IGN);
 
     int initial_pid = engine::mem::find_pid_by_name(engine::TARGET_PACKAGE);
@@ -603,14 +604,13 @@ int main(int argc, char** argv) {
         // Dynamically track display orientation
         g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
         uint8_t cur_ori = (uint8_t)g_DisplayInfo.orientation;
-        if (cur_ori == 0 || cur_ori == 2) {
-            cur_ori = 1; // Default to landscape standard for gaming overlay
-        }
+        int cur_w = g_DisplayInfo.width > 0 ? g_DisplayInfo.width : screenW;
+        int cur_h = g_DisplayInfo.height > 0 ? g_DisplayInfo.height : screenH;
 
         static uint8_t s_last_ori = 255;
         if (s_last_ori != cur_ori) {
             s_last_ori = cur_ori;
-            touch::update(screenW, screenH, cur_ori);
+            touch::update(cur_w, cur_h, cur_ori);
         }
 
         ImGui_ImplOpenGL3_NewFrame();
