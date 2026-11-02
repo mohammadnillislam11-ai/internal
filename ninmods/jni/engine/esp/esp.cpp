@@ -201,23 +201,28 @@ namespace engine::esp {
 
             if (p.isOnScreen) {
                 PlayerBox box = compute_player_box(p);
-                if (box.valid) {
-                    // 1. ESP Line (Tracer line: NEXOMODS architecture attached directly to top of box)
-                    if (cfg::esp::tracer) {
-                        float centerX = (box.tl.x + box.br.x) * 0.5f;
-                        float centerY = box.tl.y; // Attached to top edge of box
-                        ImVec2 target_pt(centerX, centerY);
 
-                        // Top anchor dot
-                        dl->AddCircleFilled(anchor, 4.0f, box_col);
-                        dl->AddCircle(anchor, 5.5f, IM_COL32(0, 0, 0, 180), 12, 1.2f);
-
-                        // Distance adaptive thickness
-                        float line_thick = (p.distance > 70.0f) ? 1.2f : 1.8f;
-                        dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.30f * aa), line_thick + 2.0f);
-                        dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.95f * aa), line_thick);
+                // 1. ESP Line (Tracer line: attaches to top of box if valid, or directly to head)
+                if (cfg::esp::tracer && ok(p.Head)) {
+                    float centerX = p.Head.x;
+                    float centerY = p.Head.y;
+                    if (box.valid) {
+                        centerX = (box.tl.x + box.br.x) * 0.5f;
+                        centerY = box.tl.y; // Attached to top edge of box
                     }
+                    ImVec2 target_pt(centerX, centerY);
 
+                    // Top anchor dot
+                    dl->AddCircleFilled(anchor, 4.0f, box_col);
+                    dl->AddCircle(anchor, 5.5f, IM_COL32(0, 0, 0, 180), 12, 1.2f);
+
+                    // Distance adaptive thickness
+                    float line_thick = (p.distance > 70.0f) ? 1.2f : 1.8f;
+                    dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.30f * aa), line_thick + 2.0f);
+                    dl->AddLine(anchor, target_pt, with_alpha(box_col, 0.95f * aa), line_thick);
+                }
+
+                if (box.valid) {
                     // 2. ESP Box (NEXOMODS style)
                     if (cfg::esp::box) {
                         draw_box(dl, box.tl, box.br, box_col, cfg::esp::box_type);

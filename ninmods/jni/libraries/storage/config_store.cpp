@@ -4,15 +4,15 @@
 namespace storage {
 
 bool load_config() {
-    // Pure real-time in-memory: All cheat toggles strictly start OFF (false).
-    cfg::esp::enabled       = false;
-    cfg::esp::box           = false;
+    // Pure real-time in-memory: ESP toggles start ACTIVE (true) by default
+    cfg::esp::enabled       = true;
+    cfg::esp::box           = true;
     cfg::esp::box_type      = 0;
     cfg::esp::box_thickness = 1.8f;
     cfg::esp::box_rounding  = 3.0f;
     cfg::esp::max_range     = 250.0f;
-    cfg::esp::tracer        = false;
-    cfg::esp::health        = false;
+    cfg::esp::tracer        = true;
+    cfg::esp::health        = true;
 
     cfg::aim::enabled      = false;
     cfg::aim::silent       = false;

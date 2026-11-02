@@ -12,12 +12,12 @@ namespace cfg {
 
 
     namespace esp {
-        // Master Toggles - All features strictly default to FALSE (OFF)
-        inline bool  enabled        = false;
-        inline bool  box            = false; // ESP Box
+        // Master Toggles - ESP Features default to ACTIVE (true)
+        inline bool  enabled        = true;
+        inline bool  box            = true;  // ESP Box
         inline int   box_type       = 0;     // 0 = Corner, 1 = Full, 2 = Glow
-        inline bool  tracer         = false; // ESP Line
-        inline bool  health         = false; // ESP Health
+        inline bool  tracer         = true;  // ESP Line (Tracer Line)
+        inline bool  health         = true;  // ESP Health
 
         // Sliders & Adjustments
         inline float max_range      = 250.0f;
