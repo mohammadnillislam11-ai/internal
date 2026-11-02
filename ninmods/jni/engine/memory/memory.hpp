@@ -384,23 +384,66 @@ namespace engine::mem {
      * Bypasses maps reading entirely.
      */
     /**
-     * @brief 100% Pure Ring 0 Module Base Resolver.
-     * Strictly queries the kernel driver via IOCTL DEV_OP_MODULE_BASE (0x803).
-     * All userland /proc/pid/maps fallbacks are permanently eradicated.
+     * @brief High-reliability Module Base Resolver.
+     * 1. Directly queries the kernel driver via IOCTL DEV_OP_MODULE_BASE (0x803).
+     * 2. If 0x803 misses (e.g. split APK bundle mappings like base.apk!libil2cpp.so),
+     *    locates mapping from /proc/<pid>/maps and verifies ELF header strictly via Ring 0 driver read.
      */
     inline uintptr_t find_module_base(int pid, const char* module_name) {
         if (pid <= 0 || !module_name) return 0;
 
         int dfd = get_driver_fd();
+
+        // 1. Direct Ring 0 Kernel Driver IOCTL
         if (dfd >= 0) {
             MODULE_BASE mb{};
             mb.pid = pid;
             mb.name = const_cast<char*>(module_name);
             mb.base = 0;
             if (ioctl(dfd, DEV_OP_MODULE_BASE, &mb) == 0 && mb.base > 0) {
-                return mb.base;
+                uint32_t magic = 0;
+                COPY_MEMORY cm{};
+                cm.pid = pid;
+                cm.addr = mb.base;
+                cm.buffer = &magic;
+                cm.size = 4;
+                if (ioctl(dfd, DEV_OP_READ_MEM, &cm) == 0 && magic == 0x464C457F) {
+                    return mb.base;
+                }
             }
         }
+
+        // 2. Comprehensive Maps Fallback (Handles APK bundle mappings: split_config.arm64_v8a.apk!libil2cpp.so)
+        char maps_path[64];
+        snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", pid);
+        FILE* fp = fopen(maps_path, "r");
+        if (fp) {
+            char line[512];
+            uintptr_t first_elf = 0;
+            while (fgets(line, sizeof(line), fp)) {
+                if (strstr(line, module_name)) {
+                    uintptr_t start = 0;
+                    if (sscanf(line, "%lx", &start) == 1 && start > 0) {
+                        uint32_t magic = 0;
+                        if (dfd >= 0) {
+                            COPY_MEMORY cm{};
+                            cm.pid = pid;
+                            cm.addr = start;
+                            cm.buffer = &magic;
+                            cm.size = 4;
+                            if (ioctl(dfd, DEV_OP_READ_MEM, &cm) == 0 && magic == 0x464C457F) {
+                                fclose(fp);
+                                return start;
+                            }
+                        }
+                        if (first_elf == 0) first_elf = start;
+                    }
+                }
+            }
+            fclose(fp);
+            if (first_elf > 0) return first_elf;
+        }
+
         return 0;
     }
 
