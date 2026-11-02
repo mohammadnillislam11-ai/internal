@@ -354,7 +354,14 @@ static int run_headless_daemon() {
         return 1;
     }
 
+    ch->engine_pid  = static_cast<int32_t>(getpid());
+    ch->engine_uid  = static_cast<int32_t>(getuid());
+    ch->engine_euid = static_cast<int32_t>(geteuid());
+    ch->shm_file_bytes = sizeof(engine::shm::SharedChannel);
+    ch->mmap_active = true;
     ch->engine_running = true;
+    logger::log_info("[ROOT_ENGINE] Booted | PID: %d | UID: %d (eUID: %d) | SHM: %u bytes",
+                     ch->engine_pid, ch->engine_uid, ch->engine_euid, ch->shm_file_bytes);
     bool s_engine_hooked = false;
 
     while (ch->engine_running) {
@@ -383,9 +390,11 @@ static int run_headless_daemon() {
             engine::update();
 
             // 3. Export to shared memory
-            ch->active_pid = engine::mem::g_pid;
-            ch->lib_base   = engine::mem::g_lib_base;
-            ch->in_match   = engine::data::g_in_match.load(std::memory_order_relaxed);
+            ch->active_pid       = engine::mem::g_pid;
+            ch->lib_base         = engine::mem::g_lib_base;
+            ch->in_match         = engine::data::g_in_match.load(std::memory_order_relaxed);
+            ch->last_read_errno  = engine::mem::g_last_read_errno;
+            ch->read_engine_mode = engine::mem::g_last_engine_mode;
 
             {
                 std::lock_guard<std::mutex> lock(engine::data::g_players_mutex);

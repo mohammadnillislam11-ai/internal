@@ -7,6 +7,7 @@
 #include "cfg.hpp"
 #include "engine/game_data.hpp"
 #include "engine/engine.hpp"
+#include "engine/shared_channel.hpp"
 #include "config_store.h"
 #include "clipboard.h"
 #include "Icon.h"
@@ -615,6 +616,41 @@ namespace ui::menu {
 
         // 7. Memory Syscall
         NS_InfoRow(oxorany("Memory Syscall"), oxorany("Kernel Direct (SVC #0)"), C_Success(), pageW - S(24.f));
+
+        // 8. DIAGNOSTIC TELEMETRY (Requested by dj)
+        static engine::shm::SharedChannel* s_menu_shm = nullptr;
+        if (!s_menu_shm) s_menu_shm = engine::shm::open_shm(false);
+
+        if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC) {
+            // Diagnostic 1: Background Engine Real PID & Real UID (0 = ROOT)
+            char daemonBuf[96];
+            bool isRoot = (s_menu_shm->engine_uid == 0);
+            snprintf(daemonBuf, sizeof(daemonBuf), "PID: %d | UID: %d (%s)",
+                     s_menu_shm->engine_pid, s_menu_shm->engine_uid,
+                     isRoot ? "ROOT" : "NON-ROOT");
+            NS_InfoRow(oxorany("Engine Daemon"), daemonBuf,
+                       isRoot ? C_Success() : IM_COL32(255, 75, 75, (int)(content_alpha * 255)),
+                       pageW - S(24.f));
+
+            // Diagnostic 2: Shared Memory (mmap) File Size & Map Status
+            char shmBuf[96];
+            snprintf(shmBuf, sizeof(shmBuf), "ACTIVE (%u B, MAP_OK)", s_menu_shm->shm_file_bytes);
+            NS_InfoRow(oxorany("Shared RAM (mmap)"), shmBuf, C_Accent(), pageW - S(24.f));
+
+            // Diagnostic 3: Linux Syscall Errno tracking
+            if (s_menu_shm->last_read_errno != 0) {
+                char errBuf[96];
+                snprintf(errBuf, sizeof(errBuf), "FAIL (errno %d: %s)",
+                         s_menu_shm->last_read_errno, strerror(s_menu_shm->last_read_errno));
+                NS_InfoRow(oxorany("Syscall Status"), errBuf, IM_COL32(255, 75, 75, (int)(content_alpha * 255)), pageW - S(24.f));
+            } else {
+                NS_InfoRow(oxorany("Syscall Status"), oxorany("PASS (0 ERRORS)"), C_Success(), pageW - S(24.f));
+            }
+        } else {
+            NS_InfoRow(oxorany("Engine Daemon"), oxorany("STANDBY / OFFLINE"), C_TextDim(), pageW - S(24.f));
+            NS_InfoRow(oxorany("Shared RAM (mmap)"), oxorany("WAITING FOR BACKING FILE"), C_TextDim(), pageW - S(24.f));
+            NS_InfoRow(oxorany("Syscall Status"), oxorany("STANDBY"), C_TextDim(), pageW - S(24.f));
+        }
 
         ImGui::Dummy({0, S(4.f)});
 

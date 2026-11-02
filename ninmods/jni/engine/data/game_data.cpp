@@ -293,11 +293,13 @@ namespace engine::data {
         static bool s_elf_verified = false;
         if (!s_elf_verified) {
             uint32_t elf_magic = rpm<uint32_t>(lib);
-            if (elf_magic == 0x464C457F) { // ELF
-                logger::log_success("[SECTOR-1] Memory Read Verified: libil2cpp ELF=0x%08X", elf_magic);
+            if (elf_magic == 0x464C457F) {
+                logger::log_success("[SECTOR-1] Memory Read Verified: libil2cpp ELF=0x%08X (engine=%d)", elf_magic, engine::mem::g_last_engine_mode);
                 s_elf_verified = true;
             } else {
-                logger::log_warn("[SECTOR-1] Memory Read Alert: libil2cpp at 0x%lx returned 0x%08X", (unsigned long)lib, elf_magic);
+                int err = engine::mem::g_last_read_errno;
+                logger::log_warn("[SECTOR-1] Memory Read Alert: libil2cpp at 0x%lx returned 0x%08X (errno=%d: %s, engine=%d)",
+                    (unsigned long)lib, elf_magic, err, (err != 0 ? strerror(err) : "None"), engine::mem::g_last_engine_mode);
             }
         }
 

@@ -118,6 +118,8 @@ namespace engine::mem {
     inline int       g_detected_pid = -1;
     inline uintptr_t g_lib_base = 0;
     inline int       g_mem_fd = -1;
+    inline int       g_last_read_errno = 0;
+    inline int       g_last_engine_mode = 0;
 
     /**
      * @brief Validates virtual memory addresses based on ABI address space limits.
@@ -452,11 +454,19 @@ namespace engine::mem {
 
         // Engine 1: Direct Kernel Assembly SVC #0
         long r = sys::vm_read(target_pid, &local_iov, 1, &remote_iov, 1);
-        if (r == static_cast<long>(size)) return true;
+        if (r == static_cast<long>(size)) {
+            g_last_engine_mode = 1;
+            return true;
+        }
 
         // Engine 2: Libc process_vm_readv
+        errno = 0;
         ssize_t lr = process_vm_readv(target_pid, &local_iov, 1, &remote_iov, 1, 0);
-        if (lr == static_cast<ssize_t>(size)) return true;
+        if (lr == static_cast<ssize_t>(size)) {
+            g_last_engine_mode = 2;
+            return true;
+        }
+        int saved_errno = errno;
 
         // Engine 3: Cached /proc/<pid>/mem pread64
         if (g_mem_fd < 0) {
@@ -466,9 +476,14 @@ namespace engine::mem {
         }
         if (g_mem_fd >= 0) {
             ssize_t pr = pread64(g_mem_fd, buffer, size, static_cast<off64_t>(address));
-            if (pr == static_cast<ssize_t>(size)) return true;
+            if (pr == static_cast<ssize_t>(size)) {
+                g_last_engine_mode = 3;
+                return true;
+            }
+            if (saved_errno == 0) saved_errno = errno;
         }
 
+        g_last_read_errno = saved_errno;
         memset(buffer, 0, size);
         return false;
     }

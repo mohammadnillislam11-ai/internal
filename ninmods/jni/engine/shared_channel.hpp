@@ -47,6 +47,16 @@ namespace engine::shm {
         bool     is_attached;
         bool     in_match;
 
+        // Diagnostic Telemetry
+        int32_t  engine_pid;       // Background daemon real PID
+        int32_t  engine_uid;       // getuid() result (0 = ROOT)
+        int32_t  engine_euid;      // geteuid() result (0 = ROOT)
+        int32_t  last_read_errno;  // Linux errno on read failure
+        int32_t  read_engine_mode; // 1: SVC #0, 2: Libc, 3: pread64
+        uint32_t elf_magic;        // Value read from libil2cpp base
+        uint32_t shm_file_bytes;   // Sized backing file bytes
+        bool     mmap_active;      // Both producer and consumer synced
+
         SharedConfig config;
 
         int32_t      entity_count;
@@ -73,8 +83,20 @@ namespace engine::shm {
 
         if (fd < 0) return nullptr;
 
-        if (is_producer) {
-            ftruncate(fd, sizeof(SharedChannel));
+        struct stat st{};
+        if (fstat(fd, &st) == 0) {
+            if (st.st_size < static_cast<off_t>(sizeof(SharedChannel))) {
+                if (is_producer) {
+                    if (ftruncate(fd, sizeof(SharedChannel)) != 0) {
+                        close(fd);
+                        return nullptr;
+                    }
+                } else {
+                    // Backing file not sized yet
+                    close(fd);
+                    return nullptr;
+                }
+            }
         }
 
         int prot = PROT_READ | PROT_WRITE;
