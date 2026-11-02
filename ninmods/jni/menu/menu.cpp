@@ -673,7 +673,7 @@ namespace ui::menu {
                 "libil2cpp Base  : %s\n"
                 "Match State     : %s\n"
                 "Radar Entities  : %zu Players Tracked\n"
-                "Memory Syscall  : Kernel Direct (SVC #0)\n"
+                "Memory Syscall  : Ring 0 Kernel Driver (/dev/mem_tool)\n"
                 "Aim Safety      : Reversible (Auto-Restore)\n"
                 "Framerate       : %.1f FPS\n"
                 "Resolution      : %.0f x %.0f\n"
