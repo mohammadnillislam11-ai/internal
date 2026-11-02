@@ -850,24 +850,29 @@ namespace ui::menu {
         NS_CardTitle(dl, {pLeft.x + S(12.f), pLeft.y + S(12.f)}, oxorany("Client State"), "Left Page", pageW);
         ImGui::SetCursorScreenPos({pLeft.x + S(12.f), pLeft.y + S(38.f)});
         ImGui::BeginGroup();
+        bool isOnline = is_driver_online_global();
+        const char* nodeName = get_driver_node_global();
+        int activePid = get_target_pid_global();
+        uintptr_t libBase = get_lib_base_global();
+        uint64_t reads = get_driver_reads_global();
+
         char drvNodeBuf[64];
-        snprintf(drvNodeBuf, sizeof(drvNodeBuf), "%s", engine::mem::get_driver_node());
+        snprintf(drvNodeBuf, sizeof(drvNodeBuf), "%s", nodeName);
         char pidBuf[64];
-        int activePid = (engine::mem::g_pid > 0) ? engine::mem::g_pid : engine::mem::g_detected_pid;
         if (activePid > 0) snprintf(pidBuf, sizeof(pidBuf), "ATTACHED (%d)", activePid);
         else snprintf(pidBuf, sizeof(pidBuf), "SCANNING");
 
         char baseBuf[64];
-        if (engine::mem::g_lib_base > 0) snprintf(baseBuf, sizeof(baseBuf), "0x%" PRIXPTR, engine::mem::g_lib_base);
+        if (libBase > 0) snprintf(baseBuf, sizeof(baseBuf), "0x%" PRIXPTR, libBase);
         else snprintf(baseBuf, sizeof(baseBuf), "RESOLVING (0x803)");
 
         char drvReadsBuf[64];
-        snprintf(drvReadsBuf, sizeof(drvReadsBuf), "%llu OK", (unsigned long long)engine::mem::get_driver_reads());
+        snprintf(drvReadsBuf, sizeof(drvReadsBuf), "%llu OK", (unsigned long long)reads);
 
-        NS_InfoRow(oxorany("Kernel Driver"), engine::mem::is_driver_online() ? oxorany("ONLINE (Ring 0)") : oxorany("OFFLINE"), engine::mem::is_driver_online() ? C_Success() : C_Danger(), pageW - S(24.f));
+        NS_InfoRow(oxorany("Kernel Driver"), isOnline ? oxorany("ONLINE (Ring 0)") : oxorany("OFFLINE"), isOnline ? C_Success() : C_Danger(), pageW - S(24.f));
         NS_InfoRow(oxorany("Active Node"), drvNodeBuf, C_Accent(), pageW - S(24.f));
         NS_InfoRow(oxorany("Game Target"), pidBuf, activePid > 0 ? C_Success() : C_TextDim(), pageW - S(24.f));
-        NS_InfoRow(oxorany("IL2CPP Base"), baseBuf, engine::mem::g_lib_base > 0 ? C_Success() : C_TextDim(), pageW - S(24.f));
+        NS_InfoRow(oxorany("IL2CPP Base"), baseBuf, libBase > 0 ? C_Success() : C_TextDim(), pageW - S(24.f));
         NS_InfoRow(oxorany("IOCTL Reads"), drvReadsBuf, C_Accent(), pageW - S(24.f));
         ImGui::EndGroup();
 
@@ -990,8 +995,8 @@ namespace ui::menu {
         dl->AddText(ImGui::GetFont(), S(17.0f), {logoX + logoSize + S(12.f), wp.y + (headerH - S(17.0f)) * 0.5f},
                     col(UITheme::text, ma), "NINMODS");
 
-        bool drv_online = engine::mem::is_driver_online();
-        const char* drv_node = engine::mem::get_driver_node();
+        bool drv_online = is_driver_online_global();
+        const char* drv_node = get_driver_node_global();
         char drv_badge[64];
         snprintf(drv_badge, sizeof(drv_badge), "RING 0: %s", drv_online ? (drv_node[0] ? drv_node : "ONLINE") : "STANDBY");
         ImU32 badge_bg = drv_online ? IM_COL32(20, 60, 35, (int)(220 * ma)) : IM_COL32(60, 25, 25, (int)(220 * ma));

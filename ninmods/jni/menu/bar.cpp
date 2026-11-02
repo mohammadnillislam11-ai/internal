@@ -134,7 +134,7 @@ static void render_fps_icon(float alpha) {
                 text_col, buf);
 
     // Real-Time Ring 0 Kernel Driver Live Status Dot & Badge
-    bool drv_ok = engine::mem::is_driver_online();
+    bool drv_ok = ui::menu::is_driver_online_global();
     float fpsTextW = font->CalcTextSizeA(fpsSize, FLT_MAX, 0.f, buf).x;
     float dot_x = textX + fpsTextW + h * 0.16f;
     float dot_y = g_fps_y + h * 0.5f;
