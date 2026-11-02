@@ -65,23 +65,10 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     private int headerHeightPx = 50;
     private int lastUnlockedPid = -1;
 
+    private static boolean sDriverPermsEnsured = false;
     private void ensureDriverNodePermissions() {
-        new Thread(() -> {
-            try {
-                Process su = Runtime.getRuntime().exec("su");
-                java.io.OutputStream os = su.getOutputStream();
-                String script =
-                        "chmod 666 /dev/mem_tool /dev/BYNb /dev/uevents_records 2>/dev/null\n" +
-                        "exit\n";
-                os.write(script.getBytes());
-                os.flush();
-                os.close();
-                su.waitFor();
-            } catch (Throwable ignored) {}
-        }).start();
-    }
-
-    private void ensureRootPermissions(final int pid) {
+        if (sDriverPermsEnsured) return;
+        sDriverPermsEnsured = true;
         new Thread(() -> {
             try {
                 Process su = Runtime.getRuntime().exec("su");
@@ -112,7 +99,6 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 int targetPid = NativeBridge.getTargetPid();
                 if (targetPid > 0 && targetPid != lastUnlockedPid) {
                     lastUnlockedPid = targetPid;
-                    ensureRootPermissions(targetPid);
                 }
             } catch (Throwable ignored) {}
 
@@ -469,16 +455,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         isServiceRunning = false;
         mainHandler.removeCallbacks(menuWatchdog);
 
-        new Thread(() -> {
-            try {
-                Process su = Runtime.getRuntime().exec("su");
-                java.io.OutputStream os = su.getOutputStream();
-                os.write("pkill -f gemini_engine 2>/dev/null\nexit\n".getBytes());
-                os.flush();
-                os.close();
-                su.waitFor();
-            } catch (Throwable ignored) {}
-        }).start();
+
 
         NativeBridge.stopEngine();
 
