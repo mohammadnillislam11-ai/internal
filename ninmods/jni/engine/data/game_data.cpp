@@ -205,7 +205,8 @@ namespace engine::data {
 
 
     /**
-     * @brief Managed IL2CPP Dictionary wrapper matching ZqwClient stealth 1-syscall architecture.
+     * @brief Managed IL2CPP Dictionary wrapper supporting both standard monoDictionary (entries at +0x28)
+     *        and packed array layouts.
      */
     class ManagedDictionary {
     public:
@@ -217,21 +218,60 @@ namespace engine::data {
         explicit ManagedDictionary(uint64_t addr) : address(addr) {
             if (!engine::mem::addr_valid(addr)) return;
 
-            struct { uint64_t entries; uint64_t count_and_pad; } header{};
-            if (!mem_read(addr + offsets::Dict_Entries, &header, sizeof(header))) return;
+            // Strategy 1: Standard Unity IL2CPP monoDictionary - monoArray<V>* values at +0x28
+            uint64_t values_arr = rpm<uint64_t>(addr + 0x28);
+            if (engine::mem::addr_valid(values_arr)) {
+                int len = rpm<int>(values_arr + 0x18); // monoArray max_length
+                if (len <= 0 || len > 2000) {
+                    len = rpm<int>(addr + 0x38); // fallback to dict->size
+                }
+                if (len > 0 && len <= 2000) {
+                    entries_head = values_arr + 0x20; // monoArray vector offset
+                    count = len;
+                    valid = true;
+                    return;
+                }
+            }
 
-            if (!engine::mem::addr_valid(header.entries)) return;
+            // Strategy 2: monoArray at +0x18
+            uint64_t arr18 = rpm<uint64_t>(addr + 0x18);
+            if (engine::mem::addr_valid(arr18)) {
+                int len = rpm<int>(arr18 + 0x18);
+                if (len <= 0 || len > 2000) len = rpm<int>(addr + 0x20);
+                if (len > 0 && len <= 2000) {
+                    entries_head = arr18 + 0x20;
+                    count = len;
+                    valid = true;
+                    return;
+                }
+            }
 
-            entries_head = header.entries + offsets::Dict_ArrayHeader;
-            count        = static_cast<int>(header.count_and_pad & 0xFFFFFFFFu);
-            valid        = (count > 0 && count < 0x1000);
+            // Strategy 3: monoArray at +0x20
+            uint64_t arr20 = rpm<uint64_t>(addr + 0x20);
+            if (engine::mem::addr_valid(arr20)) {
+                int len = rpm<int>(arr20 + 0x18);
+                if (len <= 0 || len > 2000) len = rpm<int>(addr + 0x38);
+                if (len > 0 && len <= 2000) {
+                    entries_head = arr20 + 0x20;
+                    count = len;
+                    valid = true;
+                    return;
+                }
+            }
         }
 
         inline int get_count() const { return count; }
 
         inline uint64_t entry(int i) const {
             if (!valid || i < 0 || i >= count) return 0;
-            return rpm<uint64_t>(entries_head + (i * offsets::Dict_EntryStride) + offsets::Dict_EntryValue);
+            // Each IL2CPP Entry<K, V> is 0x18 bytes, Value pointer is at offset +0x10
+            uint64_t entry_addr = entries_head + (i * 0x18);
+            uint64_t val = rpm<uint64_t>(entry_addr + 0x10);
+            if (!engine::mem::addr_valid(val)) {
+                // Fallback: direct pointer array (each entry 8 bytes)
+                val = rpm<uint64_t>(entries_head + (i * 8));
+            }
+            return val;
         }
     };
 
@@ -284,8 +324,11 @@ namespace engine::data {
         uintptr_t lib = (engine::mem::g_lib_base > 0) ? engine::mem::g_lib_base : proc::lib;
         if (pid <= 0 || lib == 0) return;
 
+        static auto s_epoch = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - s_epoch).count();
+        double now_sec = static_cast<double>(elapsed) / 1000.0;
+
         static double s_last_diag_tick = 0.0;
-        double now_sec = ImGui::GetTime();
         bool print_diag = (now_sec - s_last_diag_tick >= 2.5);
         if (print_diag) s_last_diag_tick = now_sec;
 
@@ -320,11 +363,11 @@ namespace engine::data {
         }
 
         static const uintptr_t candidates[] = {
-            0xA72E4E0, // ZqwClient / ninmodpro FF Normal OB55 / 1.132.x
+            0xA72E4E0, // ZqwClient / FF Normal OB55 / 1.132.x
+            0xB4C41A0, // NEXOMODS FF
+            0xA986B7C, // NEXOMODS FF alt
             0xAD6DC18, // STORM_MODS FF MAX
             0xAD68E18, // STORM_MODS FF MAX Ind
-            0xB4C41A0, // NEXOMODS FF MAX
-            0xA986B7C, // NEXOMODS FF MAX alt
             0xA7384E0,
             0xA8E44E0,
             0xAD74BB0,
@@ -359,77 +402,108 @@ namespace engine::data {
 
         if (!base_game) return;
 
-        // SECTOR 2: Match State & Local Player
+        // SECTOR 2: Match & Local Player Resolution
         uint64_t match = rpm<uint64_t>(base_game + offsets::BaseGame_Match);
-        uint64_t local_player = match ? rpm<uint64_t>(match + offsets::Match_LocalPlayer) : 0;
+        uint64_t local_player = 0;
+        if (match && engine::mem::addr_valid(match)) {
+            local_player = rpm<uint64_t>(match + offsets::Match_LocalPlayer);
+            if (!local_player) {
+                for (uintptr_t lpoff : {0xD8, 0xD0, 0xE0, 0xC8}) {
+                    uint64_t lp = rpm<uint64_t>(match + lpoff);
+                    if (engine::mem::addr_valid(lp)) { local_player = lp; break; }
+                }
+            }
+        }
         if (!local_player) {
             local_player = rpm<uint64_t>(base_game + offsets::Match_LocalPlayer);
         }
 
+        // SECTOR 3: Player Dictionary Resolution (probes multiple offsets)
+        uint64_t dict_addr = 0;
+        for (uintptr_t doff : {0xC0, 0xC8, 0xB8, 0xB0, 0xD0}) {
+            uint64_t d = rpm<uint64_t>(base_game + doff);
+            if (engine::mem::addr_valid(d)) {
+                ManagedDictionary test_dict(d);
+                if (test_dict.valid && test_dict.count > 0) {
+                    dict_addr = d;
+                    break;
+                }
+            }
+            if (match && engine::mem::addr_valid(match)) {
+                uint64_t dm = rpm<uint64_t>(match + doff);
+                if (engine::mem::addr_valid(dm)) {
+                    ManagedDictionary test_dict(dm);
+                    if (test_dict.valid && test_dict.count > 0) {
+                        dict_addr = dm;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!dict_addr) {
+            dict_addr = rpm<uint64_t>(base_game + offsets::Match_PlayerDict);
+            if (!dict_addr && match) dict_addr = rpm<uint64_t>(match + offsets::Match_PlayerDict);
+        }
+
+        ManagedDictionary dict(dict_addr);
+
         bool match_active = false;
-        bool mir = rpm<bool>(base_game + offsets::MatchIsRunning);
-        if (mir) {
-            match_active = true;
+        if (dict.valid && dict.count > 0) {
+            match_active = true; // Training targets or combat enemies exist!
         } else if (match && engine::mem::addr_valid(match)) {
             match_active = true;
         } else if (local_player && engine::mem::addr_valid(local_player)) {
             match_active = true;
         }
-
-        // SECTOR 3: Player Dictionary
-        uint64_t dict_addr = rpm<uint64_t>(base_game + offsets::Match_PlayerDict);
-        if (!dict_addr && match) {
-            dict_addr = rpm<uint64_t>(match + offsets::Match_PlayerDict);
-        }
-
-        ManagedDictionary dict(dict_addr);
-        if (dict.valid && dict.count > 0) {
-            match_active = true; // Combat or Training targets exist! Force active!
-        }
         g_in_match.store(match_active);
 
         if (print_diag) {
-            logger::log_info("[SECTOR-2] MatchState -> BaseGame=0x%lx | Match=0x%lx | Local=0x%lx | Running=%s | Dict=0x%lx (Count: %d)",
+            logger::log_info("[SECTOR-2] MatchState -> BaseGame=0x%lx | Match=0x%lx | Local=0x%lx | Active=%s | Dict=0x%lx (Count: %d)",
                 (unsigned long)base_game, (unsigned long)match, (unsigned long)local_player,
                 match_active ? "ACTIVE" : "STANDBY", (unsigned long)dict_addr, dict.valid ? dict.count : 0);
         }
 
-        if (!match_active) {
-            g_local_player.store(0);
-            g_vis_stable.clear();
-            g_vis_counter.clear();
-            {
-                std::lock_guard<std::mutex> lk(g_players_mutex);
-                g_players.clear();
-            }
+        if (!dict.valid || dict.count <= 0) {
+            std::lock_guard<std::mutex> lk(g_players_mutex);
+            g_players.clear();
             return;
         }
 
-        // SECTOR 4: Camera Matrix Resolution
+        // SECTOR 4: Camera Matrix Resolution (NEXOMODS 0x30 chain + fallbacks)
         uint64_t int_ptr = 0;
         uint64_t follow = 0;
         uint64_t cam = 0;
         if (local_player && engine::mem::addr_valid(local_player)) {
             g_local_player.store(local_player);
 
-            follow = rpm<uint64_t>(local_player + 0x690);
-            cam = follow ? rpm<uint64_t>(follow + offsets::Camera_Follow) : 0;
-            if (cam) int_ptr = rpm<uint64_t>(cam + offsets::Camera_IntPtr);
-
-            if (!int_ptr) {
-                follow = rpm<uint64_t>(local_player + offsets::Player_Camera);
-                cam = follow ? rpm<uint64_t>(follow + offsets::Camera_Follow) : 0;
-                if (cam) int_ptr = rpm<uint64_t>(cam + offsets::Camera_IntPtr);
+            // NEXOMODS verified chain: local_player + 0x30 -> FollowCamera + 0x30 -> Camera + 0x10 -> IntPtrCam
+            follow = rpm<uint64_t>(local_player + offsets::Player_Camera); // 0x30
+            if (follow && engine::mem::addr_valid(follow)) {
+                cam = rpm<uint64_t>(follow + 0x30);
+                if (cam && engine::mem::addr_valid(cam)) int_ptr = rpm<uint64_t>(cam + 0x10);
             }
 
-            if (!int_ptr && follow) {
-                cam = rpm<uint64_t>(follow + 0x30);
-                if (cam) int_ptr = rpm<uint64_t>(cam + 0x10);
+            // Fallback chain: local_player + 0x690 -> Camera_Follow (0x28) -> Camera_IntPtr (0x10)
+            if (!int_ptr) {
+                follow = rpm<uint64_t>(local_player + offsets::Player_Camera_Alt); // 0x690
+                if (follow && engine::mem::addr_valid(follow)) {
+                    cam = rpm<uint64_t>(follow + offsets::Camera_Follow);
+                    if (cam && engine::mem::addr_valid(cam)) int_ptr = rpm<uint64_t>(cam + offsets::Camera_IntPtr);
+                }
+            }
+
+            // Fallback: local_player + 0x398 (GetPlayerMainCamera)
+            if (!int_ptr) {
+                cam = rpm<uint64_t>(local_player + 0x398);
+                if (cam && engine::mem::addr_valid(cam)) int_ptr = rpm<uint64_t>(cam + 0x10);
             }
         }
 
         if (int_ptr && engine::mem::addr_valid(int_ptr)) {
-            g_view_matrix = rpm<Matrix4x4>(int_ptr + offsets::Camera_Matrix);
+            g_view_matrix = rpm<Matrix4x4>(int_ptr + offsets::Camera_Matrix); // 0x100
+            if (std::abs(g_view_matrix.m11) < 0.0001f && std::abs(g_view_matrix.m22) < 0.0001f) {
+                g_view_matrix = rpm<Matrix4x4>(int_ptr + 0xDC); // alt matrix offset
+            }
         }
 
         if (print_diag && local_player) {
@@ -439,15 +513,13 @@ namespace engine::data {
 
         Vector3 local_pos = Vector3::Zero();
         if (local_player) {
-            uint64_t local_head_node = rpm<uint64_t>(local_player + offsets::Bone_Head);
-            if (!local_head_node) local_head_node = rpm<uint64_t>(local_player + 0x6A0);
-            if (local_head_node) local_pos = get_node_position(local_head_node);
-        }
-
-        if (!dict.valid || dict.count <= 0) {
-            std::lock_guard<std::mutex> lk(g_players_mutex);
-            g_players.clear();
-            return;
+            for (uintptr_t off : {0x648, 0x6A0, 0x6A8, 0x668}) {
+                uint64_t ln = rpm<uint64_t>(local_player + off);
+                if (engine::mem::addr_valid(ln)) {
+                    Vector3 lp = get_node_position(ln);
+                    if (lp != Vector3::Zero()) { local_pos = lp; break; }
+                }
+            }
         }
 
         // SECTOR 5: Entity Scanning & Screen Projection
@@ -466,8 +538,7 @@ namespace engine::data {
             bool is_bot = rpm<bool>(enemy + offsets::Player_IsBot);
 
             auto avatar = rpm<uint64_t>(enemy + offsets::Player_Avatar);
-            if (!avatar) avatar = rpm<uint64_t>(enemy + 0x770);
-            if (!avatar) avatar = rpm<uint64_t>(enemy + 0x778);
+            if (!avatar) avatar = rpm<uint64_t>(enemy + offsets::Player_Avatar_Alt);
             auto uma = avatar ? rpm<uint64_t>(avatar + offsets::Avatar_Uma) : 0;
             if (uma) {
                 auto uma_data = rpm<uint64_t>(uma + offsets::Uma_Data);
@@ -497,15 +568,21 @@ namespace engine::data {
                 }
             }
 
-            // Head world & distance
-            uint64_t head_node = rpm<uint64_t>(enemy + offsets::Bone_Head);
-            if (!head_node) head_node = rpm<uint64_t>(enemy + 0x6A0);
-            if (!head_node) head_node = rpm<uint64_t>(enemy + 0x6A8);
-            if (!head_node) head_node = rpm<uint64_t>(enemy + 0x6B0);
-            if (!head_node) continue;
-
-            Vector3 head_world = get_node_position(head_node);
-            if (head_world == Vector3::Zero()) continue;
+            // Head world & distance: probe NEXOMODS 0x648, standard 0x6A0, 0x6A8, 0x668
+            uint64_t head_node = 0;
+            Vector3 head_world = Vector3::Zero();
+            for (uintptr_t off : {0x648, 0x6A0, 0x6A8, 0x6B0, 0x668}) {
+                uint64_t hn = rpm<uint64_t>(enemy + off);
+                if (engine::mem::addr_valid(hn)) {
+                    Vector3 pos = get_node_position(hn);
+                    if (pos != Vector3::Zero()) {
+                        head_node = hn;
+                        head_world = pos;
+                        break;
+                    }
+                }
+            }
+            if (!head_node || head_world == Vector3::Zero()) continue;
 
             float dist = (local_pos != Vector3::Zero()) ? get_distance_meters(local_pos, head_world) : 25.0f;
             if (dist > cfg::esp::max_range) continue;
@@ -516,11 +593,24 @@ namespace engine::data {
                 continue; // Behind camera or offscreen
             }
 
-            bool is_knocked = rpm<bool>(enemy + offsets::Player_DeathInfo) || (hp <= 0);
-            float model_h = is_knocked ? 0.90f : 1.72f;
-
-            Vector3 foot_world = head_world;
-            foot_world.y -= model_h;
+            // Foot world: probe NEXOMODS 0x670, standard 0x6E8, 0x6B8
+            Vector3 foot_world = Vector3::Zero();
+            for (uintptr_t off : {0x670, 0x6E8, 0x6B8, 0x6F0}) {
+                uint64_t fn = rpm<uint64_t>(enemy + off);
+                if (engine::mem::addr_valid(fn)) {
+                    Vector3 fpos = get_node_position(fn);
+                    if (fpos != Vector3::Zero()) {
+                        foot_world = fpos;
+                        break;
+                    }
+                }
+            }
+            if (foot_world == Vector3::Zero()) {
+                bool is_knocked = rpm<bool>(enemy + offsets::Player_DeathInfo) || (hp <= 0);
+                float model_h = is_knocked ? 0.90f : 1.72f;
+                foot_world = head_world;
+                foot_world.y -= model_h;
+            }
 
             Vector3 toe_screen = world_to_screen(g_view_matrix, foot_world, screen_w, screen_h);
             if (toe_screen.x < 0.0f || toe_screen.y < 0.0f) {

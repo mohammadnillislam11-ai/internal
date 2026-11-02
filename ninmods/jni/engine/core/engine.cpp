@@ -176,6 +176,9 @@ namespace engine {
             security::init(mem::g_pid);
         }
 
+        // Real-time entity & radar snapshot refresh
+        data::update_cycle();
+
         // Aimbot update and state restoration safety
         aim::update();
 

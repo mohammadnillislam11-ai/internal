@@ -26,21 +26,25 @@ namespace offsets {
     constexpr uintptr_t Dict_EntryStride     = 0x18;
     constexpr uintptr_t Dict_EntryValue      = 0x10;
 
-    /** @brief PLAYER FIELDS - Aligned strictly with ZqwClient verified structure */
+    /** @brief PLAYER FIELDS - Aligned strictly with ZqwClient & NEXOMODS verified structure */
     constexpr uintptr_t Player_Rotation      = 0x614;
-    constexpr uintptr_t Player_HeadTF        = 0x6A0;
-    constexpr uintptr_t Player_FootTF        = 0x6E8;
-    constexpr uintptr_t Player_Camera        = 0x690;
+    constexpr uintptr_t Player_HeadTF        = 0x648; // NEXOMODS verified (alt: 0x6A0)
+    constexpr uintptr_t Player_FootTF        = 0x670; // NEXOMODS verified (alt: 0x6E8)
+    constexpr uintptr_t Player_HeadTF_Alt    = 0x6A0;
+    constexpr uintptr_t Player_FootTF_Alt    = 0x6E8;
+    constexpr uintptr_t Player_Camera        = 0x30;  // NEXOMODS FollowCamera at +0x30 (alt: 0x690)
+    constexpr uintptr_t Player_Camera_Alt    = 0x690;
     constexpr uintptr_t Player_IsFiring      = 0x848;
     constexpr uintptr_t Player_IsSight       = 0x8A0;
     constexpr uintptr_t Player_HP            = 0x70;
     constexpr uintptr_t Player_Armor         = 0x74;
     constexpr uintptr_t Player_IsDead        = 0x7C;
-    constexpr uintptr_t Player_Avatar        = 0x770;
-    constexpr uintptr_t Player_HeadCollider  = 0x738;
+    constexpr uintptr_t Player_Avatar        = 0x718; // NEXOMODS AvatarManager at +0x718 (alt: 0x770)
+    constexpr uintptr_t Player_Avatar_Alt    = 0x770;
+    constexpr uintptr_t Player_HeadCollider  = 0x6E0; // NEXOMODS HedColider at +0x6E0 (alt: 0x738)
     constexpr uintptr_t Player_ColWrite      = 0x80;
     constexpr uintptr_t Player_DeathInfo     = 0x24A8;
-    constexpr uintptr_t Player_IsBot         = 0x4A0;
+    constexpr uintptr_t Player_IsBot         = 0x450; // NEXOMODS isClientBot at +0x450 (alt: 0x4A0)
     
     constexpr uintptr_t Player_Name          = 0x490;
     constexpr uintptr_t Player_AimInfo       = 0xE50;
