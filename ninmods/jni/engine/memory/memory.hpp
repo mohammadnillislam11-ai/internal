@@ -303,49 +303,35 @@ namespace engine::mem {
 
                                     if (b > 0) {
                                         cmd[b] = '\0';
-                                        if (strcmp(cmd, process_name) == 0 ||
-                                            (strncmp(cmd, process_name, plen) == 0 && (cmd[plen] == '\0' || cmd[plen] == ':' || cmd[plen] == ' '))) {
-                                            found = cpid;
-                                        }
-                                    }
-                                }
-
-                                if (found <= 0) {
-                                    ps = base_len;
-                                    const char* cms = oxorany("/comm");
-                                    while (*cms) cp[ps++] = *cms++;
-                                    cp[ps] = '\0';
-
-                                    int cmfd = sys::openat(AT_FDCWD, cp, O_RDONLY);
-                                    if (cmfd < 0) cmfd = open(cp, O_RDONLY);
-                                    if (cmfd >= 0) {
-                                        char comm_buf[64] = {0};
-                                        long cb = sys::read(cmfd, comm_buf, sizeof(comm_buf) - 1);
-                                        sys::close(cmfd);
-                                        if (cb > 0) {
-                                            comm_buf[cb] = '\0';
-                                            while (cb > 0 && (comm_buf[cb-1] == '\n' || comm_buf[cb-1] == '\r')) comm_buf[--cb] = '\0';
-                                            if (strcmp(comm_buf, "com.dts.freefir") == 0 || strcmp(comm_buf, "freefire") == 0) {
+                                        // Strict exact match: Never match subprocesses like :push, :remote, :sandboxed
+                                        if (strcmp(cmd, process_name) == 0) {
+                                            // Prioritize PID that already loaded libil2cpp.so
+                                            if (find_module_base(cpid, "libil2cpp.so") > 0) {
+                                                found = cpid;
+                                                break;
+                                            }
+                                            if (found <= 0) {
                                                 found = cpid;
                                             }
                                         }
                                     }
                                 }
+
                                 sys::wipe(cp, sizeof(cp));
-                                if (found > 0) break;
+                                if (found > 0 && find_module_base(found, "libil2cpp.so") > 0) break;
                             }
                         }
                     }
                     p += e->d_reclen;
                 }
-                if (found > 0) break;
+                if (found > 0 && find_module_base(found, "libil2cpp.so") > 0) break;
             }
             sys::close(pfd);
             sys::wipe(buf, sizeof(buf));
         }
 
         // Secondary fallback: Libc opendir("/proc")
-        if (found <= 0) {
+        if (found <= 0 || find_module_base(found, "libil2cpp.so") == 0) {
             DIR* d = opendir("/proc");
             if (d) {
                 struct dirent* de;
@@ -369,10 +355,12 @@ namespace engine::mem {
                         close(cfd);
                         if (b > 0) {
                             cmd[b] = '\0';
-                            if (strcmp(cmd, process_name) == 0 ||
-                                (strncmp(cmd, process_name, plen) == 0 && (cmd[plen] == '\0' || cmd[plen] == ':' || cmd[plen] == ' '))) {
-                                found = cpid;
-                                break;
+                            if (strcmp(cmd, process_name) == 0) {
+                                if (find_module_base(cpid, "libil2cpp.so") > 0) {
+                                    found = cpid;
+                                    break;
+                                }
+                                if (found <= 0) found = cpid;
                             }
                         }
                     }
