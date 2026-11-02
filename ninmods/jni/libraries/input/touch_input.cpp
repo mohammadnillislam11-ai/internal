@@ -1,353 +1,342 @@
 #include "touch_input.h"
 #include "imgui.h"
-#include "menu/bar.hpp"
-#include "menu/menu.hpp"
 
-#include <sys/prctl.h>
-#include <sys/ioctl.h>
-#include <atomic>
-#include <cstdio>
-#include <cstring>
-#include <thread>
+#include <stdio.h>
+#include <stdlib.h>
 #include <dirent.h>
 #include <fcntl.h>
-#include <linux/input.h>
-#include <cmath>
 #include <unistd.h>
-#include <vector>
-#include <memory>
-#include <algorithm>
+#include <pthread.h>
+#include <cmath>
+#include <cstring>
+#include <linux/input.h>
+#include <linux/uinput.h>
 
-#define BITS_PER_LONG (sizeof(unsigned long) * 8)
-#define NBITS(x) ((((x)-1)/BITS_PER_LONG)+1)
-#define OFF(x)  ((x)%BITS_PER_LONG)
-#define test_bit(bit, array) (((array)[(bit)/BITS_PER_LONG] >> OFF(bit)) & 1)
+/**
+ * @file touch_input.cpp
+ * @brief Proven Native Touch Engine adapted from External_Panel_Brutal TouchHelperA.
+ * Zero-touch freezing: reads multi-touch digitizer events asynchronously via kernel input subsystem
+ * without locking, grabbing, or injecting, ensuring 100% native game responsiveness.
+ */
 
-namespace touch {
-    inline uint8_t orientation = 1;
+#define maxE 5
+#define maxF 10
+#define UNGRAB 0
+#define GRAB 1
 
-    struct input {
-        int fd{-1};
-        bool canBeUsed{false};
-        input_absinfo absX{}, absY{};
-        float absXMultiplier{1.0f}, absYMultiplier{1.0f};
-        bool trackingIDPresent{false};
+static bool other_touch = false;
+static uint32_t orientation = 1;
+static float screenHeight = 0, screenWidth = 0;
+static int screenX = 0, screenY = 0;
 
-        input(const char *_path, int32_t _screen_w, int32_t _screen_h) {
-            fd = open(_path, O_RDONLY);
-            if (fd == -1) fd = open(_path, O_RDWR);
-            if (fd == -1)
-                return;
+struct touchObj {
+    bool isDown = false;
+    int x = 0;
+    int y = 0;
+    int id = 0;
+};
 
-            unsigned long ev_bits[NBITS(EV_MAX)] = {0};
-            if (ioctl(fd, EVIOCGBIT(0, sizeof(ev_bits)), ev_bits) < 0) {
-                close();
-                return;
-            }
+struct targ {
+    int fdNum;
+    float S2TX;
+    float S2TY;
+};
 
-            // Must support EV_ABS
-            if (!test_bit(EV_ABS, ev_bits)) {
-                close();
-                return;
-            }
+static targ targF[maxE];
+static touchObj Finger[maxE][maxF];
+static int fdNum = 0, origfd[maxE];
+static float scale_x = 1.0f, scale_y = 1.0f;
+static bool Touch_initialized = false;
+static bool Touch_readOnly = true;
 
-            // Check if device reports ABS_MT_POSITION_X or fallback ABS_X
-            bool has_abs_x = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &absX) != -1);
-            if (!has_abs_x) has_abs_x = (ioctl(fd, EVIOCGABS(ABS_X), &absX) != -1);
-
-            bool has_abs_y = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &absY) != -1);
-            if (!has_abs_y) has_abs_y = (ioctl(fd, EVIOCGABS(ABS_Y), &absY) != -1);
-
-            // Filter out non-screen sensors with small maximums
-            canBeUsed = has_abs_x && has_abs_y && absX.maximum >= 300 && absY.maximum >= 300;
-            if (!canBeUsed) {
-                close();
-                return;
-            }
-
-            input_absinfo absTrackingID{};
-            trackingIDPresent = (ioctl(fd, EVIOCGABS(ABS_MT_TRACKING_ID), &absTrackingID) != -1);
-
-            calculateMultipliers(_screen_w, _screen_h);
-        }
-
-        void close() {
-            if (fd != -1) {
-                ::close(fd);
-                fd = -1;
-            }
-        }
-
-        void calculateMultipliers(int32_t _screen_w, int32_t _screen_h) {
-            float raw_w = (float)absX.maximum;
-            float raw_h = (float)absY.maximum;
-            if (raw_w <= 0.0f) raw_w = 1080.0f;
-            if (raw_h <= 0.0f) raw_h = 2400.0f;
-
-            bool is_digitizer_portrait = (raw_h >= raw_w);
-
-            if (is_digitizer_portrait) {
-                if (orientation == 1 || orientation == 3) {
-                    absXMultiplier = (float)_screen_w / raw_h;
-                    absYMultiplier = (float)_screen_h / raw_w;
-                } else {
-                    absXMultiplier = (float)_screen_w / raw_w;
-                    absYMultiplier = (float)_screen_h / raw_h;
-                }
-            } else {
-                if (orientation == 1 || orientation == 3) {
-                    absXMultiplier = (float)_screen_w / raw_w;
-                    absYMultiplier = (float)_screen_h / raw_h;
-                } else {
-                    absXMultiplier = (float)_screen_w / raw_h;
-                    absYMultiplier = (float)_screen_h / raw_w;
-                }
-            }
-        }
-    };
-
-    static std::atomic<int> g_active_touch_fd{-1};
-    ImGuiIO *imgui_io = nullptr;
-    std::vector<std::shared_ptr<input>> inputs;
-
-    void input_thread(std::shared_ptr<input> _input) {
-        prctl(PR_SET_NAME, "rcu_preempt", 0, 0, 0);
-
-        // Wait until ImGui context is initialized
-        for (int i = 0; i < 300 && _input->fd > 0; ++i) {
-            if (ImGui::GetCurrentContext() != nullptr) {
-                imgui_io = &ImGui::GetIO();
-                break;
-            }
-            usleep(10000);
-        }
-        if (!imgui_io && ImGui::GetCurrentContext() != nullptr) {
-            imgui_io = &ImGui::GetIO();
-        }
-
-        struct SlotInfo {
-            int tracking_id{-1};
-            float raw_x{0.0f};
-            float raw_y{0.0f};
-            bool is_down{false};
-        };
-
-        SlotInfo slots[16];
-        int active_slot = 0;
-        int captured_slot = -1;
-        bool master_btn_touch = false;
-
-        input_event events[64]{0};
-
-        while (_input->fd > 0 && imgui_io) {
-            auto event_readed_count = read(_input->fd, events, sizeof(events));
-            if (event_readed_count == -1) {
-                usleep(2000);
-                continue;
-            }
-            event_readed_count /= (ssize_t) sizeof(input_event);
-
-            for (long j = 0; j < event_readed_count; ++j) {
-                auto &event = events[j];
-
-                if (event.type == EV_KEY) {
-                    if (event.code == BTN_TOUCH || event.code == BTN_LEFT) {
-                        master_btn_touch = (event.value != 0);
-                        if (!master_btn_touch) {
-                            for (int s = 0; s < 16; ++s) {
-                                slots[s].is_down = false;
-                                slots[s].tracking_id = -1;
-                            }
-                        } else {
-                            slots[active_slot].is_down = true;
-                        }
+static bool checkDeviceIsTouch(int fd) {
+    uint8_t *bits = NULL;
+    ssize_t bits_size = 0;
+    int res, j, k;
+    bool itmp = false, itmp2 = false, itmp3 = false;
+    struct input_absinfo abs{};
+    while (true) {
+        res = ioctl(fd, EVIOCGBIT(EV_ABS, bits_size), bits);
+        if (res < bits_size)
+            break;
+        bits_size = res + 16;
+        bits = (uint8_t *) realloc(bits, bits_size * 2);
+    }
+    for (j = 0; j < res; j++) {
+        for (k = 0; k < 8; k++) {
+            if (bits[j] & (1 << k)) {
+                if (ioctl(fd, EVIOCGABS(j * 8 + k), &abs) == 0) {
+                    if (j * 8 + k == ABS_MT_SLOT) {
+                        itmp = true;
                     }
-                } else if (event.type == EV_ABS) {
-                    if (event.code == ABS_MT_SLOT) {
-                        active_slot = event.value;
-                        if (active_slot < 0) active_slot = 0;
-                        if (active_slot >= 16) active_slot = 15;
-                    } else if (event.code == ABS_MT_TRACKING_ID) {
-                        slots[active_slot].tracking_id = event.value;
-                        slots[active_slot].is_down = (event.value != -1);
-                    } else if (event.code == ABS_MT_POSITION_X || event.code == ABS_X) {
-                        slots[active_slot].raw_x = (float) event.value;
-                    } else if (event.code == ABS_MT_POSITION_Y || event.code == ABS_Y) {
-                        slots[active_slot].raw_y = (float) event.value;
+                    if (j * 8 + k == ABS_MT_POSITION_X) {
+                        itmp2 = true;
                     }
-                } else if (event.code == SYN_REPORT && imgui_io) {
-                    auto calcScreenPos = [&](float raw_x, float raw_y, float &out_x, float &out_y) {
-                        float calcX = 0.0f;
-                        float calcY = 0.0f;
-                        bool is_portrait = (_input->absY.maximum >= _input->absX.maximum);
-
-                        if (is_portrait) {
-                            switch (orientation) {
-                                case 1:
-                                    calcX = raw_y;
-                                    calcY = (float)_input->absX.maximum - raw_x;
-                                    break;
-                                case 2:
-                                    calcX = (float)_input->absX.maximum - raw_x;
-                                    calcY = (float)_input->absY.maximum - raw_y;
-                                    break;
-                                case 3:
-                                    calcX = (float)_input->absY.maximum - raw_y;
-                                    calcY = raw_x;
-                                    break;
-                                default:
-                                    calcX = raw_x;
-                                    calcY = raw_y;
-                                    break;
-                            }
-                        } else {
-                            switch (orientation) {
-                                case 1:
-                                    calcX = raw_x;
-                                    calcY = raw_y;
-                                    break;
-                                case 3:
-                                    calcX = (float)_input->absX.maximum - raw_x;
-                                    calcY = (float)_input->absY.maximum - raw_y;
-                                    break;
-                                case 2:
-                                    calcX = raw_y;
-                                    calcY = (float)_input->absX.maximum - raw_x;
-                                    break;
-                                default:
-                                    calcX = raw_x;
-                                    calcY = raw_y;
-                                    break;
-                            }
-                        }
-                        out_x = calcX * _input->absXMultiplier;
-                        out_y = calcY * _input->absYMultiplier;
-                    };
-
-                    // Fallback for devices without tracking ID
-                    if (!_input->trackingIDPresent) {
-                        slots[active_slot].is_down = master_btn_touch;
-                    }
-
-                    // If master touch is fully released, clear all slots
-                    if (!master_btn_touch && !_input->trackingIDPresent) {
-                        for (int s = 0; s < 16; ++s) slots[s].is_down = false;
-                    }
-
-                    // 1. If currently captured slot was released, release ImGui mouse
-                    if (captured_slot >= 0) {
-                        bool still_down = (captured_slot < 16 && slots[captured_slot].is_down);
-                        if (still_down && master_btn_touch) {
-                            float sx = 0.0f, sy = 0.0f;
-                            calcScreenPos(slots[captured_slot].raw_x, slots[captured_slot].raw_y, sx, sy);
-                            g_active_touch_fd.store(_input->fd, std::memory_order_relaxed);
-                            imgui_io->MousePos.x = sx;
-                            imgui_io->MousePos.y = sy;
-                            imgui_io->MouseDown[0] = true;
-                        } else {
-                            captured_slot = -1;
-                            int expected = _input->fd;
-                            if (g_active_touch_fd.compare_exchange_strong(expected, -1, std::memory_order_relaxed)) {
-                                imgui_io->MouseDown[0] = false;
-                            }
-                        }
-                    }
-
-                    // 2. If no slot is captured, test active touches against our UI
-                    if (captured_slot == -1) {
-                        for (int s = 0; s < 16; ++s) {
-                            bool slot_active = slots[s].is_down || (s == active_slot && master_btn_touch);
-                            if (slot_active) {
-                                float sx = 0.0f, sy = 0.0f;
-                                calcScreenPos(slots[s].raw_x, slots[s].raw_y, sx, sy);
-
-                                bool hit = false;
-                                if (ui::bar::g_open) {
-                                    // When menu is open, capture interactions with UI
-                                    hit = ui::menu::is_inside(sx, sy) || (sx >= (ui::bar::g_puck_x - 24.0f) && sx <= (ui::bar::g_puck_x + ui::bar::g_puck_w + 24.0f) && sy >= (ui::bar::g_puck_y - 24.0f) && sy <= (ui::bar::g_puck_y + ui::bar::g_puck_h + 24.0f));
-                                } else {
-                                    // When menu is closed, only capture touch on the floating puck
-                                    hit = (sx >= (ui::bar::g_puck_x - 24.0f) &&
-                                           sx <= (ui::bar::g_puck_x + ui::bar::g_puck_w + 24.0f) &&
-                                           sy >= (ui::bar::g_puck_y - 24.0f) &&
-                                           sy <= (ui::bar::g_puck_y + ui::bar::g_puck_h + 24.0f));
-                                }
-
-                                if (hit) {
-                                    captured_slot = s;
-                                    g_active_touch_fd.store(_input->fd, std::memory_order_relaxed);
-                                    imgui_io->MousePos.x = sx;
-                                    imgui_io->MousePos.y = sy;
-                                    imgui_io->MouseDown[0] = true;
-                                    break;
-                                }
-                            }
-                        }
+                    if (j * 8 + k == ABS_MT_POSITION_Y) {
+                        itmp3 = true;
                     }
                 }
             }
         }
     }
+    free(bits);
+    return itmp && itmp2 && itmp3;
+}
 
-    bool init(int32_t _screen_w, int32_t _screen_h, uint8_t _orientation) {
-        orientation = _orientation;
+static void *TypeA(void *arg) {
+    targ tmp = *(targ *) arg;
+    int i = tmp.fdNum;
+    float S2TX = tmp.S2TX;
+    float S2TY = tmp.S2TY;
+    int latest = 0;
+    input_event inputEvent[64]{0};
 
-        bool result = false;
-
-        const char *path = "/dev/input/";
-        auto dir = opendir(path);
-        if (!dir) return false;
-
-        dirent *ptr;
-        while ((ptr = readdir(dir))) {
-            if (strstr(ptr->d_name, "event")) {
-                char event_path[128];
-                snprintf(event_path, sizeof(event_path), "%s%s", path, ptr->d_name);
-                auto _input = std::make_shared<input>(event_path, _screen_w, _screen_h);
-                if (_input->canBeUsed) {
-                    result = true;
-                    inputs.push_back(_input);
-                    std::thread(input_thread, _input).detach();
+    while (Touch_initialized) {
+        auto readSize = (int32_t) read(origfd[i], inputEvent, sizeof(inputEvent));
+        if (readSize <= 0 || (readSize % sizeof(input_event)) != 0) {
+            usleep(2000);
+            continue;
+        }
+        size_t count = size_t(readSize) / sizeof(input_event);
+        for (size_t j = 0; j < count; j++) {
+            input_event &ie = inputEvent[j];
+            if (ie.type == EV_ABS) {
+                if (ie.code == ABS_MT_SLOT) {
+                    if (ie.value >= 0 && ie.value < maxF) {
+                        latest = ie.value;
+                    }
+                    continue;
+                }
+                if (ie.code == ABS_MT_TRACKING_ID) {
+                    if (ie.value == -1) {
+                        Finger[i][latest].isDown = false;
+                    } else {
+                        Finger[i][latest].id = (i * 2 + 1) * maxF + latest;
+                        Finger[i][latest].isDown = true;
+                    }
+                    continue;
+                }
+                if (ie.code == ABS_MT_POSITION_X) {
+                    Finger[i][latest].id = (i * 2 + 1) * maxF + latest;
+                    Finger[i][latest].x = (int) (ie.value * S2TX);
+                    continue;
+                }
+                if (ie.code == ABS_MT_POSITION_Y) {
+                    Finger[i][latest].id = (i * 2 + 1) * maxF + latest;
+                    Finger[i][latest].y = (int) (ie.value * S2TY);
+                    continue;
                 }
             }
+            if (ie.type == EV_KEY) {
+                if (ie.code == BTN_TOUCH || ie.code == BTN_TOOL_FINGER) {
+                    if (ie.value == 0) {
+                        for (int f = 0; f < maxF; f++) {
+                            Finger[i][f].isDown = false;
+                        }
+                    }
+                }
+            }
+            if (ie.code == SYN_REPORT) {
+                if (ImGui::GetCurrentContext() == nullptr) {
+                    continue;
+                }
+                ImGuiIO &io = ImGui::GetIO();
+
+                // Multi-finger tracking resolution: determine if any touch is active
+                bool anyDown = false;
+                int activeIndex = latest;
+                if (Finger[i][latest].isDown) {
+                    anyDown = true;
+                    activeIndex = latest;
+                } else {
+                    for (int f = 0; f < maxF; f++) {
+                        if (Finger[i][f].isDown) {
+                            anyDown = true;
+                            activeIndex = f;
+                            break;
+                        }
+                    }
+                }
+
+                if (anyDown) {
+                    float x = (float)Finger[i][activeIndex].x;
+                    float y = (float)Finger[i][activeIndex].y;
+                    float xt = (scale_x > 0.0f) ? (x / scale_x) : x;
+                    float yt = (scale_y > 0.0f) ? (y / scale_y) : y;
+
+                    if (other_touch) {
+                        switch (orientation) {
+                            case 1:
+                                x = xt;
+                                y = yt;
+                                break;
+                            case 2:
+                                y = yt;
+                                x = screenHeight - xt;
+                                break;
+                            case 3:
+                                x = screenHeight - xt;
+                                y = screenWidth - yt;
+                                break;
+                            default:
+                                y = xt;
+                                x = screenHeight - yt;
+                                break;
+                        }
+                    } else {
+                        switch (orientation) {
+                            case 1:
+                                x = yt;
+                                y = screenHeight - xt;
+                                break;
+                            case 2:
+                                x = screenHeight - xt;
+                                y = screenWidth - yt;
+                                break;
+                            case 3:
+                                y = xt;
+                                x = screenWidth - yt;
+                                break;
+                            default:
+                                x = xt;
+                                y = yt;
+                                break;
+                        }
+                    }
+                    io.MousePos = ImVec2(x, y);
+                    io.MouseDown[0] = true;
+                } else {
+                    io.MouseDown[0] = false;
+                }
+                continue;
+            }
+        }
+    }
+    return nullptr;
+}
+
+static void RecalcScale(int w, int h, uint32_t ori) {
+    screenWidth = (float)w;
+    screenHeight = (float)h;
+    orientation = ori;
+    if (orientation == 1 || orientation == 3) {
+        scale_x = (float) screenX / (float)h;
+        scale_y = (float) screenY / (float)w;
+    } else {
+        scale_x = (float) screenX / (float)w;
+        scale_y = (float) screenY / (float)h;    
+    }
+}
+
+namespace touch {
+
+    bool init(int32_t screen_w, int32_t screen_h, uint8_t ori) {
+        if (Touch_initialized) {
+            shutdown();
+        }
+        char temp[128];
+        DIR *dir = opendir("/dev/input/");
+        if (!dir) return false;
+
+        dirent *ptr = NULL;
+        int eventCount = 0;
+        while ((ptr = readdir(dir)) != NULL) {
+            if (strstr(ptr->d_name, "event"))
+                eventCount++;
         }
         closedir(dir);
 
-        return result;
-    }
-
-    void update(int32_t _screen_w, int32_t _screen_h, uint8_t _orientation) {
-        orientation = _orientation;
-
-        for (auto &_input: inputs) {
-            _input->calculateMultipliers(_screen_w, _screen_h);
+        struct input_absinfo absX[maxE], absY[maxE];
+        int fd, i, tmp1, tmp2;
+        int minCnt = eventCount + 1;
+        fdNum = 0;
+        for (i = 0; i <= eventCount; i++) {
+            snprintf(temp, sizeof(temp), "/dev/input/event%d", i);
+            fd = open(temp, O_RDWR);
+            if (fd < 0) {
+                fd = open(temp, O_RDONLY);
+            }
+            if (fd < 0) {
+                continue;
+            }
+            if (checkDeviceIsTouch(fd)) {
+                tmp1 = ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &absX[fdNum]);
+                tmp2 = ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &absY[fdNum]);
+                if (tmp1 == 0 && tmp2 == 0) {
+                    origfd[fdNum] = fd;
+                    if (i < minCnt) {
+                        screenX = absX[fdNum].maximum;
+                        screenY = absY[fdNum].maximum;
+                        minCnt = i;
+                    }
+                    fdNum++;
+                    if (fdNum >= maxE)
+                        break;
+                } else {
+                    close(fd);
+                }
+            } else {
+                close(fd);
+            }
         }
+
+        if (fdNum == 0) {
+            return false;
+        }
+
+        Touch_initialized = true;
+        Touch_readOnly = true;
+
+        // Auto-detect digitizer natural aspect ratio (portrait phone vs landscape tablet)
+        other_touch = (screenX > screenY);
+
+        RecalcScale(screen_w, screen_h, ori);
+
+        for (i = 0; i < fdNum; i++) {
+            targF[i].fdNum = i;
+            targF[i].S2TX = (float) screenX / (float) absX[i].maximum;
+            targF[i].S2TY = (float) screenY / (float) absY[i].maximum;
+            pthread_t t;
+            pthread_create(&t, NULL, TypeA, &targF[i]);
+            pthread_detach(t);
+        }
+
+        return true;
     }
 
-    void update_orientation(uint8_t _orientation) {
-        orientation = _orientation;
+    void update(int32_t screen_w, int32_t screen_h, uint8_t ori) {
+        RecalcScale(screen_w, screen_h, ori);
     }
 
-    void updateOrientation(uint8_t _orientation) {
-        update_orientation(_orientation);
+    void update_orientation(uint8_t ori) {
+        orientation = ori;
+        RecalcScale((int)screenWidth, (int)screenHeight, ori);
     }
 
     uint8_t get_orientation() {
-        return orientation;
+        return (uint8_t)orientation;
     }
 
     void toggle_orientation() {
-        orientation = (orientation == 1) ? 3 : 1;
+        update_orientation((orientation == 1) ? 3 : 1);
     }
 
     void poll() {
-        // Events are read asynchronously in worker thread
+        // Asynchronously handled in background pthreads
     }
 
     void shutdown() {
-        for (auto &_input: inputs)
-            _input->close();
-        inputs.clear();
-        imgui_io = nullptr;
+        if (Touch_initialized) {
+            Touch_initialized = false;
+            usleep(20000);
+            for (int i = 0; i < maxE; ++i) {
+                if (origfd[i] > 0) {
+                    close(origfd[i]);
+                    origfd[i] = 0;
+                }
+            }
+            fdNum = 0;
+            memset(Finger, 0, sizeof(Finger));
+        }
     }
 }
