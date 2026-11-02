@@ -8,8 +8,10 @@
 #include <dirent.h>
 #include <sys/syscall.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <atomic>
 #include "oxorany.h"
-#include "KittyMemory.hpp"
 
 /**
  * @file memory.hpp
@@ -108,6 +110,11 @@ namespace engine::mem {
     inline int       g_driver_fd = -1;
     inline int       g_last_read_errno = 0;
     inline int       g_last_engine_mode = 0; // Strictly 0: Ring 0 Kernel Driver
+    inline char      g_active_driver_node[64] = {0};
+    inline std::atomic<uint64_t> g_driver_read_count{0};
+    inline std::atomic<uint64_t> g_driver_write_count{0};
+    inline std::atomic<uint64_t> g_driver_error_count{0};
+    inline std::atomic<bool>     g_driver_online{false};
 
     /**
      * @brief Validates virtual memory addresses based on ABI address space limits.
@@ -125,20 +132,121 @@ namespace engine::mem {
     }
 
     /**
+     * @brief Probes /sys/class/mem_tool_class/mem_tool/dev to resolve major:minor numbers.
+     * Recreates /dev/mem_tool via mknod if the character device node was unlinked or missing.
+     */
+    inline int probe_sysfs_class() {
+        const char* path = oxorany("/sys/class/mem_tool_class/mem_tool/dev");
+        int fd = open(path, O_RDONLY);
+        if (fd < 0) return -1;
+        char buf[32] = {0};
+        ssize_t n = read(fd, buf, sizeof(buf) - 1);
+        close(fd);
+        if (n <= 0) return -1;
+        int major = 0, minor = 0;
+        if (sscanf(buf, "%d:%d", &major, &minor) == 2 && major > 0) {
+            unlink("/dev/mem_tool");
+            if (mknod("/dev/mem_tool", S_IFCHR | 0666, makedev(major, minor)) == 0 || errno == EEXIST) {
+                chmod("/dev/mem_tool", 0666);
+                return open("/dev/mem_tool", O_RDWR);
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * @brief Probes /proc/devices for registered mem_tool / BYNb major character driver numbers.
+     */
+    inline int probe_proc_devices() {
+        int fd = open(oxorany("/proc/devices"), O_RDONLY);
+        if (fd < 0) return -1;
+        char buf[4096] = {0};
+        ssize_t n = read(fd, buf, sizeof(buf) - 1);
+        close(fd);
+        if (n <= 0) return -1;
+
+        char* saveptr = nullptr;
+        char* line = strtok_r(buf, "\n", &saveptr);
+        while (line) {
+            int major = 0;
+            char name[64] = {0};
+            if (sscanf(line, "%d %63s", &major, name) == 2) {
+                if (strcmp(name, oxorany("mem_tool")) == 0 || strcmp(name, oxorany("BYNb")) == 0) {
+                    char node[32];
+                    snprintf(node, sizeof(node), "/dev/%s", name);
+                    unlink(node);
+                    if (mknod(node, S_IFCHR | 0666, makedev(major, 0)) == 0 || errno == EEXIST) {
+                        chmod(node, 0666);
+                        return open(node, O_RDWR);
+                    }
+                }
+            }
+            line = strtok_r(nullptr, "\n", &saveptr);
+        }
+        return -1;
+    }
+
+    /**
      * @brief Probes and opens the Ring 0 kernel driver device node.
-     * Checks /dev/mem_tool, /dev/BYNb, and /dev/uevents_records.
+     * Checks direct nodes (/dev/mem_tool, /dev/BYNb), sysfs class, and /proc/devices.
      */
     inline int get_driver_fd() {
         if (g_driver_fd >= 0) return g_driver_fd;
+
+        // 1. Check direct standard character nodes
         const char* nodes[] = { "/dev/mem_tool", "/dev/BYNb", "/dev/uevents_records" };
         for (const char* node : nodes) {
             int fd = open(node, O_RDWR);
             if (fd >= 0) {
                 g_driver_fd = fd;
+                strncpy(g_active_driver_node, node, sizeof(g_active_driver_node) - 1);
+                g_driver_online.store(true);
                 return g_driver_fd;
             }
         }
+
+        // 2. Proactively probe sysfs class entry
+        int sys_fd = probe_sysfs_class();
+        if (sys_fd >= 0) {
+            g_driver_fd = sys_fd;
+            strncpy(g_active_driver_node, "/dev/mem_tool", sizeof(g_active_driver_node) - 1);
+            g_driver_online.store(true);
+            return g_driver_fd;
+        }
+
+        // 3. Proactively probe /proc/devices
+        int proc_fd = probe_proc_devices();
+        if (proc_fd >= 0) {
+            g_driver_fd = proc_fd;
+            strncpy(g_active_driver_node, "/dev/mem_tool", sizeof(g_active_driver_node) - 1);
+            g_driver_online.store(true);
+            return g_driver_fd;
+        }
+
         return -1;
+    }
+
+    inline bool is_driver_online() {
+        if (g_driver_online.load(std::memory_order_relaxed)) return true;
+        return get_driver_fd() >= 0;
+    }
+
+    inline const char* get_driver_node() {
+        if (g_active_driver_node[0]) return g_active_driver_node;
+        get_driver_fd();
+        return g_active_driver_node[0] ? g_active_driver_node : "DISCONNECTED";
+    }
+
+    inline uint64_t get_driver_reads() {
+        return g_driver_read_count.load(std::memory_order_relaxed);
+    }
+
+    inline uint64_t get_driver_writes() {
+        return g_driver_write_count.load(std::memory_order_relaxed);
+    }
+
+    inline uint64_t get_driver_errors() {
+        return g_driver_error_count.load(std::memory_order_relaxed);
     }
 
     /**
@@ -366,9 +474,12 @@ namespace engine::mem {
             if (ioctl(dfd, DEV_OP_READ_MEM, &cm) == 0) {
                 g_last_engine_mode = 0;
                 g_last_read_errno = 0;
+                g_driver_online.store(true, std::memory_order_relaxed);
+                g_driver_read_count.fetch_add(1, std::memory_order_relaxed);
                 return true;
             }
             g_last_read_errno = errno;
+            g_driver_error_count.fetch_add(1, std::memory_order_relaxed);
         } else {
             g_last_read_errno = ENOENT; // /dev/mem_tool not loaded
         }
@@ -393,8 +504,11 @@ namespace engine::mem {
             cm.buffer = const_cast<void*>(buffer);
             cm.size = size;
             if (ioctl(dfd, DEV_OP_WRITE_MEM, &cm) == 0) {
+                g_driver_online.store(true, std::memory_order_relaxed);
+                g_driver_write_count.fetch_add(1, std::memory_order_relaxed);
                 return true;
             }
+            g_driver_error_count.fetch_add(1, std::memory_order_relaxed);
         }
         return false;
     }

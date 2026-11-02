@@ -132,6 +132,20 @@ static void render_fps_icon(float alpha) {
     float textX = cx + radius + h * 0.20f;
     dl->AddText(font, fpsSize, {textX, g_fps_y + (h - fpsSize) * 0.5f},
                 text_col, buf);
+
+    // Real-Time Ring 0 Kernel Driver Live Status Dot & Badge
+    bool drv_ok = engine::mem::is_driver_online();
+    float fpsTextW = font->CalcTextSizeA(fpsSize, FLT_MAX, 0.f, buf).x;
+    float dot_x = textX + fpsTextW + h * 0.16f;
+    float dot_y = g_fps_y + h * 0.5f;
+    float dot_r = h * 0.11f;
+    ImU32 dot_col = drv_ok ? IM_COL32(52, 211, 110, static_cast<int>(255 * alpha))
+                           : IM_COL32(255, 69, 58, static_cast<int>(255 * alpha));
+    dl->AddCircleFilled({dot_x, dot_y}, dot_r, dot_col);
+    dl->AddCircle({dot_x, dot_y}, dot_r + 1.2f, col(UITheme::border_light, 0.4f * alpha), 16, 1.0f);
+    float drvSize = h * 0.28f;
+    dl->AddText(font, drvSize, {dot_x + dot_r + 4.f, g_fps_y + (h - drvSize) * 0.5f},
+                dot_col, drv_ok ? "DRV" : "OFF");
   }
 }
 

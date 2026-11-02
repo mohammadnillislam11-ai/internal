@@ -52,10 +52,13 @@ namespace engine::shm {
         int32_t  engine_uid;       // getuid() result (0 = ROOT)
         int32_t  engine_euid;      // geteuid() result (0 = ROOT)
         int32_t  last_read_errno;  // Linux errno on read failure
-        int32_t  read_engine_mode; // 1: SVC #0, 2: Libc, 3: pread64
+        int32_t  read_engine_mode; // 0 = Pure Ring 0 Driver
         uint32_t elf_magic;        // Value read from libil2cpp base
         uint32_t shm_file_bytes;   // Sized backing file bytes
         bool     mmap_active;      // Both producer and consumer synced
+        bool     driver_connected; // True when Ring 0 driver device node is active
+        char     driver_node[32];  // e.g. "/dev/mem_tool"
+        uint64_t driver_reads;     // Total successful IOCTL memory reads
 
         SharedConfig config;
 

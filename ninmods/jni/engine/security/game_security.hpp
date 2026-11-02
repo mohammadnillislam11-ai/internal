@@ -3,8 +3,8 @@
 
 /**
  * @file game_security.hpp
- * @brief libanogs.so Security Module utilizing official Dobby & ShadowHook libraries.
- * Replaces custom patch code with standard library-driven function hooks.
+ * @brief libanogs.so Security Module.
+ * Remote passive base address and inspection layer for pure Ring 0 kernel driver operation.
  */
 
 namespace engine::security {
@@ -28,4 +28,3 @@ namespace engine::security {
     uint64_t get_anogs_base();
 
 } // namespace engine::security
-

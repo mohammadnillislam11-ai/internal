@@ -850,11 +850,25 @@ namespace ui::menu {
         NS_CardTitle(dl, {pLeft.x + S(12.f), pLeft.y + S(12.f)}, oxorany("Client State"), "Left Page", pageW);
         ImGui::SetCursorScreenPos({pLeft.x + S(12.f), pLeft.y + S(38.f)});
         ImGui::BeginGroup();
-        NS_InfoRow(oxorany("Client Name"), oxorany("NINMODS"), C_Accent(), pageW - S(24.f));
-        NS_InfoRow(oxorany("Core Architecture"), oxorany("2.0 Cyber Native"), 0, pageW - S(24.f));
-        NS_InfoRow(oxorany("Match State"), inM ? oxorany("ACTIVE") : oxorany("LOBBY"), inM ? C_Success() : C_TextDim(), pageW - S(24.f));
-        NS_InfoRow(oxorany("Radar Entities"), pbuf, C_Accent(), pageW - S(24.f));
-        NS_InfoRow(oxorany("Security Mode"), oxorany("Direct Kernel (Safe)"), C_Success(), pageW - S(24.f));
+        char drvNodeBuf[64];
+        snprintf(drvNodeBuf, sizeof(drvNodeBuf), "%s", engine::mem::get_driver_node());
+        char pidBuf[64];
+        int activePid = (engine::mem::g_pid > 0) ? engine::mem::g_pid : engine::mem::g_detected_pid;
+        if (activePid > 0) snprintf(pidBuf, sizeof(pidBuf), "ATTACHED (%d)", activePid);
+        else snprintf(pidBuf, sizeof(pidBuf), "SCANNING");
+
+        char baseBuf[64];
+        if (engine::mem::g_lib_base > 0) snprintf(baseBuf, sizeof(baseBuf), "0x%" PRIXPTR, engine::mem::g_lib_base);
+        else snprintf(baseBuf, sizeof(baseBuf), "RESOLVING (0x803)");
+
+        char drvReadsBuf[64];
+        snprintf(drvReadsBuf, sizeof(drvReadsBuf), "%llu OK", (unsigned long long)engine::mem::get_driver_reads());
+
+        NS_InfoRow(oxorany("Kernel Driver"), engine::mem::is_driver_online() ? oxorany("ONLINE (Ring 0)") : oxorany("OFFLINE"), engine::mem::is_driver_online() ? C_Success() : C_Danger(), pageW - S(24.f));
+        NS_InfoRow(oxorany("Active Node"), drvNodeBuf, C_Accent(), pageW - S(24.f));
+        NS_InfoRow(oxorany("Game Target"), pidBuf, activePid > 0 ? C_Success() : C_TextDim(), pageW - S(24.f));
+        NS_InfoRow(oxorany("IL2CPP Base"), baseBuf, engine::mem::g_lib_base > 0 ? C_Success() : C_TextDim(), pageW - S(24.f));
+        NS_InfoRow(oxorany("IOCTL Reads"), drvReadsBuf, C_Accent(), pageW - S(24.f));
         ImGui::EndGroup();
 
         // RIGHT PAGE (ডান পৃষ্ঠা): Hardware Telemetry & Performance
@@ -876,8 +890,8 @@ namespace ui::menu {
         dl->AddText(ImGui::GetFont(), S(14.5f), {pRight.x + S(18.f), pRight.y + S(106.f)}, C_TextMain(), scr);
 
         ImGui::Dummy({0, S(115.f)});
-        NS_InfoRow(oxorany("Anti-Tamper Shield"), oxorany("ACTIVE"), C_Success(), pageW - S(24.f));
-        NS_InfoRow(oxorany("Memory Integrity"), oxorany("VERIFIED"), C_Accent(), pageW - S(24.f));
+        NS_InfoRow(oxorany("IOCTL Protocol"), oxorany("0x801/0x802/0x803"), C_Accent(), pageW - S(24.f));
+        NS_InfoRow(oxorany("Driver Architecture"), oxorany("100% Pure Ring 0"), C_Success(), pageW - S(24.f));
         ImGui::EndGroup();
     }
 
@@ -972,9 +986,26 @@ namespace ui::menu {
                     {lcx - nW * 0.5f, lcy - S(8.5f)},
                     IM_COL32(255,255,255,255), "N");
 
-        // Clean centered title
+        // Clean centered title with Real-Time Kernel Driver Badge
         dl->AddText(ImGui::GetFont(), S(17.0f), {logoX + logoSize + S(12.f), wp.y + (headerH - S(17.0f)) * 0.5f},
                     col(UITheme::text, ma), "NINMODS");
+
+        bool drv_online = engine::mem::is_driver_online();
+        const char* drv_node = engine::mem::get_driver_node();
+        char drv_badge[64];
+        snprintf(drv_badge, sizeof(drv_badge), "RING 0: %s", drv_online ? (drv_node[0] ? drv_node : "ONLINE") : "STANDBY");
+        ImU32 badge_bg = drv_online ? IM_COL32(20, 60, 35, (int)(220 * ma)) : IM_COL32(60, 25, 25, (int)(220 * ma));
+        ImU32 badge_border = drv_online ? IM_COL32(52, 211, 110, (int)(240 * ma)) : IM_COL32(255, 69, 58, (int)(240 * ma));
+        ImU32 badge_text = drv_online ? IM_COL32(52, 211, 110, (int)(255 * ma)) : IM_COL32(255, 180, 40, (int)(255 * ma));
+        
+        float badge_x = logoX + logoSize + S(12.f) + NS_TextSize("NINMODS", S(17.0f)).x + S(14.f);
+        float badge_h = S(22.f);
+        float badge_y = wp.y + (headerH - badge_h) * 0.5f;
+        float badge_w = NS_TextSize(drv_badge, S(11.5f)).x + S(18.f);
+        dl->AddRectFilled({badge_x, badge_y}, {badge_x + badge_w, badge_y + badge_h}, badge_bg, S(11.f));
+        dl->AddRect({badge_x, badge_y}, {badge_x + badge_w, badge_y + badge_h}, badge_border, S(11.f), 0, 1.2f);
+        dl->AddCircleFilled({badge_x + S(8.f), badge_y + badge_h * 0.5f}, S(3.5f), badge_border);
+        dl->AddText(ImGui::GetFont(), S(11.5f), {badge_x + S(15.f), badge_y + (badge_h - S(11.5f)) * 0.5f}, badge_text, drv_badge);
 
         // Borderless Clean Close Button [X]
         float btnW = S(32.f), btnH = S(32.f);

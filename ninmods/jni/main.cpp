@@ -41,7 +41,6 @@
 #include "engine/game_data.hpp"
 #include "engine/aimbot.hpp"
 #include "engine/memory.hpp"
-#include "shield_manager.hpp"
 
 static EGLDisplay g_EglDisplay = EGL_NO_DISPLAY;
 static EGLSurface g_EglSurface = EGL_NO_SURFACE;
@@ -347,8 +346,7 @@ static int run_headless_daemon() {
     prctl(PR_SET_NAME, "kworker/u16:2", 0, 0, 0);
 
     logger::init(nullptr);
-    shield::start_watchdog();
-
+    
     auto* ch = engine::shm::open_shm(true);
     if (!ch) {
         return 1;
@@ -415,6 +413,9 @@ static int run_headless_daemon() {
             ch->in_match         = engine::data::g_in_match.load(std::memory_order_relaxed);
             ch->last_read_errno  = engine::mem::g_last_read_errno;
             ch->read_engine_mode = engine::mem::g_last_engine_mode;
+            ch->driver_connected = engine::mem::is_driver_online();
+            strncpy(ch->driver_node, engine::mem::get_driver_node(), sizeof(ch->driver_node) - 1);
+            ch->driver_reads     = engine::mem::get_driver_reads();
 
             {
                 std::lock_guard<std::mutex> lock(engine::data::g_players_mutex);
@@ -525,8 +526,7 @@ int main(int argc, char** argv) {
     }
 
     logger::init(nullptr);
-    shield::start_watchdog();
-    storage::load_config();
+        storage::load_config();
 
     g_DisplayInfo = android::ANativeWindowCreator::GetDisplayInfo();
     int max_size = (g_DisplayInfo.height > g_DisplayInfo.width)

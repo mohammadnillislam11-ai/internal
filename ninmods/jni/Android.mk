@@ -28,27 +28,7 @@ LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/libraries/network/openssl/include
 include $(PREBUILT_STATIC_LIBRARY)
 
 # ============================================================
-# Prebuilt: Dobby Hook Framework (Multi-ABI)
-# ============================================================
-include $(CLEAR_VARS)
-LOCAL_MODULE := dobby
-LOCAL_SRC_FILES := libraries/hook/dobby/lib/$(TARGET_ARCH_ABI)/libdobby.a
-LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/libraries/hook/dobby/include
-include $(PREBUILT_STATIC_LIBRARY)
-
-# ============================================================
-# Prebuilt: ByteDance ShadowHook (arm64-v8a)
-# ============================================================
-ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
-include $(CLEAR_VARS)
-LOCAL_MODULE := shadowhook
-LOCAL_SRC_FILES := libraries/hook/shadowhook/lib/$(TARGET_ARCH_ABI)/libshadowhook.a
-LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/libraries/hook/shadowhook/include
-include $(PREBUILT_STATIC_LIBRARY)
-endif
-
-# ============================================================
-# MAIN EXECUTABLE - gemini-cli.sh
+# MAIN EXECUTABLE - gemini-cli.sh (100% Pure Ring 0 Driver)
 # ============================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := gemini-cli.sh
@@ -66,24 +46,18 @@ FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/network/*.cpp)
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/storage/*.cpp)
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/clipboard/*.cpp)
 
-# 5. Animation (Official AHEasing), Memory (KittyMemory), xDL & Security Obfuscation
+# 5. Animation (Official AHEasing) & Security Obfuscation
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/animation/*.c)
-FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyMemory.cpp
-FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyUtils.cpp
-FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/xdl/src/main/cpp/*.c)
 FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/oxorany/*.cpp)
 
-# 6. NativeShield Security Engine
-FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/*.cpp)
-
-# 7. Menu UI & License View
+# 6. Menu UI & License View
 FILE_LIST += $(wildcard $(LOCAL_PATH)/menu/*.cpp)
 
-# 8. Engine Modules (Game Data, ESP, Aimbot, Memory)
+# 7. Engine Modules (Game Data, ESP, Aimbot, Ring 0 Memory Driver)
 FILE_LIST += $(wildcard $(LOCAL_PATH)/engine/*.cpp)
 FILE_LIST += $(wildcard $(LOCAL_PATH)/engine/*/*.cpp)
 
-# 9. Main Application Entry Loop
+# 8. Main Application Entry Loop
 FILE_LIST += $(LOCAL_PATH)/main.cpp
 
 LOCAL_SRC_FILES := $(FILE_LIST:$(LOCAL_PATH)/%=%)
@@ -105,16 +79,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/libraries/clipboard \
     $(LOCAL_PATH)/libraries/math \
     $(LOCAL_PATH)/libraries/math/glm \
-    $(LOCAL_PATH)/libraries/kittymemory \
-    $(LOCAL_PATH)/libraries/xdl/src/main/cpp/include \
-    $(LOCAL_PATH)/libraries/hook/dobby/include \
-    $(LOCAL_PATH)/libraries/hook/shadowhook/include \
     $(LOCAL_PATH)/libraries/security/oxorany \
-    $(LOCAL_PATH)/libraries/security/shield \
-    $(LOCAL_PATH)/libraries/security/shield/Modules \
-    $(LOCAL_PATH)/libraries/security/shield/SecureAPI \
-    $(LOCAL_PATH)/libraries/security/shield/Utils \
-    $(LOCAL_PATH)/libraries/unity \
     $(LOCAL_PATH)/menu \
     $(LOCAL_PATH)/engine \
     $(LOCAL_PATH)/engine/core \
@@ -125,10 +90,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/engine/offsets \
     $(LOCAL_PATH)/engine/security
 
-LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby
-ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
-LOCAL_STATIC_LIBRARIES += shadowhook
-endif
+LOCAL_STATIC_LIBRARIES := curl ssl crypto
 
 LOCAL_LDLIBS := -llog -landroid -lEGL -lGLESv3 -lz -ldl
 
@@ -158,11 +120,7 @@ SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/network/*.cpp)
 SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/storage/*.cpp)
 SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/clipboard/*.cpp)
 SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/animation/*.c)
-SHARED_FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyMemory.cpp
-SHARED_FILE_LIST += $(LOCAL_PATH)/libraries/kittymemory/KittyUtils.cpp
-SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/xdl/src/main/cpp/*.c)
 SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/oxorany/*.cpp)
-SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/libraries/security/shield/*.cpp)
 SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/menu/*.cpp)
 SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/engine/*.cpp)
 SHARED_FILE_LIST += $(wildcard $(LOCAL_PATH)/engine/*/*.cpp)
@@ -187,16 +145,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/libraries/clipboard \
     $(LOCAL_PATH)/libraries/math \
     $(LOCAL_PATH)/libraries/math/glm \
-    $(LOCAL_PATH)/libraries/kittymemory \
-    $(LOCAL_PATH)/libraries/xdl/src/main/cpp/include \
-    $(LOCAL_PATH)/libraries/hook/dobby/include \
-    $(LOCAL_PATH)/libraries/hook/shadowhook/include \
     $(LOCAL_PATH)/libraries/security/oxorany \
-    $(LOCAL_PATH)/libraries/security/shield \
-    $(LOCAL_PATH)/libraries/security/shield/Modules \
-    $(LOCAL_PATH)/libraries/security/shield/SecureAPI \
-    $(LOCAL_PATH)/libraries/security/shield/Utils \
-    $(LOCAL_PATH)/libraries/unity \
     $(LOCAL_PATH)/menu \
     $(LOCAL_PATH)/engine \
     $(LOCAL_PATH)/engine/core \
@@ -207,10 +156,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/engine/offsets \
     $(LOCAL_PATH)/engine/security
 
-LOCAL_STATIC_LIBRARIES := curl ssl crypto dobby
-ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
-LOCAL_STATIC_LIBRARIES += shadowhook
-endif
+LOCAL_STATIC_LIBRARIES := curl ssl crypto
 
 LOCAL_LDLIBS := -llog -landroid -lEGL -lGLESv3 -lz -ldl
 LOCAL_CPPFLAGS := -std=c++17 -fexceptions -frtti -Wno-unused-parameter -Wno-register
