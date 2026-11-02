@@ -72,16 +72,16 @@ namespace engine {
         if (s_first_run) {
             s_first_run = false;
             logger::log_info("[ENGINE] Memory subsystem initialized. Targeting: %s", TARGET_PACKAGE);
-            logger::log_info("[MEM] Syscall driver: Direct Kernel Assembly (SVC #0)");
+            logger::log_info("[MEM] Syscall driver: Ring 0 Kernel Driver (/dev/mem_tool)");
         }
 
         if (g_attached && mem::g_pid > 0 && is_process_alive(mem::g_pid) && mem::g_lib_base > 0) {
             return true;
         }
 
-        if (mem::g_mem_fd >= 0) {
-            close(mem::g_mem_fd);
-            mem::g_mem_fd = -1;
+        if (mem::g_driver_fd >= 0) {
+            close(mem::g_driver_fd);
+            mem::g_driver_fd = -1;
         }
         g_attached = false;
         mem::g_pid = -1;
@@ -148,7 +148,7 @@ namespace engine {
 
         logger::log_success("[+] ATTACHED: %s", g_detected_package);
         logger::log_success("[+] PID: %d | Base: 0x%lx", mem::g_pid, (unsigned long)mem::g_lib_base);
-        logger::log_success("[+] Direct Kernel SVC #0 active. Telemetry linked.");
+        logger::log_success("[+] Ring 0 Kernel Driver (/dev/mem_tool) active. Telemetry linked.");
 
         return true;
     }
@@ -220,9 +220,9 @@ namespace engine {
         mem::g_pid = -1;
         mem::g_lib_base = 0;
         g_detected_package[0] = '\0';
-        if (mem::g_mem_fd >= 0) {
-            close(mem::g_mem_fd);
-            mem::g_mem_fd = -1;
+        if (mem::g_driver_fd >= 0) {
+            close(mem::g_driver_fd);
+            mem::g_driver_fd = -1;
         }
         proc::pid = -1;
         proc::lib = 0;
