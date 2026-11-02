@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "engine/memory.hpp"
 #include "engine/shared_channel.hpp"
+#include "engine/engine.hpp"
 
 namespace ui::menu {
     inline float g_menu_x = -1.f;
