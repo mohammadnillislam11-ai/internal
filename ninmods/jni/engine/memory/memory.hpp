@@ -249,6 +249,9 @@ namespace engine::mem {
         return g_driver_error_count.load(std::memory_order_relaxed);
     }
 
+    // Forward declaration for pure Ring 0 module base resolver
+    inline uintptr_t find_module_base(int pid, const char* module_name);
+
     /**
      * @brief Stealth process finder via direct /proc reading.
      */
