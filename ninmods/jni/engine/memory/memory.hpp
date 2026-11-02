@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <dirent.h>
 #include <sys/syscall.h>
+#include <sys/ioctl.h>
 #include "oxorany.h"
 #include "KittyMemory.hpp"
 
@@ -114,12 +115,49 @@ struct sys_dirent64 {
 
 namespace engine::mem {
 
+    // Kernel Driver IOCTL Definitions (ninmods-kernel-builder Ring 0 protocol)
+    #define DEV_OP_READ_MEM    0x801
+    #define DEV_OP_WRITE_MEM   0x802
+    #define DEV_OP_MODULE_BASE 0x803
+
+    #pragma pack(push, 8)
+    struct COPY_MEMORY {
+        pid_t     pid;    // Target PID
+        uintptr_t addr;   // Memory Address
+        void*     buffer; // Data buffer
+        size_t    size;   // Byte count
+    };
+
+    struct MODULE_BASE {
+        pid_t     pid;    // Target PID
+        char*     name;   // Module Name (e.g. "libil2cpp.so")
+        uintptr_t base;   // Returned Base Address
+    };
+    #pragma pack(pop)
+
     inline int       g_pid = -1;
     inline int       g_detected_pid = -1;
     inline uintptr_t g_lib_base = 0;
     inline int       g_mem_fd = -1;
+    inline int       g_driver_fd = -1;
     inline int       g_last_read_errno = 0;
     inline int       g_last_engine_mode = 0;
+
+    /**
+     * @brief Probes and opens Ring 0 kernel driver device node if loaded.
+     */
+    inline int get_driver_fd() {
+        if (g_driver_fd >= 0) return g_driver_fd;
+        const char* nodes[] = { "/dev/mem_tool", "/dev/BYNb", "/dev/uevents_records" };
+        for (const char* node : nodes) {
+            int fd = open(node, O_RDWR);
+            if (fd >= 0) {
+                g_driver_fd = fd;
+                return g_driver_fd;
+            }
+        }
+        return -1;
+    }
 
     /**
      * @brief Validates virtual memory addresses based on ABI address space limits.
@@ -317,6 +355,18 @@ namespace engine::mem {
     inline uintptr_t find_module_base(int pid, const char* module_name) {
         if (pid <= 0 || !module_name) return 0;
 
+        // Engine 0: Ring 0 Kernel Driver IOCTL DEV_OP_MODULE_BASE
+        int dfd = get_driver_fd();
+        if (dfd >= 0) {
+            MODULE_BASE mb{};
+            mb.pid = pid;
+            mb.name = const_cast<char*>(module_name);
+            mb.base = 0;
+            if (ioctl(dfd, DEV_OP_MODULE_BASE, &mb) == 0 && mb.base > 0) {
+                return mb.base;
+            }
+        }
+
         char mp[64];
         snprintf(mp, sizeof(mp), "/proc/%d/maps", pid);
 
@@ -435,7 +485,8 @@ namespace engine::mem {
     }
 
     /**
-     * @brief Triple-engine high-performance memory reader.
+     * @brief Quad-engine high-performance memory reader.
+     *        0. Ring 0 Kernel Driver IOCTL DEV_OP_READ_MEM (/dev/mem_tool, /dev/BYNb).
      *        1. Direct Kernel Assembly SVC #0 (0-libc overhead, native speed).
      *        2. Standard Bionic process_vm_readv (seamless emulator & translation layer support).
      *        3. Direct /proc/<pid>/mem cached pread64.
@@ -443,6 +494,20 @@ namespace engine::mem {
     inline bool read_raw(uintptr_t address, void* buffer, size_t size) {
         int target_pid = (g_pid > 0) ? g_pid : proc::pid;
         if (!is_valid_addr(address) || !buffer || size == 0 || target_pid <= 0) return false;
+
+        // Engine 0: Ring 0 Kernel Driver IOCTL (Zero-Fail, Bypasses All Userland/DAC/SELinux Restrictions)
+        int dfd = get_driver_fd();
+        if (dfd >= 0) {
+            COPY_MEMORY cm{};
+            cm.pid = target_pid;
+            cm.addr = address;
+            cm.buffer = buffer;
+            cm.size = size;
+            if (ioctl(dfd, DEV_OP_READ_MEM, &cm) == 0) {
+                g_last_engine_mode = 0;
+                return true;
+            }
+        }
 
         struct iovec local_iov;
         local_iov.iov_base = buffer;
@@ -489,11 +554,26 @@ namespace engine::mem {
     }
 
     /**
-     * @brief Triple-engine high-performance memory writer.
+     * @brief Quad-engine high-performance memory writer.
+     *        0. Ring 0 Kernel Driver IOCTL DEV_OP_WRITE_MEM.
+     *        1. Direct Kernel Assembly SVC #0.
+     *        2. Standard Bionic process_vm_writev.
+     *        3. Direct /proc/<pid>/mem cached pwrite64.
      */
     inline bool write_raw(uintptr_t address, const void* buffer, size_t size) {
         int target_pid = (g_pid > 0) ? g_pid : proc::pid;
         if (!is_valid_addr(address) || !buffer || size == 0 || target_pid <= 0) return false;
+
+        // Engine 0: Ring 0 Kernel Driver IOCTL
+        int dfd = get_driver_fd();
+        if (dfd >= 0) {
+            COPY_MEMORY cm{};
+            cm.pid = target_pid;
+            cm.addr = address;
+            cm.buffer = const_cast<void*>(buffer);
+            cm.size = size;
+            if (ioctl(dfd, DEV_OP_WRITE_MEM, &cm) == 0) return true;
+        }
 
         struct iovec local_iov;
         local_iov.iov_base = const_cast<void*>(buffer);

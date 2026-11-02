@@ -634,7 +634,11 @@ namespace ui::menu {
         NS_InfoRow(oxorany("Radar Entities"), buf, (pCount > 0) ? C_Accent() : C_TextDim(), pageW - S(24.f));
 
         // 7. Memory Syscall
-        NS_InfoRow(oxorany("Memory Syscall"), oxorany("Kernel Direct (SVC #0)"), C_Success(), pageW - S(24.f));
+        const char* driverStr = oxorany("Kernel Direct (SVC #0)");
+        if (s_menu_shm && s_menu_shm->read_engine_mode == 0) {
+            driverStr = oxorany("Ring 0 Kernel Driver (/dev/mem_tool)");
+        }
+        NS_InfoRow(oxorany("Memory Syscall"), driverStr, C_Success(), pageW - S(24.f));
 
         // 8. DIAGNOSTIC TELEMETRY (Requested by dj)
         if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC) {
