@@ -28,4 +28,7 @@ namespace logger {
     void get_terminal_entries(std::vector<LogEntry>& out);
     std::string get_all_terminal_text();
     void clear_terminal();
+
+    typedef void (*LogCallback)(const char* time_str, const char* level, const char* msg, uint32_t color);
+    void set_callback(LogCallback cb);
 }

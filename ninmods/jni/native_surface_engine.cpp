@@ -154,8 +154,9 @@ namespace {
             init_imgui_context();
         }
 
-        // Try initializing memory engine (will succeed if root is present)
-        engine::init();
+        // Open Shared RAM Channel as consumer (Root Daemon handles memory engine)
+        static engine::shm::SharedChannel* s_ui_shm = nullptr;
+        if (!s_ui_shm) s_ui_shm = engine::shm::open_shm(false);
 
         while (g_running.load()) {
             auto frame_start = std::chrono::steady_clock::now();
@@ -169,10 +170,21 @@ namespace {
             ImGui_ImplAndroid_NewFrame(sw, sh);
             ImGui::NewFrame();
 
-            // Background memory worker update
-            engine::update();
+            // Sync UI configs to Root Engine via Shared RAM
+            if (!s_ui_shm) s_ui_shm = engine::shm::open_shm(false);
+            if (s_ui_shm && s_ui_shm->magic == GEMINI_SHM_MAGIC) {
+                s_ui_shm->config.esp_enabled     = cfg::esp::enabled;
+                s_ui_shm->config.tracer_enabled  = cfg::esp::tracer;
+                s_ui_shm->config.box_enabled     = cfg::esp::box;
+                s_ui_shm->config.health_enabled  = cfg::esp::health;
+                s_ui_shm->config.aim_enabled     = cfg::aim::enabled;
+                s_ui_shm->config.aim_target      = cfg::aim::target_bone;
+                s_ui_shm->config.aim_fov         = cfg::aim::fov;
+                s_ui_shm->config.aim_smooth      = cfg::aim::smooth;
+                s_ui_shm->config.zero_recoil     = cfg::aim::zero_recoil;
+            }
 
-            // Pure C++ ImGui Menu, Floating Puck, and ESP
+            // Pure C++ ImGui Menu and Floating Puck
             ui::menu::render();
 
             ImGui::Render();
@@ -195,7 +207,6 @@ namespace {
             }
         }
 
-        engine::shutdown();
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplAndroid_Shutdown();
         ImGui::DestroyContext();

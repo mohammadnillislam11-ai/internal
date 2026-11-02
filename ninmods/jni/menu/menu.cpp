@@ -560,13 +560,32 @@ namespace ui::menu {
         float pageW = (cw - gap) * 0.5f;
         float pageH = ImMax(S(320.f), ch - S(4.f));
 
+        static engine::shm::SharedChannel* s_menu_shm = nullptr;
+        if (!s_menu_shm) s_menu_shm = engine::shm::open_shm(false);
+
         char buf[128];
-        bool isAttached = engine::is_attached();
-        int curPid = engine::get_target_pid();
-        uintptr_t libBase = isAttached ? (uintptr_t)engine::mem::g_lib_base : 0;
-        const char* targetPkg = engine::get_target_package();
-        bool inM = isAttached ? data::in_match() : false;
-        size_t pCount = isAttached ? data::player_count() : 0;
+        bool isAttached = false;
+        int curPid = -1;
+        uintptr_t libBase = 0;
+        const char* targetPkg = nullptr;
+        bool inM = false;
+        size_t pCount = 0;
+
+        if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC) {
+            isAttached = s_menu_shm->is_attached;
+            curPid = s_menu_shm->active_pid;
+            libBase = (uintptr_t)s_menu_shm->lib_base;
+            inM = s_menu_shm->in_match;
+            pCount = static_cast<size_t>(s_menu_shm->entity_count);
+            if (curPid > 0) targetPkg = "com.dts.freefireth";
+        } else {
+            isAttached = engine::is_attached();
+            curPid = engine::get_target_pid();
+            libBase = isAttached ? (uintptr_t)engine::mem::g_lib_base : 0;
+            targetPkg = engine::get_target_package();
+            inM = isAttached ? data::in_match() : false;
+            pCount = isAttached ? data::player_count() : 0;
+        }
 
         // LEFT PAGE (বাম পৃষ্ঠা): Live Engine Telemetry & Memory Readings
         ImVec2 pLeft = cp;
@@ -618,9 +637,6 @@ namespace ui::menu {
         NS_InfoRow(oxorany("Memory Syscall"), oxorany("Kernel Direct (SVC #0)"), C_Success(), pageW - S(24.f));
 
         // 8. DIAGNOSTIC TELEMETRY (Requested by dj)
-        static engine::shm::SharedChannel* s_menu_shm = nullptr;
-        if (!s_menu_shm) s_menu_shm = engine::shm::open_shm(false);
-
         if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC) {
             // Diagnostic 1: Background Engine Real PID & Real UID (0 = ROOT)
             char daemonBuf[96];
@@ -732,7 +748,22 @@ namespace ui::menu {
                           ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
         std::vector<logger::LogEntry> entries;
-        logger::get_terminal_entries(entries);
+        if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC && s_menu_shm->log_count > 0) {
+            uint32_t count = s_menu_shm->log_count;
+            uint32_t head = s_menu_shm->log_head;
+            for (uint32_t i = 0; i < count; i++) {
+                uint32_t idx = (head + i) % 32;
+                const auto& item = s_menu_shm->logs[idx];
+                logger::LogEntry le;
+                le.time_str = item.time_str;
+                le.level = item.level;
+                le.msg = item.msg;
+                le.color = item.color;
+                entries.push_back(le);
+            }
+        } else {
+            logger::get_terminal_entries(entries);
+        }
 
         if (entries.empty()) {
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 0.7f), "[System Ready. Waiting for engine reports...]");
@@ -774,7 +805,18 @@ namespace ui::menu {
 
         ImGui::SetCursorScreenPos({termX, btnY});
         if (NS_Button("copy_term_logs", copyLogLbl, {copyW, S(30.f)}, logCopied)) {
-            std::string allLogs = logger::get_all_terminal_text();
+            std::string allLogs;
+            if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC && s_menu_shm->log_count > 0) {
+                uint32_t count = s_menu_shm->log_count;
+                uint32_t head = s_menu_shm->log_head;
+                for (uint32_t i = 0; i < count; i++) {
+                    uint32_t idx = (head + i) % 32;
+                    const auto& item = s_menu_shm->logs[idx];
+                    allLogs += "[" + std::string(item.time_str) + "] [" + std::string(item.level) + "] " + std::string(item.msg) + "\n";
+                }
+            } else {
+                allLogs = logger::get_all_terminal_text();
+            }
             if (allLogs.empty()) allLogs = "[NINMODS] No terminal logs recorded yet.\n";
             clipboard::set_text(allLogs);
             s_copy_log_feedback = ImGui::GetTime();

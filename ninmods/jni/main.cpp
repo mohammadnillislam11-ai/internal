@@ -360,6 +360,26 @@ static int run_headless_daemon() {
     ch->shm_file_bytes = sizeof(engine::shm::SharedChannel);
     ch->mmap_active = true;
     ch->engine_running = true;
+
+    static engine::shm::SharedChannel* s_daemon_shm = ch;
+    logger::set_callback([](const char* time_str, const char* level, const char* msg, uint32_t col) {
+        if (!s_daemon_shm) return;
+        uint32_t idx = (s_daemon_shm->log_head + s_daemon_shm->log_count) % 32;
+        if (s_daemon_shm->log_count < 32) {
+            s_daemon_shm->log_count++;
+        } else {
+            s_daemon_shm->log_head = (s_daemon_shm->log_head + 1) % 32;
+        }
+        auto& e = s_daemon_shm->logs[idx];
+        strncpy(e.time_str, time_str, sizeof(e.time_str) - 1);
+        e.time_str[sizeof(e.time_str) - 1] = '\0';
+        strncpy(e.level, level, sizeof(e.level) - 1);
+        e.level[sizeof(e.level) - 1] = '\0';
+        strncpy(e.msg, msg, sizeof(e.msg) - 1);
+        e.msg[sizeof(e.msg) - 1] = '\0';
+        e.color = col;
+    });
+
     logger::log_info("[ROOT_ENGINE] Booted | PID: %d | UID: %d (eUID: %d) | SHM: %u bytes",
                      ch->engine_pid, ch->engine_uid, ch->engine_euid, ch->shm_file_bytes);
     bool s_engine_hooked = false;

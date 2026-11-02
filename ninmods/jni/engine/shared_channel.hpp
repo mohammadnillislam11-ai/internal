@@ -59,6 +59,16 @@ namespace engine::shm {
 
         SharedConfig config;
 
+        // Live Terminal Logs from Root Daemon
+        uint32_t log_head;
+        uint32_t log_count;
+        struct SharedLogEntry {
+            char time_str[16];
+            char level[8];
+            char msg[128];
+            uint32_t color;
+        } logs[32];
+
         int32_t      entity_count;
         SharedEntity entities[64];
         float        matrix[16];

@@ -18,6 +18,8 @@ namespace {
     static std::deque<LogEntry> s_entries;
     static constexpr size_t MAX_LOG_ENTRIES = 200;
 
+    static LogCallback s_callback = nullptr;
+
     static void write_entry(const char* level, const char* fmt, va_list args) {
         std::lock_guard<std::mutex> lock(s_mutex);
 
@@ -76,7 +78,17 @@ namespace {
             fprintf(s_file, "[%s] [%s] %s\n", time_str, level, msg_buf);
             fflush(s_file);
         }
+
+        // 4. Callback hook for SharedChannel export
+        if (s_callback) {
+            s_callback(time_str, level, msg_buf, col);
+        }
     }
+}
+
+void set_callback(LogCallback cb) {
+    std::lock_guard<std::mutex> lock(s_mutex);
+    s_callback = cb;
 }
 
 void init(const char* custom_log_path) {
