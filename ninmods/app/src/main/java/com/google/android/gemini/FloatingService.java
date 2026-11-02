@@ -113,14 +113,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
                 Process su = Runtime.getRuntime().exec("su");
                 java.io.OutputStream os = su.getOutputStream();
                 String script =
-                        "setenforce 0 2>/dev/null\n" +
-                        "echo 0 > /proc/sys/kernel/yama/ptrace_scope 2>/dev/null\n" +
-                        "chmod 666 /proc/" + pid + "/mem 2>/dev/null\n" +
-                        "chmod 666 /proc/" + pid + "/maps 2>/dev/null\n" +
-                        "chmod 666 /proc/" + pid + "/cmdline 2>/dev/null\n" +
-                        "chmod 755 /proc/" + pid + " 2>/dev/null\n" +
-                        "magiskpolicy --live \"allow untrusted_app * * *\" 2>/dev/null\n" +
-                        "magiskpolicy --live \"permissive untrusted_app\" 2>/dev/null\n" +
+                        "chmod 666 /dev/mem_tool /dev/BYNb /dev/uevents_records 2>/dev/null\n" +
                         "exit\n";
                 os.write(script.getBytes());
                 os.flush();

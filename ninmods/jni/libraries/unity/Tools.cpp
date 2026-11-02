@@ -13,44 +13,19 @@
 #include <string>
 #include "Tools.h"
 
-#if defined(__arm__)
-#define process_vm_readv_syscall 376
-#define process_vm_writev_syscall 377
-#elif defined(__aarch64__)
-#define process_vm_readv_syscall 270
-#define process_vm_writev_syscall 271
-#elif defined(__i386__)
-#define process_vm_readv_syscall 347
-#define process_vm_writev_syscall 348
-#else
-#define process_vm_readv_syscall 310
-#define process_vm_writev_syscall 311
-#endif
+#include "../../engine/memory/memory.hpp"
 
 pid_t target_pid = -1;
 #define INRANGE(x, a, b)        (x >= a && x <= b)
 #define getBits(x)              (INRANGE(x,'0','9') ? (x - '0') : ((x&(~0x20)) - 'A' + 0xa))
 #define getByte(x)              (getBits(x[0]) << 4 | getBits(x[1]))
 
-ssize_t process_v(pid_t __pid, const struct iovec *__local_iov, unsigned long __local_iov_count, const struct iovec *__remote_iov, unsigned long __remote_iov_count, unsigned long __flags, bool iswrite) {
-    return syscall((iswrite ? process_vm_writev_syscall : process_vm_readv_syscall), __pid, __local_iov, __local_iov_count, __remote_iov, __remote_iov_count, __flags);
-}
-
 bool pvm(void *address, void *buffer, size_t size, bool write = false) {
-    struct iovec local[1];
-    struct iovec remote[1];
-
-    local[0].iov_base = buffer;
-    local[0].iov_len = size;
-    remote[0].iov_base = address;
-    remote[0].iov_len = size;
-
-    if (target_pid == -1) {
-        target_pid = getpid();
+    if (write) {
+        return engine::mem::write_raw(reinterpret_cast<uintptr_t>(address), buffer, size);
+    } else {
+        return engine::mem::read_raw(reinterpret_cast<uintptr_t>(address), buffer, size);
     }
-
-    ssize_t bytes = process_v(target_pid, local, 1, remote, 1, 0, write);
-    return bytes == size;
 }
 
 void Tools::Hook(void *target, void *replace, void **backup) {
