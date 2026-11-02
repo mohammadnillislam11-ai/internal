@@ -7,7 +7,6 @@
 #include "cfg.hpp"
 #include "engine/game_data.hpp"
 #include "engine/engine.hpp"
-#include "engine/shared_channel.hpp"
 #include "config_store.h"
 #include "clipboard.h"
 #include "Icon.h"
@@ -560,32 +559,13 @@ namespace ui::menu {
         float pageW = (cw - gap) * 0.5f;
         float pageH = ImMax(S(320.f), ch - S(4.f));
 
-        static engine::shm::SharedChannel* s_menu_shm = nullptr;
-        if (!s_menu_shm) s_menu_shm = engine::shm::open_shm(false);
-
         char buf[128];
-        bool isAttached = false;
-        int curPid = -1;
-        uintptr_t libBase = 0;
-        const char* targetPkg = nullptr;
-        bool inM = false;
-        size_t pCount = 0;
-
-        if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC) {
-            isAttached = s_menu_shm->is_attached;
-            curPid = s_menu_shm->active_pid;
-            libBase = (uintptr_t)s_menu_shm->lib_base;
-            inM = s_menu_shm->in_match;
-            pCount = static_cast<size_t>(s_menu_shm->entity_count);
-            if (s_menu_shm->target_pkg[0] != '\0') targetPkg = s_menu_shm->target_pkg; else if (curPid > 0) targetPkg = get_target_package_global();
-        } else {
-            isAttached = engine::is_attached();
-            curPid = engine::get_target_pid();
-            libBase = isAttached ? (uintptr_t)engine::mem::g_lib_base : 0;
-            targetPkg = engine::get_target_package();
-            inM = isAttached ? data::in_match() : false;
-            pCount = isAttached ? data::player_count() : 0;
-        }
+        bool isAttached = engine::is_attached();
+        int curPid = (engine::mem::g_pid > 0) ? engine::mem::g_pid : engine::mem::g_detected_pid;
+        uintptr_t libBase = isAttached ? (uintptr_t)engine::mem::g_lib_base : 0;
+        const char* targetPkg = engine::get_target_package();
+        bool inM = isAttached ? data::in_match() : false;
+        size_t pCount = isAttached ? data::player_count() : 0;
 
         // LEFT PAGE (বাম পৃষ্ঠা): Live Engine Telemetry & Memory Readings
         ImVec2 pLeft = cp;
@@ -636,36 +616,25 @@ namespace ui::menu {
         // 7. Memory Syscall
         NS_InfoRow(oxorany("Memory Syscall"), oxorany("Ring 0 Kernel Driver (/dev/mem_tool)"), C_Success(), pageW - S(24.f));
 
-        // 8. DIAGNOSTIC TELEMETRY (Requested by dj)
-        if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC) {
-            // Diagnostic 1: Background Engine Real PID & Real UID (0 = ROOT)
-            char daemonBuf[96];
-            bool isRoot = (s_menu_shm->engine_uid == 0);
-            snprintf(daemonBuf, sizeof(daemonBuf), "PID: %d | UID: %d (%s)",
-                     s_menu_shm->engine_pid, s_menu_shm->engine_uid,
-                     isRoot ? "ROOT" : "NON-ROOT");
-            NS_InfoRow(oxorany("Engine Daemon"), daemonBuf,
-                       isRoot ? C_Success() : IM_COL32(255, 75, 75, (int)(content_alpha * 255)),
-                       pageW - S(24.f));
+        // 8. DIAGNOSTIC RING 0 KERNEL TELEMETRY
+        char driverBuf[96];
+        snprintf(driverBuf, sizeof(driverBuf), "%s (%s)",
+                 engine::mem::get_driver_node(),
+                 engine::mem::is_driver_online() ? "ONLINE" : "STANDBY");
+        NS_InfoRow(oxorany("Kernel Node"), driverBuf,
+                   engine::mem::is_driver_online() ? C_Success() : IM_COL32(255, 120, 50, (int)(content_alpha * 255)),
+                   pageW - S(24.f));
 
-            // Diagnostic 2: Shared Memory (mmap) File Size & Map Status
-            char shmBuf[96];
-            snprintf(shmBuf, sizeof(shmBuf), "ACTIVE (%u B, MAP_OK)", s_menu_shm->shm_file_bytes);
-            NS_InfoRow(oxorany("Shared RAM (mmap)"), shmBuf, C_Accent(), pageW - S(24.f));
+        char readsBuf[96];
+        snprintf(readsBuf, sizeof(readsBuf), "%llu IOCTL Reads", (unsigned long long)engine::mem::get_driver_reads());
+        NS_InfoRow(oxorany("Kernel IOCTL Reads"), readsBuf, C_Accent(), pageW - S(24.f));
 
-            // Diagnostic 3: Linux Syscall Errno tracking
-            if (s_menu_shm->last_read_errno != 0) {
-                char errBuf[96];
-                snprintf(errBuf, sizeof(errBuf), "FAIL (errno %d: %s)",
-                         s_menu_shm->last_read_errno, strerror(s_menu_shm->last_read_errno));
-                NS_InfoRow(oxorany("Syscall Status"), errBuf, IM_COL32(255, 75, 75, (int)(content_alpha * 255)), pageW - S(24.f));
-            } else {
-                NS_InfoRow(oxorany("Syscall Status"), oxorany("PASS (0 ERRORS)"), C_Success(), pageW - S(24.f));
-            }
+        if (engine::mem::get_driver_errors() > 0) {
+            char errBuf[96];
+            snprintf(errBuf, sizeof(errBuf), "ERRORS: %llu", (unsigned long long)engine::mem::get_driver_errors());
+            NS_InfoRow(oxorany("Driver Status"), errBuf, IM_COL32(255, 75, 75, (int)(content_alpha * 255)), pageW - S(24.f));
         } else {
-            NS_InfoRow(oxorany("Engine Daemon"), oxorany("STANDBY / OFFLINE"), C_TextDim(), pageW - S(24.f));
-            NS_InfoRow(oxorany("Shared RAM (mmap)"), oxorany("WAITING FOR BACKING FILE"), C_TextDim(), pageW - S(24.f));
-            NS_InfoRow(oxorany("Syscall Status"), oxorany("STANDBY"), C_TextDim(), pageW - S(24.f));
+            NS_InfoRow(oxorany("Driver Status"), oxorany("PASS (0 ERRORS)"), C_Success(), pageW - S(24.f));
         }
 
         ImGui::Dummy({0, S(4.f)});
@@ -748,22 +717,7 @@ namespace ui::menu {
                           ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
         std::vector<logger::LogEntry> entries;
-        if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC && s_menu_shm->log_count > 0) {
-            uint32_t count = s_menu_shm->log_count;
-            uint32_t head = s_menu_shm->log_head;
-            for (uint32_t i = 0; i < count; i++) {
-                uint32_t idx = (head + i) % 32;
-                const auto& item = s_menu_shm->logs[idx];
-                logger::LogEntry le;
-                le.time_str = item.time_str;
-                le.level = item.level;
-                le.msg = item.msg;
-                le.color = item.color;
-                entries.push_back(le);
-            }
-        } else {
-            logger::get_terminal_entries(entries);
-        }
+        logger::get_terminal_entries(entries);
 
         if (entries.empty()) {
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 0.7f), "[System Ready. Waiting for engine reports...]");
@@ -805,18 +759,7 @@ namespace ui::menu {
 
         ImGui::SetCursorScreenPos({termX, btnY});
         if (NS_Button("copy_term_logs", copyLogLbl, {copyW, S(30.f)}, logCopied)) {
-            std::string allLogs;
-            if (s_menu_shm && s_menu_shm->magic == GEMINI_SHM_MAGIC && s_menu_shm->log_count > 0) {
-                uint32_t count = s_menu_shm->log_count;
-                uint32_t head = s_menu_shm->log_head;
-                for (uint32_t i = 0; i < count; i++) {
-                    uint32_t idx = (head + i) % 32;
-                    const auto& item = s_menu_shm->logs[idx];
-                    allLogs += "[" + std::string(item.time_str) + "] [" + std::string(item.level) + "] " + std::string(item.msg) + "\n";
-                }
-            } else {
-                allLogs = logger::get_all_terminal_text();
-            }
+            std::string allLogs = logger::get_all_terminal_text();
             if (allLogs.empty()) allLogs = "[NINMODS] No terminal logs recorded yet.\n";
             clipboard::set_text(allLogs);
             s_copy_log_feedback = ImGui::GetTime();

@@ -79,7 +79,7 @@ namespace {
             fflush(s_file);
         }
 
-        // 4. Callback hook for SharedChannel export
+        // 4. Callback hook for real-time log export
         if (s_callback) {
             s_callback(time_str, level, msg_buf, col);
         }

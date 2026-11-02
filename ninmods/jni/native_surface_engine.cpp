@@ -27,7 +27,6 @@
 #include "engine/data/game_data.hpp"
 #include "engine/esp.hpp"
 #include "engine/aimbot.hpp"
-#include "engine/shared_channel.hpp"
 #include "logger.h"
 
 namespace {
@@ -144,6 +143,30 @@ namespace {
         }
     }
 
+    static std::thread s_engine_thread;
+    static std::atomic<bool> s_engine_running{false};
+
+    static void start_engine_worker() {
+        if (s_engine_running.exchange(true)) return;
+        s_engine_thread = std::thread([]() {
+            while (s_engine_running.load()) {
+                if (!engine::is_attached()) {
+                    engine::init();
+                } else {
+                    engine::update();
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+        });
+    }
+
+    static void stop_engine_worker() {
+        s_engine_running.store(false);
+        if (s_engine_thread.joinable()) {
+            s_engine_thread.join();
+        }
+    }
+
     void render_thread_func() {
         {
             std::lock_guard<std::mutex> lock(g_window_mutex);
@@ -154,9 +177,8 @@ namespace {
             init_imgui_context();
         }
 
-        // Open Shared RAM Channel as consumer (Root Daemon handles memory engine)
-        static engine::shm::SharedChannel* s_ui_shm = nullptr;
-        if (!s_ui_shm) s_ui_shm = engine::shm::open_shm(false);
+        // Launch direct Ring 0 memory engine worker
+        start_engine_worker();
 
         while (g_running.load()) {
             auto frame_start = std::chrono::steady_clock::now();
@@ -170,44 +192,7 @@ namespace {
             ImGui_ImplAndroid_NewFrame(sw, sh);
             ImGui::NewFrame();
 
-            // Sync UI configs to Root Engine via Shared RAM
-            if (!s_ui_shm) s_ui_shm = engine::shm::open_shm(false);
-            if (s_ui_shm && s_ui_shm->magic == GEMINI_SHM_MAGIC) {
-                s_ui_shm->config.esp_enabled     = cfg::esp::enabled;
-                s_ui_shm->config.tracer_enabled  = cfg::esp::tracer;
-                s_ui_shm->config.box_enabled     = cfg::esp::box;
-                s_ui_shm->config.health_enabled  = cfg::esp::health;
-                s_ui_shm->config.aim_enabled     = cfg::aim::enabled;
-                s_ui_shm->config.aim_target      = cfg::aim::target_bone;
-                s_ui_shm->config.aim_fov         = cfg::aim::fov;
-                s_ui_shm->config.aim_smooth      = cfg::aim::smooth;
-                s_ui_shm->config.zero_recoil     = cfg::aim::zero_recoil;
-
-                // Sync live match state & genuine enemy entities from Daemon to Overlay
-                engine::data::g_in_match.store(s_ui_shm->in_match, std::memory_order_relaxed);
-
-                std::vector<engine::data::PlayerData> live_players;
-                int count = s_ui_shm->entity_count;
-                if (count > 64) count = 64;
-                for (int i = 0; i < count; i++) {
-                    const auto& e = s_ui_shm->entities[i];
-                    engine::data::PlayerData pd{};
-                    pd.Head       = Vector3(e.head_x, e.head_y, 0.0f);
-                    pd.Toe        = Vector3(e.toe_x, e.toe_y, 0.0f);
-                    pd.distance   = e.distance;
-                    pd.curHP      = e.hp;
-                    pd.maxHP      = 200;
-                    pd.isVisible  = e.is_visible;
-                    pd.isOnScreen = e.is_on_screen;
-                    live_players.push_back(pd);
-                }
-                {
-                    std::lock_guard<std::mutex> lk(engine::data::g_players_mutex);
-                    engine::data::g_players = std::move(live_players);
-                }
-            }
-
-            // Pure C++ ImGui Menu and Floating Puck
+            // Pure C++ ImGui Menu, Floating Puck, and Real-Time ESP
             ui::menu::render();
 
             ImGui::Render();
@@ -230,6 +215,7 @@ namespace {
             }
         }
 
+        stop_engine_worker();
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplAndroid_Shutdown();
         ImGui::DestroyContext();
@@ -351,51 +337,7 @@ JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_fetchESPData(
     jsize len = env->GetArrayLength(outBuffer);
     if (len < 5) return 0;
 
-    static engine::shm::SharedChannel* s_shm = nullptr;
-    if (!s_shm) {
-        s_shm = engine::shm::open_shm(false);
-    }
-
-    // Sync UI control options into Shared Memory for Root Engine
-    if (s_shm && s_shm->magic == GEMINI_SHM_MAGIC) {
-        s_shm->config.esp_enabled     = cfg::esp::enabled;
-        s_shm->config.tracer_enabled  = cfg::esp::tracer;
-        s_shm->config.box_enabled     = cfg::esp::box;
-        s_shm->config.health_enabled  = cfg::esp::health;
-        s_shm->config.aim_enabled     = cfg::aim::enabled;
-        s_shm->config.aim_target      = cfg::aim::target_bone;
-        s_shm->config.aim_fov         = cfg::aim::fov;
-        s_shm->config.aim_smooth      = cfg::aim::smooth;
-        s_shm->config.zero_recoil     = cfg::aim::zero_recoil;
-
-        if (s_shm->entity_count > 0) {
-            jfloat temp[1024];
-            temp[0] = cfg::aim::draw_fov ? 1.0f : 0.0f;
-            temp[1] = cfg::aim::fov;
-            temp[2] = static_cast<float>(cfg::esp::box_col_idx);
-            temp[3] = static_cast<float>(cfg::esp::vis_col_idx);
-            temp[4] = cfg::esp::tracer ? 1.0f : 0.0f;
-
-            int idx = 5;
-            for (int i = 0; i < s_shm->entity_count && idx + 8 <= len && idx + 8 <= 1024; i++) {
-                const auto& e = s_shm->entities[i];
-                if (!e.is_on_screen) continue;
-
-                temp[idx++] = e.head_x;
-                temp[idx++] = e.head_y;
-                temp[idx++] = e.toe_x;
-                temp[idx++] = e.toe_y;
-                temp[idx++] = e.distance;
-                temp[idx++] = static_cast<float>(e.hp > 0 ? e.hp : 100);
-                temp[idx++] = e.is_visible ? 1.0f : 0.0f;
-                temp[idx++] = e.is_tracer ? 1.0f : 0.0f;
-            }
-            env->SetFloatArrayRegion(outBuffer, 0, idx, temp);
-            return idx;
-        }
-    }
-
-    // Fallback: local engine reading
+    // Direct Engine Memory Reading (100% Pure Ring 0 Kernel Driver)
     jfloat temp[1024];
     temp[0] = cfg::aim::draw_fov ? 1.0f : 0.0f;
     temp[1] = cfg::aim::fov;
@@ -429,9 +371,6 @@ JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_fetchESPData(
 
 JNIEXPORT jint JNICALL Java_com_google_android_gemini_NativeBridge_getTargetPid(
     JNIEnv* env, jclass clazz) {
-    static engine::shm::SharedChannel* s_shm = nullptr;
-    if (!s_shm) s_shm = engine::shm::open_shm(false);
-    if (s_shm && s_shm->active_pid > 0) return s_shm->active_pid;
     if (engine::mem::g_pid > 0) return engine::mem::g_pid;
     if (proc::pid > 0) return proc::pid;
     return engine::mem::g_detected_pid;

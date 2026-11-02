@@ -65,39 +65,13 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
     private int headerHeightPx = 50;
     private int lastUnlockedPid = -1;
 
-    private void startRootEngine() {
+    private void ensureDriverNodePermissions() {
         new Thread(() -> {
             try {
-                java.io.File filesDir = getFilesDir();
-                if (!filesDir.exists()) filesDir.mkdirs();
-
-                java.io.File engineBin = new java.io.File(filesDir, "gemini_engine");
-                String assetName = Build.SUPPORTED_64_BIT_ABIS.length > 0 ? "gemini-engine-arm64" : "gemini-engine-arm32";
-
-                try (java.io.InputStream is = getAssets().open(assetName);
-                     java.io.FileOutputStream fos = new java.io.FileOutputStream(engineBin)) {
-                    byte[] buffer = new byte[8192];
-                    int read;
-                    while ((read = is.read(buffer)) != -1) {
-                        fos.write(buffer, 0, read);
-                    }
-                } catch (Throwable ignored) {}
-
-                java.io.File shmFile = new java.io.File(filesDir, ".gemini_shm");
-                if (!shmFile.exists()) {
-                    shmFile.createNewFile();
-                }
-
-                String enginePath = engineBin.getAbsolutePath();
-                String shmPath = shmFile.getAbsolutePath();
-
                 Process su = Runtime.getRuntime().exec("su");
                 java.io.OutputStream os = su.getOutputStream();
                 String script =
-                        "chmod 755 " + enginePath + "\n" +
-                        "chmod 666 " + shmPath + "\n" +
-                        "pkill -f gemini_engine 2>/dev/null\n" +
-                        enginePath + " --daemon " + shmPath + " &\n" +
+                        "chmod 666 /dev/mem_tool /dev/BYNb /dev/uevents_records 2>/dev/null\n" +
                         "exit\n";
                 os.write(script.getBytes());
                 os.flush();
@@ -225,7 +199,7 @@ public class FloatingService extends Service implements SurfaceHolder.Callback, 
         NativeBridge.setContext(this);
 
         startForegroundNotification();
-        startRootEngine();
+        ensureDriverNodePermissions();
 
         mainHandler.post(menuWatchdog);
 

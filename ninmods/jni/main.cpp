@@ -317,7 +317,6 @@ static bool check_trial_license(char* out_exp_str, size_t out_len, int* out_rem_
     return true;
 }
 
-#include "engine/shared_channel.hpp"
 
 static void disguise_process() {
     // Camouflage process comm in /proc/self/comm as an internal Linux kernel worker
@@ -330,9 +329,7 @@ static int run_headless_daemon() {
     disguise_process();
 
     pid_t pid = fork();
-    if (pid > 0) {
-        return 0;
-    }
+    if (pid > 0) return 0;
     setsid();
     umask(0);
     int dev_null = open("/dev/null", O_RDWR);
@@ -344,106 +341,17 @@ static int run_headless_daemon() {
     }
 
     prctl(PR_SET_NAME, "kworker/u16:2", 0, 0, 0);
-
     logger::init(nullptr);
-    
-    auto* ch = engine::shm::open_shm(true);
-    if (!ch) {
-        return 1;
-    }
+    logger::log_info("[ROOT_ENGINE] Booted direct Ring 0 mode");
 
-    ch->engine_pid  = static_cast<int32_t>(getpid());
-    ch->engine_uid  = static_cast<int32_t>(getuid());
-    ch->engine_euid = static_cast<int32_t>(geteuid());
-    ch->shm_file_bytes = sizeof(engine::shm::SharedChannel);
-    ch->mmap_active = true;
-    ch->engine_running = true;
-
-    static engine::shm::SharedChannel* s_daemon_shm = ch;
-    logger::set_callback([](const char* time_str, const char* level, const char* msg, uint32_t col) {
-        if (!s_daemon_shm) return;
-        uint32_t idx = (s_daemon_shm->log_head + s_daemon_shm->log_count) % 32;
-        if (s_daemon_shm->log_count < 32) {
-            s_daemon_shm->log_count++;
+    while (true) {
+        if (!engine::is_attached()) {
+            engine::init();
         } else {
-            s_daemon_shm->log_head = (s_daemon_shm->log_head + 1) % 32;
-        }
-        auto& e = s_daemon_shm->logs[idx];
-        strncpy(e.time_str, time_str, sizeof(e.time_str) - 1);
-        e.time_str[sizeof(e.time_str) - 1] = '\0';
-        strncpy(e.level, level, sizeof(e.level) - 1);
-        e.level[sizeof(e.level) - 1] = '\0';
-        strncpy(e.msg, msg, sizeof(e.msg) - 1);
-        e.msg[sizeof(e.msg) - 1] = '\0';
-        e.color = col;
-    });
-
-    logger::log_info("[ROOT_ENGINE] Booted | PID: %d | UID: %d (eUID: %d) | SHM: %u bytes",
-                     ch->engine_pid, ch->engine_uid, ch->engine_euid, ch->shm_file_bytes);
-    bool s_engine_hooked = false;
-
-    while (ch->engine_running) {
-        if (!s_engine_hooked) {
-            if (engine::init()) {
-                s_engine_hooked = true;
-                ch->active_pid  = engine::mem::g_pid;
-                ch->lib_base    = engine::mem::g_lib_base;
-                ch->is_attached = true;
-                strncpy(ch->target_pkg, engine::g_detected_package, sizeof(ch->target_pkg) - 1);
-            }
-        }
-
-        if (s_engine_hooked) {
-            // 1. Sync config from Software UI
-            cfg::esp::enabled     = ch->config.esp_enabled;
-            cfg::esp::tracer      = ch->config.tracer_enabled;
-            cfg::esp::box         = ch->config.box_enabled;
-            cfg::esp::health      = ch->config.health_enabled;
-            cfg::aim::enabled     = ch->config.aim_enabled;
-            cfg::aim::target_bone = ch->config.aim_target;
-            cfg::aim::fov         = ch->config.aim_fov;
-            cfg::aim::smooth      = ch->config.aim_smooth;
-            cfg::aim::zero_recoil = ch->config.zero_recoil;
-
-            // 2. Execute engine cycle (Memory Read & Aimbot Write under Root UID 0)
             engine::update();
-
-            // 3. Export to shared memory
-            ch->active_pid       = engine::mem::g_pid;
-            ch->lib_base         = engine::mem::g_lib_base;
-            ch->in_match         = engine::data::g_in_match.load(std::memory_order_relaxed);
-            ch->last_read_errno  = engine::mem::g_last_read_errno;
-            ch->read_engine_mode = engine::mem::g_last_engine_mode;
-            ch->driver_connected = engine::mem::is_driver_online();
-            strncpy(ch->driver_node, engine::mem::get_driver_node(), sizeof(ch->driver_node) - 1);
-            ch->driver_reads     = engine::mem::get_driver_reads();
-            strncpy(ch->target_pkg, engine::g_detected_package, sizeof(ch->target_pkg) - 1);
-
-            {
-                std::lock_guard<std::mutex> lock(engine::data::g_players_mutex);
-                int count = 0;
-                for (const auto& p : engine::data::g_players) {
-                    if (count >= 64) break;
-                    auto& e = ch->entities[count++];
-                    e.head_x       = p.Head.x;
-                    e.head_y       = p.Head.y;
-                    e.toe_x        = p.Toe.x;
-                    e.toe_y        = p.Toe.y;
-                    e.distance     = p.distance;
-                    e.hp           = p.curHP;
-                    e.is_visible   = p.isVisible;
-                    e.is_tracer    = cfg::esp::tracer;
-                    e.is_on_screen = p.isOnScreen;
-                }
-                ch->entity_count = count;
-                ch->seq++;
-            }
         }
-
-        usleep(6000); // 160 Hz smooth telemetry sync
+        usleep(10000);
     }
-
-    engine::shutdown();
     return 0;
 }
 
