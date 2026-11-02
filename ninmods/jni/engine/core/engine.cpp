@@ -79,10 +79,6 @@ namespace engine {
             return true;
         }
 
-        if (mem::g_driver_fd >= 0) {
-            close(mem::g_driver_fd);
-            mem::g_driver_fd = -1;
-        }
         g_attached = false;
         mem::g_pid = -1;
         mem::g_lib_base = 0;

@@ -313,6 +313,18 @@ namespace engine::data {
             }
         }
 
+        // Path C: cell_addr is gf_class directly (No cell indirection: cell_addr + 0xB8 -> sf -> bg)
+        for (uintptr_t p2_off : {0xB8, 0xB0, 0xC0}) {
+            uint64_t sf = rpm<uint64_t>(cell_addr + p2_off);
+            if (engine::mem::addr_valid(sf)) {
+                out_sf = sf;
+                for (uintptr_t bg_off : {0x8, 0x0, 0x10}) {
+                    uint64_t bg = rpm<uint64_t>(sf + bg_off);
+                    if (engine::mem::addr_valid(bg)) return bg;
+                }
+            }
+        }
+
         return 0;
     }
 
