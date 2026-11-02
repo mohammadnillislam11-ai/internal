@@ -392,6 +392,11 @@ namespace engine::mem {
      * Directly asks the kernel driver via IOCTL DEV_OP_MODULE_BASE (0x803).
      * Bypasses maps reading entirely.
      */
+    /**
+     * @brief 100% Pure Ring 0 Module Base Resolver.
+     * Strictly queries the kernel driver via IOCTL DEV_OP_MODULE_BASE (0x803).
+     * All userland /proc/pid/maps fallbacks are permanently eradicated.
+     */
     inline uintptr_t find_module_base(int pid, const char* module_name) {
         if (pid <= 0 || !module_name) return 0;
 
@@ -405,61 +410,9 @@ namespace engine::mem {
                 return mb.base;
             }
         }
-
-        // Fast fallback: If driver ioctl for base returned 0, do a single-pass check on /proc/<pid>/maps
-        char mp[64];
-        snprintf(mp, sizeof(mp), "/proc/%d/maps", pid);
-        int mfd = open(mp, O_RDONLY);
-        if (mfd >= 0) {
-            char buf[8192];
-            char line[512];
-            int lpos = 0;
-            uintptr_t best_base = 0;
-
-            while (true) {
-                ssize_t nr = read(mfd, buf, sizeof(buf));
-                if (nr <= 0) break;
-
-                for (ssize_t i = 0; i < nr; i++) {
-                    char c = buf[i];
-                    if (c == '\n' || lpos >= static_cast<int>(sizeof(line)) - 1) {
-                        line[lpos] = '\0';
-                        if (strstr(line, module_name) && (strstr(line, "r--p") || strstr(line, "r-xp"))) {
-                            uint64_t st = 0;
-                            char* cur = line;
-                            while (*cur && *cur != '-') {
-                                char h = *cur++;
-                                int digit = 0;
-                                if (h >= '0' && h <= '9') digit = h - '0';
-                                else if (h >= 'a' && h <= 'f') digit = h - 'a' + 10;
-                                else if (h >= 'A' && h <= 'F') digit = h - 'A' + 10;
-                                else break;
-                                st = (st << 4) | digit;
-                            }
-                            if (st > 0) {
-                                best_base = st;
-                                close(mfd);
-                                return best_base;
-                            }
-                        }
-                        lpos = 0;
-                    } else {
-                        line[lpos++] = c;
-                    }
-                }
-            }
-            close(mfd);
-            return best_base;
-        }
-
         return 0;
     }
 
-    /**
-     * @brief Pure Ring 0 Memory Reader.
-     * Directly executes IOCTL DEV_OP_READ_MEM (0x801) through /dev/mem_tool.
-     * Zero userland syscalls, zero libc overhead, zero DAC/SELinux permissions required.
-     */
     inline bool read_raw(uintptr_t address, void* buffer, size_t size) {
         int target_pid = (g_pid > 0) ? g_pid : proc::pid;
         if (!is_valid_addr(address) || !buffer || size == 0 || target_pid <= 0) return false;
