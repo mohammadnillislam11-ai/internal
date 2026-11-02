@@ -59,6 +59,7 @@ namespace engine::shm {
         bool     driver_connected; // True when Ring 0 driver device node is active
         char     driver_node[32];  // e.g. "/dev/mem_tool"
         uint64_t driver_reads;     // Total successful IOCTL memory reads
+        char     target_pkg[64];   // 100% Genuine detected package name (e.g. "com.dts.freefiremax")
 
         SharedConfig config;
 

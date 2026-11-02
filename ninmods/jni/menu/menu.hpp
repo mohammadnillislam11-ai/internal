@@ -67,5 +67,13 @@ namespace ui::menu {
         return engine::mem::get_driver_reads();
     }
 
+    inline const char* get_target_package_global() {
+        auto* ch = get_shared_channel();
+        if (ch && ch->magic == GEMINI_SHM_MAGIC && ch->target_pkg[0] != '\0') {
+            return ch->target_pkg;
+        }
+        return engine::get_target_package();
+    }
+
     void render();
 }

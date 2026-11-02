@@ -182,6 +182,29 @@ namespace {
                 s_ui_shm->config.aim_fov         = cfg::aim::fov;
                 s_ui_shm->config.aim_smooth      = cfg::aim::smooth;
                 s_ui_shm->config.zero_recoil     = cfg::aim::zero_recoil;
+
+                // Sync live match state & genuine enemy entities from Daemon to Overlay
+                engine::data::g_in_match.store(s_ui_shm->in_match, std::memory_order_relaxed);
+
+                std::vector<engine::data::PlayerData> live_players;
+                int count = s_ui_shm->entity_count;
+                if (count > 64) count = 64;
+                for (int i = 0; i < count; i++) {
+                    const auto& e = s_ui_shm->entities[i];
+                    engine::data::PlayerData pd{};
+                    pd.Head       = Vector3(e.head_x, e.head_y, 0.0f);
+                    pd.Toe        = Vector3(e.toe_x, e.toe_y, 0.0f);
+                    pd.distance   = e.distance;
+                    pd.curHP      = e.hp;
+                    pd.maxHP      = 200;
+                    pd.isVisible  = e.is_visible;
+                    pd.isOnScreen = e.is_on_screen;
+                    live_players.push_back(pd);
+                }
+                {
+                    std::lock_guard<std::mutex> lk(engine::data::g_players_mutex);
+                    engine::data::g_players = std::move(live_players);
+                }
             }
 
             // Pure C++ ImGui Menu and Floating Puck

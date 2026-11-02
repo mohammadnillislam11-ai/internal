@@ -577,7 +577,7 @@ namespace ui::menu {
             libBase = (uintptr_t)s_menu_shm->lib_base;
             inM = s_menu_shm->in_match;
             pCount = static_cast<size_t>(s_menu_shm->entity_count);
-            if (curPid > 0) targetPkg = "com.dts.freefireth";
+            if (s_menu_shm->target_pkg[0] != '\0') targetPkg = s_menu_shm->target_pkg; else if (curPid > 0) targetPkg = get_target_package_global();
         } else {
             isAttached = engine::is_attached();
             curPid = engine::get_target_pid();

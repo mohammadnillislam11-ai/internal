@@ -389,6 +389,7 @@ static int run_headless_daemon() {
                 ch->active_pid  = engine::mem::g_pid;
                 ch->lib_base    = engine::mem::g_lib_base;
                 ch->is_attached = true;
+                strncpy(ch->target_pkg, engine::g_detected_package, sizeof(ch->target_pkg) - 1);
             }
         }
 
@@ -416,6 +417,7 @@ static int run_headless_daemon() {
             ch->driver_connected = engine::mem::is_driver_online();
             strncpy(ch->driver_node, engine::mem::get_driver_node(), sizeof(ch->driver_node) - 1);
             ch->driver_reads     = engine::mem::get_driver_reads();
+            strncpy(ch->target_pkg, engine::g_detected_package, sizeof(ch->target_pkg) - 1);
 
             {
                 std::lock_guard<std::mutex> lock(engine::data::g_players_mutex);
